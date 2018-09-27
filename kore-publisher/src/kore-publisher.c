@@ -30,7 +30,10 @@ int ep_subscribe(struct http_request *);
 int ep_register(struct http_request *);
 int ep_deregister(struct http_request *);
 
-void gen_salt_password_and_apikey (char *, char *, char *);
+int ep_register_owner (struct http_request *);
+int ep_deregister_owner (struct http_request *);
+
+void gen_salt_password_and_apikey (const char *, char *, char *, char *);
 bool login_success (const char *, const char *);
 
 inline bool is_owner(const char *);
@@ -86,8 +89,8 @@ struct kore_buf *queue = NULL;
 struct kore_buf *query = NULL;
 struct kore_buf *response = NULL;
 
+uint8_t string_to_be_hashed 	[256];
 uint8_t	binary_hash 		[SHA256_DIGEST_LENGTH];
-uint8_t string_to_be_hashed 	[SHA256_DIGEST_LENGTH*2 + 1];
 uint8_t hash_string		[SHA256_DIGEST_LENGTH*2 + 1];
 
 size_t i;
@@ -119,7 +122,7 @@ init (int state)
 }
 
 void
-gen_salt_password_and_apikey (char *salt, char *password_hash, char *apikey)
+gen_salt_password_and_apikey (const char *entity, char *salt, char *password_hash, char *apikey)
 {
 	// TODO security level
 	for (i = 0; i < 32; ++i)
@@ -130,10 +133,13 @@ gen_salt_password_and_apikey (char *salt, char *password_hash, char *apikey)
 	salt	[32] = '\0';
 	apikey	[32] = '\0';
 
-	strcpy(string_to_be_hashed, apikey);
-	strcat(string_to_be_hashed, salt);
+	strlcpy(string_to_be_hashed, apikey, 33);
+	strlcat(string_to_be_hashed, salt,   65);
+	strlcat(string_to_be_hashed, entity, 250);
 
-	SHA256((const uint8_t*)string_to_be_hashed,64,binary_hash);
+	SHA256((const uint8_t*)string_to_be_hashed,strlen(string_to_be_hashed),binary_hash);
+
+	debug_printf("gen STRING TO BE HASHED = {%s}\n",string_to_be_hashed);
 
 	sprintf	
 	(
@@ -168,7 +174,7 @@ login_success (const char *id, const char *apikey)
 	bool login_result = false;
 
 	if (id == NULL || apikey == NULL || *id == '\0' || *apikey == '\0')
-		return false;
+		goto done;
 
 	kore_buf_append(query,"SELECT blocked,salt,password_hash FROM users WHERE id ='",
 		       sizeof("SELECT blocked,salt,password_hash FROM users WHERE id ='") - 1);
@@ -193,13 +199,20 @@ login_success (const char *id, const char *apikey)
 	salt 	 	= PQgetvalue(result,0,1);
 	password_hash	= PQgetvalue(result,0,2);
 
-	printf("strlen of salt = %d (%s)\n",strlen(salt),salt);
-	printf("strlen of apikey = %d (%s)\n",strlen(apikey),apikey);
+	// there is no salt or password hash in db ?
+	if (salt[0] == '\0' || password_hash[0] == '\0')
+		goto done;
 
-	strlcpy(string_to_be_hashed, apikey, 32);
-	strlcat(string_to_be_hashed, salt,   64);
+	debug_printf("strlen of salt = %d (%s)\n",strlen(salt),salt);
+	debug_printf("strlen of apikey = %d (%s)\n",strlen(apikey),apikey);
 
-	SHA256((const uint8_t*)string_to_be_hashed,64,binary_hash);
+	strlcpy(string_to_be_hashed, apikey, 33);
+	strlcat(string_to_be_hashed, salt,   65);
+	strlcat(string_to_be_hashed, id,    250);
+
+	SHA256((const uint8_t*)string_to_be_hashed,strlen(string_to_be_hashed),binary_hash);
+
+	debug_printf("login_success STRING TO BE HASHED = {%s}\n",string_to_be_hashed);
 
 	sprintf	
 	(
@@ -224,11 +237,8 @@ login_success (const char *id, const char *apikey)
 
 	hash_string[64] = '\0';
 
-
 	if (strncmp(hash_string,password_hash,64) == 0)
 		login_result = true;
-
-	printf("\nexpecting {%s}\n",hash_string);
 
 done:
 	kore_buf_reset(query);
@@ -501,7 +511,7 @@ ep_register(struct http_request *req)
 
 	char *body;
 
-	char entity_name[256];
+	char entity_name[66];
 
 	char salt		[33];
 	char entity_apikey	[33];
@@ -527,13 +537,9 @@ ep_register(struct http_request *req)
 	if (! login_success(id,apikey))
 		FORBIDDEN("invalid id or apikey");
 
-	debug_printf("Reached here\n");
-
 	strlcpy(entity_name,id,128);
 	strcat(entity_name,"/");
 	strlcat(entity_name,entity,256);
-
-	debug_printf("Reached here 2\n");
 
 	// conflict if entity_name already exist
 	kore_buf_reset(query);
@@ -542,8 +548,6 @@ ep_register(struct http_request *req)
 
 	kore_buf_append(query,entity_name,strlen(entity_name));
 	kore_buf_append(query,"'\0",2);
-
-	debug_printf("Queryy = {%s}\n",query->data);
 
     	PQclear(result);    
 	result = PQexec(psql, (char *)query->data); 
@@ -554,8 +558,6 @@ ep_register(struct http_request *req)
 	if(PQntuples(result) > 0)
 		CONFLICT("id already used");
 
-	debug_printf("here {%s} body = %p\n",entity_name,req->http_body->data);
-
 	BAD_REQUEST_if	
 	(
 		req->http_body == NULL
@@ -565,7 +567,7 @@ ep_register(struct http_request *req)
 		"no body found in request"	
 	);	
 
-	gen_salt_password_and_apikey (salt, password_hash, entity_apikey);
+	gen_salt_password_and_apikey (entity_name, salt, password_hash, entity_apikey);
 
 	// sanitize body
 	size_t s = strlen(body);
@@ -594,7 +596,7 @@ ep_register(struct http_request *req)
     	PQclear(result); 
 	result = PQexec(psql, (char *)query->data); 
 
-	printf("Query was {%s}\n",query->data);
+	debug_printf("Query was {%s}\n",query->data);
 
 	if (PQresultStatus(result) != PGRES_COMMAND_OK)
 		FORBIDDEN("bad query");
@@ -627,7 +629,7 @@ ep_deregister(struct http_request *req)
 	const char *apikey;
 	const char *entity;
 
-	char entity_name [256];
+	char entity_name [66];
 
 	status = 403;
 
@@ -668,7 +670,7 @@ ep_deregister(struct http_request *req)
 	kore_buf_append(query,id,strlen(id));
 	kore_buf_append(query,"'\0",2);
 
-	printf("Got query = {%s}\n",query->data);
+	debug_printf("Got query = {%s}\n",query->data);
 
     	PQclear(result);    
 	result = PQexec(psql, (char *)query->data); 
@@ -682,9 +684,9 @@ ep_deregister(struct http_request *req)
 	if (strcmp(PQgetvalue(result,0,0),"t") == 0)
 		FORBIDDEN("id is blocked");
 
-	strlcpy(entity_name,id,256); 
-	strlcat(entity_name,"/",256); 
-	strlcat(entity_name,entity,256); 
+	strlcpy(entity_name,id,33); 
+	strlcat(entity_name,"/",34); 
+	strlcat(entity_name,entity,66); 
 
 	// TODO CHECK apikey
 
@@ -789,6 +791,217 @@ done:
 	PQclear(result);
 
 	kore_buf_reset(query);
+	kore_buf_reset(response);
+
+	return (KORE_RESULT_OK);
+}
+
+
+int
+ep_register_owner(struct http_request *req)
+{
+	const char *id;
+	const char *apikey;
+	const char *entity;
+
+	char salt		[33];
+	char entity_apikey	[33];
+	char password_hash	[65];
+
+	status = 403;
+
+	if (req->owner->addrtype == AF_INET)
+	{
+		if (req->owner->addr.ipv4.sin_addr.s_addr != htonl(INADDR_LOOPBACK))	
+		{
+			FORBIDDEN("unauthorized request");
+		}
+	}
+
+	BAD_REQUEST_if
+	(
+		KORE_RESULT_OK != http_request_header(req, "id", &id)
+				||
+		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+				||
+		KORE_RESULT_OK != http_request_header(req, "entity", &entity)
+			,
+		"inputs missing in headers"
+	);
+
+	// cannot create an admin
+	if (strcmp(entity,"admin") == 0)
+		FORBIDDEN("cannot create admin");
+
+	uint8_t strlen_entity = strlen(entity);
+	if (strlen_entity == 0 || strlen_entity > 32)
+		BAD_REQUEST("entity name should be 1 to 32 chars long");
+
+	if (strcmp(id,"admin") != 0)
+		FORBIDDEN("unauthorized request");
+
+	if (! login_success(id,apikey))
+		FORBIDDEN("wrong apikey");
+
+	// conflict if entity_name already exist
+	kore_buf_reset(query);
+	kore_buf_append(query,"SELECT id from users WHERE id = '",
+		       sizeof("SELECT id from users WHERE id = '") - 1);
+
+	kore_buf_append(query,entity,strlen_entity);
+	kore_buf_append(query,"'\0",2);
+
+    	PQclear(result);    
+	result = PQexec(psql, (char *)query->data); 
+
+	if (PQresultStatus(result) != PGRES_TUPLES_OK)
+		FORBIDDEN("bad query");
+
+	if(PQntuples(result) > 0)
+		CONFLICT("id already used");
+
+	gen_salt_password_and_apikey (entity, salt, password_hash, entity_apikey);
+
+	kore_buf_reset(query);
+	kore_buf_append(query,"INSERT INTO users values('",
+		       sizeof("INSERT INTO users values('") - 1);
+
+	kore_buf_append(query,entity,strlen_entity);
+		kore_buf_append(query,"','",3);
+	kore_buf_append(query,password_hash, 64);
+		kore_buf_append(query,"',",2);
+	kore_buf_append(query,"NULL",4);
+		kore_buf_append(query,",'",2);
+	kore_buf_append(query,salt,strlen(salt));
+		kore_buf_append(query,"',",2);
+	kore_buf_append(query,"'f')\0",5);
+
+    	PQclear(result); 
+	result = PQexec(psql, (char *)query->data); 
+
+	debug_printf("Query was {%s}\n",query->data);
+
+	if (PQresultStatus(result) != PGRES_COMMAND_OK)
+		FORBIDDEN("bad query");
+
+	kore_buf_reset(response);
+	kore_buf_append(response,"{\"id\":\"",7);
+	kore_buf_append(response,entity,strlen_entity);
+	kore_buf_append(response,"\",\"apikey\":\"",12);
+	kore_buf_append(response,entity_apikey,strlen(entity_apikey));
+	kore_buf_append(response,"\"}\n",3);
+
+	OK();
+
+done:
+	http_response_header(req, "content-type", "application/json");
+	http_response(req, status, response->data, response->offset);
+
+	PQclear(result);
+
+	kore_buf_reset(query);
+	kore_buf_reset(response);
+
+	return (KORE_RESULT_OK);
+}
+
+int
+ep_deregister_owner(struct http_request *req)
+{
+	const char *id;
+	const char *apikey;
+	const char *entity;
+
+	// XXX to be done
+
+	status = 403;
+
+	if (req->owner->addrtype == AF_INET)
+	{
+		if (req->owner->addr.ipv4.sin_addr.s_addr != htonl(INADDR_LOOPBACK))	
+		{
+			FORBIDDEN("unauthorized request");
+		}
+	}
+
+	BAD_REQUEST_if
+	(
+		KORE_RESULT_OK != http_request_header(req, "id", &id)
+				||
+		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+				||
+		KORE_RESULT_OK != http_request_header(req, "entity", &entity)
+			,
+		"inputs missing in headers"
+	);
+
+	uint8_t strlen_entity = strlen(entity);
+	if (strlen_entity == 0 || strlen_entity > 32)
+		BAD_REQUEST("entity name should be 1 to 32 chars long");
+
+	// cannot delete admin
+	if (strcmp(entity,"admin") == 0)
+		FORBIDDEN("cannot delete admin");
+
+	if (strcmp(id,"admin") != 0)
+		FORBIDDEN("unauthorized request");
+
+	if (! login_success(id,apikey))
+		FORBIDDEN("wrong apikey");
+
+	// XXX delete from follow table
+
+	// delete all acls
+	kore_buf_reset(query);
+	kore_buf_append(query,"DELETE from acl WHERE id LIKE ",
+		       sizeof("DELETE from acl WHERE id LIKE ") - 1);
+
+	kore_buf_append(query,entity,strlen_entity);
+	kore_buf_append(query,"/%\0",3);
+
+    	PQclear(result);    
+	result = PQexec(psql, (char *)query->data); 
+
+	if (PQresultStatus(result) != PGRES_COMMAND_OK)
+		ERROR("could not delete from acl table");
+	
+	// delete all apps and devices of the owner
+	kore_buf_reset(query);
+	kore_buf_append(query,"DELETE from users WHERE id LIKE ",
+		       sizeof("DELETE from users WHERE id LIKE ") - 1);
+
+	kore_buf_append(query,entity,strlen_entity);
+	kore_buf_append(query,"/%\0",3);
+
+    	PQclear(result);    
+	result = PQexec(psql, (char *)query->data); 
+
+	if (PQresultStatus(result) != PGRES_COMMAND_OK)
+		ERROR("could not delete apps/devices of the entity");
+
+	// finally delete the owner 
+	kore_buf_reset(query);
+	kore_buf_append(query,"DELETE from users WHERE id = '",
+		       sizeof("DELETE from users WHERE id = '") - 1);
+
+	kore_buf_append(query,entity,strlen_entity);
+	kore_buf_append(query,"'\0",2);
+
+    	PQclear(result);    
+	result = PQexec(psql, (char *)query->data); 
+
+	if (PQresultStatus(result) != PGRES_COMMAND_OK)
+		ERROR("could not delete the entity");
+
+	OK();
+
+done:
+	http_response_header(req, "content-type", "application/json");
+	http_response(req, status, response->data, response->offset);
+
+	PQclear(result);
+
+	kore_buf_reset(queue);
 	kore_buf_reset(response);
 
 	return (KORE_RESULT_OK);
