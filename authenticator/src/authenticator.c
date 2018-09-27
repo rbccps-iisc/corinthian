@@ -10,7 +10,7 @@
 #include <bsd/string.h>
 #include <bsd/stdlib.h>
 
-#if 0
+#if 1
 	#define debug_printf(...)
 #else
 	#define debug_printf(...) printf(__VA_ARGS__)
@@ -25,8 +25,14 @@
 	if (! http_argument_get_string(req, "" #x "", &x))		\
 	{								\
 		debug_printf("No GET input '%s' found\n","" #x "");	\
-		BAD_REQUEST();							\
+		BAD_REQUEST();						\
 	}
+
+#define CREATE_STRING(buf,...) 	{			\
+		kore_buf_reset(buf);			\
+		kore_buf_appendf(buf,__VA_ARGS__);	\
+		kore_buf_stringify(buf,NULL);		\
+}
 
 int init(int);
 int auth_user(struct http_request *);
@@ -81,11 +87,7 @@ login_success (const char *id, const char *apikey)
 	if (id == NULL || apikey == NULL || *id == '\0' || *apikey == '\0')
 		goto done;
 
-	kore_buf_append(query,"SELECT blocked,salt,password_hash FROM users WHERE id ='",
-		       sizeof("SELECT blocked,salt,password_hash FROM users WHERE id ='") - 1);
-
-	kore_buf_append(query,id,strlen(id));
-	kore_buf_append(query,"'\0",2);
+	CREATE_STRING (query,"SELECT blocked,salt,password_hash FROM users WHERE id='%s'",id);
 
 	debug_printf("login query = {%s}\n",query->data);
 
@@ -242,10 +244,9 @@ auth_resource(struct http_request *req)
 		DENY()
 
 	// get user info in acl, if blocked deny
-	kore_buf_append(query,"SELECT blocked FROM users WHERE id ='",
-		       sizeof("SELECT blocked FROM users WHERE id ='") - 1);
-	kore_buf_append(query,username,strlen(username));
-	kore_buf_append(query,"'\0",2);
+	CREATE_STRING (query,"SELECT blocked FROM users WHERE id='%s'",username);
+
+	debug_printf("Query = {%s}\n",query->data);
 
 	result = PQexec(psql, (char *)query->data); 
 	if (PQresultStatus(result) != PGRES_TUPLES_OK)
@@ -325,7 +326,7 @@ auth_resource(struct http_request *req)
 				// 	username.private
 				// 	username.protected
 				// 	username.diagnostics
-			printf("Came here 1\n");
+
 				char *exchange_ends_with = name + strlen_username;
 
 				if (
@@ -343,18 +344,16 @@ auth_resource(struct http_request *req)
 			}
 			else
 			{
-				kore_buf_reset(query);
-				kore_buf_append(query,"SELECT permissions FROM acl WHERE id ='",
-		       			       sizeof("SELECT permissions FROM acl WHERE id ='") - 1);
-				kore_buf_append(query,username,strlen(username));
-				kore_buf_append(query,"' AND exchange = '",
-		       			       sizeof("' AND exchange = '") - 1);
-				kore_buf_append(query,name,strlen(name));
-				kore_buf_append(query,"'\0",2);
-
+				CREATE_STRING (query,
+						"SELECT permissions FROM acl WHERE id='%s' AND exchange='%s'",
+							username,
+							name
+				);
 				debug_printf("query = '%s'\n",query->data);
 
+    				PQclear(result); 
 				result = PQexec(psql, (char *)query->data); 
+
 				if (PQresultStatus(result) != PGRES_TUPLES_OK)
 					DENY();
 

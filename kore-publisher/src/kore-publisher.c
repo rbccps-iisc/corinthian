@@ -15,7 +15,7 @@
 
 #include <openssl/sha.h>
 
-#if 0
+#if 1
 	#define debug_printf(...)
 #else
 	#define debug_printf(...) printf(__VA_ARGS__)
@@ -97,6 +97,12 @@ size_t i;
 
 int status = 403;
 
+#define CREATE_STRING(buf,...) 	{			\
+		kore_buf_reset(buf);			\
+		kore_buf_appendf(buf,__VA_ARGS__);	\
+		kore_buf_stringify(buf,NULL);		\
+}
+
 int
 init (int state)
 {
@@ -176,13 +182,7 @@ login_success (const char *id, const char *apikey)
 	if (id == NULL || apikey == NULL || *id == '\0' || *apikey == '\0')
 		goto done;
 
-	kore_buf_append(query,"SELECT blocked,salt,password_hash FROM users WHERE id ='",
-		       sizeof("SELECT blocked,salt,password_hash FROM users WHERE id ='") - 1);
-
-	kore_buf_append(query,id,strlen(id));
-	kore_buf_append(query,"'\0",2);
-
-	debug_printf("login query = {%s}\n",query->data);
+	CREATE_STRING (query,"SELECT blocked,salt,password_hash FROM users WHERE id='%s'",id);
 
     	PQclear(result); 
 	result = PQexec(psql, (char *)query->data); 
@@ -542,12 +542,9 @@ ep_register(struct http_request *req)
 	strlcat(entity_name,entity,256);
 
 	// conflict if entity_name already exist
-	kore_buf_reset(query);
-	kore_buf_append(query,"SELECT id from users WHERE id = '",
-		       sizeof("SELECT id from users WHERE id = '") - 1);
+	CREATE_STRING(query,"SELECT id from users WHERE id='%s'",entity_name);
 
-	kore_buf_append(query,entity_name,strlen(entity_name));
-	kore_buf_append(query,"'\0",2);
+	debug_printf("Got query = {%s}\n",query->data);
 
     	PQclear(result);    
 	result = PQexec(psql, (char *)query->data); 
@@ -579,19 +576,13 @@ ep_register(struct http_request *req)
 			body[i] = ' ';
 	} 
 
-	kore_buf_reset(query);
-	kore_buf_append(query,"INSERT INTO users values('",
-		       sizeof("INSERT INTO users values('") - 1);
-
-	kore_buf_append(query,entity_name,strlen(entity_name));
-		kore_buf_append(query,"','",3);
-	kore_buf_append(query,password_hash, 64);
-		kore_buf_append(query,"','",3);
-	kore_buf_append(query,body,strlen(body));
-		kore_buf_append(query,"','",3);
-	kore_buf_append(query,salt,strlen(salt));
-		kore_buf_append(query,"',",2);
-	kore_buf_append(query,"'f')\0",5);
+	CREATE_STRING (query,
+			"INSERT INTO users values('%s','%s','%s','f')",
+			entity_name,
+			password_hash,
+			body,		// schema
+			salt
+	);
 
     	PQclear(result); 
 	result = PQexec(psql, (char *)query->data); 
@@ -664,11 +655,7 @@ ep_deregister(struct http_request *req)
 	)
 
 	// TODO deny if user is blocked
-	kore_buf_append(query,"SELECT blocked,salt,password_hash FROM users WHERE id ='",
-		       sizeof("SELECT blocked,salt,password_hash FROM users WHERE id ='") - 1);
-
-	kore_buf_append(query,id,strlen(id));
-	kore_buf_append(query,"'\0",2);
+	CREATE_STRING (query,"SELECT blocked,salt,password_hash FROM users WHERE id='%s'",id);
 
 	debug_printf("Got query = {%s}\n",query->data);
 
@@ -725,19 +712,13 @@ ep_cat(struct http_request *req)
 		if (strchr(id,'/') == NULL)
 			FORBIDDEN("id is not a valid entity");
 
-		kore_buf_append (query,"SELECT schema FROM users WHERE schema is NOT NULL AND id='",
-			        sizeof("SELECT schema FROM users WHERE schema is NOT NULL AND id='") - 1);
-		kore_buf_append (query,id,strlen(id));
-		kore_buf_append (query,"'",1);
+		CREATE_STRING (query,"SELECT schema FROM users WHERE schema is NOT NULL AND id='%s'",id);
 	}
 	else
 	{
 		id = NULL;
-		kore_buf_append (query,"SELECT id,schema FROM users WHERE schema is NOT NULL",
-			        sizeof("SELECT id,schema FROM users WHERE schema is NOT NULL") - 1);
+		CREATE_STRING (query,"SELECT id,schema FROM users WHERE schema is NOT NULL");
 	}
-	
-	kore_buf_append (query,"\0",1);
 
     	PQclear(result);
 	result = PQexec(psql, (char *)query->data); 
@@ -844,12 +825,7 @@ ep_register_owner(struct http_request *req)
 		FORBIDDEN("wrong apikey");
 
 	// conflict if entity_name already exist
-	kore_buf_reset(query);
-	kore_buf_append(query,"SELECT id from users WHERE id = '",
-		       sizeof("SELECT id from users WHERE id = '") - 1);
-
-	kore_buf_append(query,entity,strlen_entity);
-	kore_buf_append(query,"'\0",2);
+	CREATE_STRING (query,"SELECT id FROM users WHERE id ='%s'",entity);
 
     	PQclear(result);    
 	result = PQexec(psql, (char *)query->data); 
@@ -862,19 +838,12 @@ ep_register_owner(struct http_request *req)
 
 	gen_salt_password_and_apikey (entity, salt, password_hash, entity_apikey);
 
-	kore_buf_reset(query);
-	kore_buf_append(query,"INSERT INTO users values('",
-		       sizeof("INSERT INTO users values('") - 1);
-
-	kore_buf_append(query,entity,strlen_entity);
-		kore_buf_append(query,"','",3);
-	kore_buf_append(query,password_hash, 64);
-		kore_buf_append(query,"',",2);
-	kore_buf_append(query,"NULL",4);
-		kore_buf_append(query,",'",2);
-	kore_buf_append(query,salt,strlen(salt));
-		kore_buf_append(query,"',",2);
-	kore_buf_append(query,"'f')\0",5);
+	CREATE_STRING (query,
+			"INSERT INTO users values('%s','%s',NULL,'%s','f')",
+				entity,
+				password_hash,
+				salt
+	);
 
     	PQclear(result); 
 	result = PQexec(psql, (char *)query->data); 
@@ -952,12 +921,7 @@ ep_deregister_owner(struct http_request *req)
 	// XXX delete from follow table
 
 	// delete all acls
-	kore_buf_reset(query);
-	kore_buf_append(query,"DELETE from acl WHERE id LIKE ",
-		       sizeof("DELETE from acl WHERE id LIKE ") - 1);
-
-	kore_buf_append(query,entity,strlen_entity);
-	kore_buf_append(query,"/%\0",3);
+	CREATE_STRING (query,"DELETE FROM acl WHERE id LIKE '%s/%%'",entity);
 
     	PQclear(result);    
 	result = PQexec(psql, (char *)query->data); 
@@ -966,12 +930,7 @@ ep_deregister_owner(struct http_request *req)
 		ERROR("could not delete from acl table");
 	
 	// delete all apps and devices of the owner
-	kore_buf_reset(query);
-	kore_buf_append(query,"DELETE from users WHERE id LIKE ",
-		       sizeof("DELETE from users WHERE id LIKE ") - 1);
-
-	kore_buf_append(query,entity,strlen_entity);
-	kore_buf_append(query,"/%\0",3);
+	CREATE_STRING (query,"DELETE FROM users WHERE id LIKE '%s/%%'",entity);
 
     	PQclear(result);    
 	result = PQexec(psql, (char *)query->data); 
@@ -980,12 +939,7 @@ ep_deregister_owner(struct http_request *req)
 		ERROR("could not delete apps/devices of the entity");
 
 	// finally delete the owner 
-	kore_buf_reset(query);
-	kore_buf_append(query,"DELETE from users WHERE id = '",
-		       sizeof("DELETE from users WHERE id = '") - 1);
-
-	kore_buf_append(query,entity,strlen_entity);
-	kore_buf_append(query,"'\0",2);
+	CREATE_STRING (query,"DELETE FROM users WHERE id = '%s'",entity);
 
     	PQclear(result);    
 	result = PQexec(psql, (char *)query->data); 
