@@ -1,0 +1,1 @@
+wrk -c 100 -t 100 -d 30 -s post.lua https://127.0.0.1:8888/publish

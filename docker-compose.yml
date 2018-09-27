@@ -1,0 +1,45 @@
+version: "3"
+
+networks:
+  kore-net:
+    driver: bridge
+
+services:
+
+  kore:
+    image: ideam/kore
+    container_name: kore
+    restart: always
+    hostname: kore
+    ports:
+      - "8888:8888"
+    networks:
+      - kore-net
+    cap_add:
+      - ALL
+
+  scylla:
+    image: scylladb/scylla
+    networks:
+      - kore-net
+    cap_add:
+     - ALL
+  
+  broker:
+    image: ideam/broker
+    
+    ports:
+      - "5672:5672"
+      - "1883:1883"
+      - "15672:15672"
+    networks:
+      - kore-net
+    cap_add:
+      - ALL
+  
+  postgres:
+    image: postgres:10.5-alpine
+    networks:
+      - kore-net
+    cap_add:
+      - ALL
