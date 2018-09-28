@@ -16,6 +16,8 @@
 
 #include <openssl/sha.h>
 
+#include <ctype.h>
+
 #if 0
 	#define debug_printf(...)
 #else
@@ -134,6 +136,33 @@ init (int state)
 	return KORE_RESULT_OK;
 }
 
+inline bool
+is_valid_string(char *str)
+{
+	uint8_t strlen_str = strlen(str);
+
+	uint8_t slash_count = 0;
+
+	if (strlen_str == 0 || strlen_str > 32)
+		return false;
+
+	for (i = 0; i < strlen_str; ++i)
+	{
+		if (str[i] == '/')
+			++slash_count;
+		else
+		{
+			if (! isalpha(str[i]))
+				return false;	
+		}
+
+		if (slash_count > 1)
+			return false;
+	}
+
+	return true;
+}
+
 void
 gen_salt_password_and_apikey (const char *entity, char *salt, char *password_hash, char *apikey)
 {
@@ -189,9 +218,12 @@ login_success (const char *id, const char *apikey)
 	if (id == NULL || apikey == NULL || *id == '\0' || *apikey == '\0')
 		goto done;
 
+	if (! is_valid_string(id))
+		goto done;	
+
 	CREATE_STRING (query,"SELECT blocked,salt,password_hash FROM users WHERE id='%s'",id);
 
-	kore_pgsql_cleanup(&sql);				\
+	kore_pgsql_cleanup(&sql);
 	if (! kore_pgsql_setup(&sql,"db",KORE_PGSQL_SYNC))
 	{
 		kore_pgsql_logerror(&sql);
@@ -549,6 +581,14 @@ ep_register(struct http_request *req)
 	if (! is_owner(id))
 		FORBIDDEN("id does not belong to a owner");
 
+	if (! is_valid_string(id))
+		BAD_REQUEST("id should be alpha numeric");	
+
+	if (! is_valid_string(entity))
+		BAD_REQUEST("entity should be alpha numeric");	
+
+	/* XXX fix if entity name has '/' */ 
+
 	BAD_REQUEST_if	
 	(
 		req->http_body == NULL
@@ -640,20 +680,15 @@ ep_deregister(struct http_request *req)
 	if (! is_owner(id))
 		FORBIDDEN("id is not an owner");
 
+	if (! is_valid_string(id))
+		BAD_REQUEST("id should be alpha numeric");	
+
 	// deny if the entity looks like a owner 
 	if (is_owner(entity))
 		FORBIDDEN("not a valid entity");
 
-	BAD_REQUEST_if
-	(
-		strlen(entity) > 256
-			|| 
-		strchr(entity,'\'')
-			||
-		strchr(entity,'\\')
-			,
-		"invalid entity"
-	)
+	if (! is_valid_string(entity))
+		BAD_REQUEST("entity should be alpha numeric");	
 
 	if (! login_success(id,apikey))
 		FORBIDDEN("invalid id or apikey");
@@ -706,6 +741,9 @@ ep_cat(struct http_request *req)
 		// if not a valid entity
 		if (is_owner(id))
 			FORBIDDEN("id is not a valid entity");
+	
+		if (! is_valid_string(id))
+			BAD_REQUEST("id should be alpha numeric");	
 
 		CREATE_STRING (query,"SELECT schema FROM users WHERE schema is NOT NULL AND id='%s'",id);
 	}
@@ -801,16 +839,20 @@ ep_register_owner(struct http_request *req)
 		"inputs missing in headers"
 	);
 
+
 	// cannot create an admin
 	if (strcmp(entity,"admin") == 0)
 		FORBIDDEN("cannot create admin");
 
-	uint8_t strlen_entity = strlen(entity);
-	if (strlen_entity == 0 || strlen_entity > 32)
-		BAD_REQUEST("entity name should be 1 to 32 chars long");
-
 	if (strcmp(id,"admin") != 0)
 		FORBIDDEN("only admin can call this api");
+
+	// it should look like an owner
+	if (! is_owner(entity))
+		BAD_REQUEST("entity should be an owner");	
+		
+	if (! is_valid_string(entity))
+		BAD_REQUEST("entity should be alpha numeric");	
 
 	if (! login_success("admin",apikey))
 		FORBIDDEN("wrong apikey");
@@ -835,7 +877,7 @@ ep_register_owner(struct http_request *req)
 
 	kore_buf_reset(response);
 	kore_buf_append(response,"{\"id\":\"",7);
-	kore_buf_append(response,entity,strlen_entity);
+	kore_buf_append(response,entity,strlen(entity));
 	kore_buf_append(response,"\",\"apikey\":\"",12);
 	kore_buf_append(response,entity_apikey,strlen(entity_apikey));
 	kore_buf_append(response,"\"}\n",3);
@@ -884,16 +926,19 @@ ep_deregister_owner(struct http_request *req)
 		"inputs missing in headers"
 	);
 
-	uint8_t strlen_entity = strlen(entity);
-	if (strlen_entity == 0 || strlen_entity > 32)
-		BAD_REQUEST("entity name should be 1 to 32 chars long");
+	if (strcmp(id,"admin") != 0)
+		FORBIDDEN("only admin can call this api");
 
 	// cannot delete admin
 	if (strcmp(entity,"admin") == 0)
 		FORBIDDEN("cannot delete admin");
 
-	if (strcmp(id,"admin") != 0)
-		FORBIDDEN("only admin can call this api");
+	// it should look like an owner
+	if (! is_owner(entity))
+		BAD_REQUEST("entity should be an owner");	
+
+	if (! is_valid_string(entity))
+		BAD_REQUEST("entity should be alpha numeric");	
 
 	if (! login_success("admin",apikey))
 		FORBIDDEN("wrong apikey");
