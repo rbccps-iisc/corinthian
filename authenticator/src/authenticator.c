@@ -1,6 +1,6 @@
 #include <kore/kore.h>
 #include <kore/http.h>
-#include <libpq-fe.h>
+#include <kore/pgsql.h>
 
 #include <openssl/sha.h>
 
@@ -10,16 +10,16 @@
 #include <bsd/string.h>
 #include <bsd/stdlib.h>
 
-#if 1
+#if 0
 	#define debug_printf(...)
 #else
 	#define debug_printf(...) printf(__VA_ARGS__)
 #endif
 
-#define OK()    { status=200; goto done; }
-#define DENY()  { status=403; goto done; }
-#define ERROR() { status=500; goto done; }
-#define BAD_REQUEST() {status=400; goto done;}
+#define OK()    { req->status=200; goto done; }
+#define DENY()  { debug_printf("DENY %d\n",__LINE__);req->status=403; goto done; }
+#define ERROR() { req->status=500; goto done; }
+#define BAD_REQUEST() {req->status=400; goto done;}
 
 #define GET_MANDATORY_FIELD(x) \
 	if (! http_argument_get_string(req, "" #x "", &x))		\
@@ -41,14 +41,12 @@ int auth_vhost(struct http_request *);
 int auth_resource(struct http_request *);
 bool login_success (const char *, const char *);
 
-PGconn *psql = NULL;
-PGresult *result = NULL;
-
 uint8_t string_to_be_hashed 	[256];
 uint8_t	binary_hash 		[SHA256_DIGEST_LENGTH];
 uint8_t hash_string		[SHA256_DIGEST_LENGTH*2 + 1];
 
 struct kore_buf *query = NULL;
+struct kore_pgsql sql;
 
 int
 init (int state)
@@ -56,16 +54,8 @@ init (int state)
 	if (query == NULL)
 		query = kore_buf_alloc(512);
 
-	if (psql == NULL)
-	{
-		// XXX this user must only have read permissions on DB
-
-		psql = PQconnectdb("user=postgres password=password");
-		if (PQstatus(psql) == CONNECTION_BAD)
-		{
-			exit(-1);
-		}
-	}
+	// XXX this user must only have read permissions on DB
+	kore_pgsql_register("db","user=postgres password=password");
 
 	return KORE_RESULT_OK;
 }
@@ -87,24 +77,30 @@ login_success (const char *id, const char *apikey)
 	if (id == NULL || apikey == NULL || *id == '\0' || *apikey == '\0')
 		goto done;
 
-	CREATE_STRING (query,"SELECT blocked,salt,password_hash FROM users WHERE id='%s'",id);
+	CREATE_STRING 	(query,"SELECT blocked,salt,password_hash FROM users WHERE id='%s'",id);
 
 	debug_printf("login query = {%s}\n",query->data);
 
-    	PQclear(result); 
-	result = PQexec(psql, (char *)query->data); 
+	kore_pgsql_cleanup(&sql);				\
+	if (! kore_pgsql_setup(&sql,"db",KORE_PGSQL_SYNC))
+	{
+		kore_pgsql_logerror(&sql);
+		goto done;	
+	}
+	if (! kore_pgsql_query(&sql,query->data))
+	{
+		kore_pgsql_logerror(&sql);
+		goto done;	
+	}
 
-	if (PQresultStatus(result) != PGRES_TUPLES_OK)
+	if (kore_pgsql_ntuples(&sql) == 0)
 		goto done;	
 
-	if (PQntuples(result) == 0)
+	if (strcmp(kore_pgsql_getvalue(&sql,0,0),"t")  == 0)
 		goto done;	
 
-	if (strcmp(PQgetvalue(result,0,0),"t") == 0)
-		goto done;	
-
-	salt 	 	= PQgetvalue(result,0,1);
-	password_hash	= PQgetvalue(result,0,2);
+	salt 	 	= kore_pgsql_getvalue(&sql,0,1);
+	password_hash	= kore_pgsql_getvalue(&sql,0,2);
 
 	// there is no salt or password hash in db ?
 	if (salt[0] == '\0' || password_hash[0] == '\0')
@@ -150,6 +146,8 @@ login_success (const char *id, const char *apikey)
 done:
 	kore_buf_reset(query);
 
+	kore_pgsql_cleanup(&sql);
+
 	return login_result;
 }
 
@@ -159,7 +157,7 @@ auth_user(struct http_request *req)
 	char *username;
 	char *password;
 
-	int status = 403;
+	req->status = 403;
 	
 	http_populate_get(req);
 
@@ -180,15 +178,14 @@ auth_user(struct http_request *req)
 	if (login_success(username,password))	
 		OK();	
 done:
-	if (status == 200)
-		http_response(req, 200, "allow", 5);
+	if (req->status == 200)
+		http_response(req, req->status, "allow", 5);
 	else
-		http_response(req, status, "deny", 4);
-
-	if (result)
-		PQclear(result);
+		http_response(req, req->status, "deny", 4);
 
 	kore_buf_reset(query);
+
+	kore_pgsql_cleanup(&sql);				\
 
 	return (KORE_RESULT_OK);
 }
@@ -216,7 +213,7 @@ auth_resource(struct http_request *req)
 	char *name;
 	char *permission;
 
-	int status = 403;
+	req->status = 403;
 
 	size_t strlen_username;
 	
@@ -248,14 +245,22 @@ auth_resource(struct http_request *req)
 
 	debug_printf("Query = {%s}\n",query->data);
 
-	result = PQexec(psql, (char *)query->data); 
-	if (PQresultStatus(result) != PGRES_TUPLES_OK)
+	kore_pgsql_cleanup(&sql);				\
+	if (! kore_pgsql_setup(&sql,"db",KORE_PGSQL_SYNC))
+	{
+		kore_pgsql_logerror(&sql);
+		DENY();
+	}
+	if (! kore_pgsql_query(&sql,query->data))
+	{
+		kore_pgsql_logerror(&sql);
+		DENY();
+	}
+
+	if (kore_pgsql_ntuples(&sql) != 1)
 		DENY();
 
-	if (PQntuples(result) != 1 || PQnfields(result) != 1)
-		DENY();
-
-	if (strcmp(PQgetvalue(result,0,0),"t") == 0)
+	if (strcmp(kore_pgsql_getvalue(&sql,0,0),"t")  == 0)
 		DENY();
 
 	strlen_username = strlen(username);
@@ -351,17 +356,23 @@ auth_resource(struct http_request *req)
 				);
 				debug_printf("query = '%s'\n",query->data);
 
-    				PQclear(result); 
-				result = PQexec(psql, (char *)query->data); 
-
-				if (PQresultStatus(result) != PGRES_TUPLES_OK)
+				kore_pgsql_cleanup(&sql);				\
+				if (! kore_pgsql_setup(&sql,"db",KORE_PGSQL_SYNC))
+				{
+					kore_pgsql_logerror(&sql);
 					DENY();
+				}
+				if (! kore_pgsql_query(&sql,query->data))
+				{
+					kore_pgsql_logerror(&sql);
+					DENY();
+				}
 
-				if (PQntuples(result) != 1 || PQnfields(result) != 1)
+				if (kore_pgsql_ntuples(&sql) != 1)
 					DENY();
 
 				// has write permission
-				if (strcmp(PQgetvalue(result,0,0),"w") == 0)
+				if (strcmp(kore_pgsql_getvalue(&sql,0,0),"w")  == 0)
 					OK()
 				else
 					DENY()
@@ -371,14 +382,14 @@ auth_resource(struct http_request *req)
 
 done:
 
-	if (status == 200)
-		http_response(req, 200, "allow", 5);
+	if (req->status == 200)
+		http_response(req, req->status, "allow", 5);
 	else
-		http_response(req, status, "deny", 4);
-
-	PQclear(result);
+		http_response(req, req->status, "deny", 4);
 
 	kore_buf_reset(query);
+
+	kore_pgsql_cleanup(&sql);				\
 
 	return (KORE_RESULT_OK);
 }

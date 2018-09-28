@@ -6,6 +6,7 @@
 
 #include <kore/kore.h>
 #include <kore/http.h>
+#include <kore/pgsql.h>
 
 #include <amqp.h>
 #include <amqp_tcp_socket.h>
@@ -15,7 +16,7 @@
 
 #include <openssl/sha.h>
 
-#if 1
+#if 0
 	#define debug_printf(...)
 #else
 	#define debug_printf(...) printf(__VA_ARGS__)
@@ -38,11 +39,11 @@ bool login_success (const char *, const char *);
 
 inline bool is_owner(const char *);
 
-#define OK()    {status=200; goto done;}
-#define OK202() {status=202; goto done;}
+#define OK()    {req->status=200; goto done;}
+#define OK202() {req->status=202; goto done;}
 
 #define BAD_REQUEST(x) { 				\
-	status = 400;					\
+	req->status = 400;				\
 	kore_buf_reset(response); 			\
 	kore_buf_append(response,"{\"error\":\"",10); 	\
 	kore_buf_append(response,x,strlen(x));	 	\
@@ -51,7 +52,7 @@ inline bool is_owner(const char *);
 }
 
 #define FORBIDDEN(x) { 					\
-	status = 403;					\
+	req->status = 403;				\
 	kore_buf_reset(response); 			\
 	kore_buf_append(response,"{\"error\":\"",10); 	\
 	kore_buf_append(response,x,strlen(x));	 	\
@@ -60,7 +61,7 @@ inline bool is_owner(const char *);
 }
 
 #define CONFLICT(x) { 					\
-	status = 409;					\
+	req->status = 409;				\
 	kore_buf_reset(response); 			\
 	kore_buf_append(response,"{\"error\":\"",10); 	\
 	kore_buf_append(response,x,strlen(x));	 	\
@@ -69,7 +70,7 @@ inline bool is_owner(const char *);
 }
 
 #define ERROR(x) { 					\
-	status = 500;					\
+	req->status = 500;				\
 	kore_buf_reset(response); 			\
 	kore_buf_append(response,"{\"error\":\"",10); 	\
 	kore_buf_append(response,x,strlen(x));	 	\
@@ -82,8 +83,21 @@ inline bool is_owner(const char *);
 #define ERROR_if(x,msg) {if(x) { ERROR(msg); }}
 #define BAD_REQUEST_if(x,msg) {if(x) { BAD_REQUEST(msg); }}
 
-PGconn *psql = NULL;
-PGresult *result = NULL;
+#define RUN_QUERY(query,err) {					\ 
+	debug_printf("RUN_QUERY ==> {%s}\n",query->data);	\
+	kore_pgsql_cleanup(&sql);				\
+	kore_pgsql_init(&sql);					\
+	if (! kore_pgsql_setup(&sql,"db",KORE_PGSQL_SYNC))	\
+	{							\
+		kore_pgsql_logerror(&sql);			\
+		ERROR("DB error while setup");			\
+	}							\
+	if (! kore_pgsql_query(&sql,query->data))		\
+	{							\
+		kore_pgsql_logerror(&sql);			\
+		ERROR(err);					\
+	}							\
+}
 
 struct kore_buf *queue = NULL;
 struct kore_buf *query = NULL;
@@ -93,9 +107,9 @@ uint8_t string_to_be_hashed 	[256];
 uint8_t	binary_hash 		[SHA256_DIGEST_LENGTH];
 uint8_t hash_string		[SHA256_DIGEST_LENGTH*2 + 1];
 
-size_t i;
+struct kore_pgsql sql;
 
-int status = 403;
+size_t i;
 
 #define CREATE_STRING(buf,...) 	{			\
 		kore_buf_reset(buf);			\
@@ -115,14 +129,7 @@ init (int state)
 	if (response == NULL)
 		response = kore_buf_alloc(65536);
 
-	if (psql == NULL)
-	{
-		psql = PQconnectdb("user=postgres password=password");
-		if (PQstatus(psql) == CONNECTION_BAD)
-		{
-			exit(-1);
-		}
-	}
+	kore_pgsql_register("db","user=postgres password=password");
 
 	return KORE_RESULT_OK;
 }
@@ -184,20 +191,26 @@ login_success (const char *id, const char *apikey)
 
 	CREATE_STRING (query,"SELECT blocked,salt,password_hash FROM users WHERE id='%s'",id);
 
-    	PQclear(result); 
-	result = PQexec(psql, (char *)query->data); 
+	kore_pgsql_cleanup(&sql);				\
+	if (! kore_pgsql_setup(&sql,"db",KORE_PGSQL_SYNC))
+	{
+		kore_pgsql_logerror(&sql);
+		goto done;	
+	}
+	if (! kore_pgsql_query(&sql,query->data))
+	{
+		kore_pgsql_logerror(&sql);
+		goto done;	
+	}
 
-	if (PQresultStatus(result) != PGRES_TUPLES_OK)
+	if (kore_pgsql_ntuples(&sql) == 0)
 		goto done;	
 
-	if (PQntuples(result) == 0)
+	if (strcmp(kore_pgsql_getvalue(&sql,i,0),"t")  == 0)
 		goto done;	
 
-	if (strcmp(PQgetvalue(result,0,0),"t") == 0)
-		goto done;	
-
-	salt 	 	= PQgetvalue(result,0,1);
-	password_hash	= PQgetvalue(result,0,2);
+	salt 	 	= kore_pgsql_getvalue(&sql,0,1);
+	password_hash	= kore_pgsql_getvalue(&sql,0,2);
 
 	// there is no salt or password hash in db ?
 	if (salt[0] == '\0' || password_hash[0] == '\0')
@@ -243,6 +256,8 @@ login_success (const char *id, const char *apikey)
 done:
 	kore_buf_reset(query);
 
+	kore_pgsql_cleanup(&sql);
+
 	return login_result;
 }
 
@@ -265,7 +280,7 @@ ep_publish (struct http_request *req)
 	amqp_rpc_reply_t 	login_reply;
 	amqp_rpc_reply_t 	rpc_reply;
 
-	status = 403;
+	req->status = 403;
 
 	BAD_REQUEST_if
 	(
@@ -337,7 +352,7 @@ done:
 	if (socket)
 		free(socket);
 
-	http_response(req, status, NULL, 0);
+	http_response(req, req->status, NULL, 0);
 
 	return (KORE_RESULT_OK);
 }
@@ -370,7 +385,7 @@ ep_subscribe(struct http_request *req)
 	amqp_rpc_reply_t 	login_reply;
 	amqp_rpc_reply_t 	rpc_reply;
 
-	status = 403;
+	req->status = 403;
 
 	BAD_REQUEST_if
 	(
@@ -494,7 +509,7 @@ done:
 		free(socket);
 
 	http_response_header(req, "content-type", "application/json");
-	http_response(req, status, response->data, response->offset);
+	http_response(req, req->status, response->data, response->offset);
 
 	kore_buf_reset(queue);
 	kore_buf_reset(response);
@@ -517,7 +532,7 @@ ep_register(struct http_request *req)
 	char entity_apikey	[33];
 	char password_hash	[65];
 
-	status = 403;
+	req->status = 403;
 
 	BAD_REQUEST_if
 	(
@@ -534,27 +549,6 @@ ep_register(struct http_request *req)
 	if (! is_owner(id))
 		FORBIDDEN("id does not belong to a owner");
 
-	if (! login_success(id,apikey))
-		FORBIDDEN("invalid id or apikey");
-
-	strlcpy(entity_name,id,128);
-	strcat(entity_name,"/");
-	strlcat(entity_name,entity,256);
-
-	// conflict if entity_name already exist
-	CREATE_STRING(query,"SELECT id from users WHERE id='%s'",entity_name);
-
-	debug_printf("Got query = {%s}\n",query->data);
-
-    	PQclear(result);    
-	result = PQexec(psql, (char *)query->data); 
-
-	if (PQresultStatus(result) != PGRES_TUPLES_OK)
-		FORBIDDEN("bad query");
-
-	if(PQntuples(result) > 0)
-		CONFLICT("id already used");
-
 	BAD_REQUEST_if	
 	(
 		req->http_body == NULL
@@ -563,6 +557,20 @@ ep_register(struct http_request *req)
 			,
 		"no body found in request"	
 	);	
+
+	if (! login_success(id,apikey))
+		FORBIDDEN("invalid id or apikey");
+
+	strlcpy(entity_name,id,128);
+	strcat(entity_name,"/");
+	strlcat(entity_name,entity,256);
+
+	// conflict if entity_name already exist
+	CREATE_STRING	(query,"SELECT id from users WHERE id='%s'",entity_name);
+	RUN_QUERY	(query,"could not get info about entity");
+
+	if (kore_pgsql_ntuples(&sql) > 0)
+		CONFLICT("id already used");
 
 	gen_salt_password_and_apikey (entity_name, salt, password_hash, entity_apikey);
 
@@ -583,14 +591,7 @@ ep_register(struct http_request *req)
 			body,		// schema
 			salt
 	);
-
-    	PQclear(result); 
-	result = PQexec(psql, (char *)query->data); 
-
-	debug_printf("Query was {%s}\n",query->data);
-
-	if (PQresultStatus(result) != PGRES_COMMAND_OK)
-		FORBIDDEN("bad query");
+	RUN_QUERY (query,"failed to create the entity");
 
 	kore_buf_reset(response);
 	kore_buf_append(response,"{\"id\":\"",7);
@@ -603,9 +604,9 @@ ep_register(struct http_request *req)
 
 done:
 	http_response_header(req, "content-type", "application/json");
-	http_response(req, status, response->data, response->offset);
+	http_response(req, req->status, response->data, response->offset);
 
-	PQclear(result);
+	kore_pgsql_cleanup(&sql);
 
 	kore_buf_reset(query);
 	kore_buf_reset(response);
@@ -622,7 +623,7 @@ ep_deregister(struct http_request *req)
 
 	char entity_name [66];
 
-	status = 403;
+	req->status = 403;
 
 	BAD_REQUEST_if
 	(
@@ -636,11 +637,11 @@ ep_deregister(struct http_request *req)
 	);
 
 	// deny if the user is not an owner
-	if (strchr(id,'/') != NULL)
+	if (! is_owner(id))
 		FORBIDDEN("id is not an owner");
 
-	// deny if the entity does not have '/'
-	if (strchr(entity,'/') == NULL)
+	// deny if the entity looks like a owner 
+	if (is_owner(entity))
 		FORBIDDEN("not a valid entity");
 
 	BAD_REQUEST_if
@@ -654,30 +655,24 @@ ep_deregister(struct http_request *req)
 		"invalid entity"
 	)
 
-	// TODO deny if user is blocked
-	CREATE_STRING (query,"SELECT blocked,salt,password_hash FROM users WHERE id='%s'",id);
+	if (! login_success(id,apikey))
+		FORBIDDEN("invalid id or apikey");
 
-	debug_printf("Got query = {%s}\n",query->data);
+	// deny if user is blocked
+	CREATE_STRING 	(query,"SELECT blocked,salt,password_hash FROM users WHERE id='%s'",id);
+	RUN_QUERY	(query,"failed to get entity info");
 
-    	PQclear(result);    
-	result = PQexec(psql, (char *)query->data); 
-
-	if (PQresultStatus(result) != PGRES_TUPLES_OK)
-		ERROR("bad query");
-
-	if (PQntuples(result) == 0)
+	if (kore_pgsql_ntuples(&sql) == 0)
 		FORBIDDEN("entity not found");
 
-	if (strcmp(PQgetvalue(result,0,0),"t") == 0)
+	if (strcmp(kore_pgsql_getvalue(&sql,0,0),"t") == 0)
 		FORBIDDEN("id is blocked");
 
 	strlcpy(entity_name,id,33); 
 	strlcat(entity_name,"/",34); 
 	strlcat(entity_name,entity,66); 
 
-	// TODO CHECK apikey
-
-	// TODO deny if entity_name is not in users db deny with msg
+	// TODO ? deny if entity_name is not in users db deny with msg
 
 	// TODO delete from acl where id = entity_name
 	// TODO delete from follow where from_entity = entity_name or to_entity = entity_name
@@ -687,9 +682,9 @@ ep_deregister(struct http_request *req)
 
 done:
 	http_response_header(req, "content-type", "application/json");
-	http_response(req, status, response->data, response->offset);
+	http_response(req, req->status, response->data, response->offset);
 
-	PQclear(result);
+	kore_pgsql_cleanup(&sql);
 
 	kore_buf_reset(query);
 	kore_buf_reset(response);
@@ -700,42 +695,39 @@ done:
 int
 ep_cat(struct http_request *req)
 {
-	char *id = NULL;
+	const char *id;
 	uint32_t num_rows = 0;
 
-	status = 403;
+	req->status = 403;
 
 	http_populate_get(req);
 	if (http_argument_get_string(req,"id",&id))
 	{
 		// if not a valid entity
-		if (strchr(id,'/') == NULL)
+		if (is_owner(id))
 			FORBIDDEN("id is not a valid entity");
 
-		CREATE_STRING (query,"SELECT schema FROM users WHERE schema is NOT NULL AND id='%s'",id);
+		CREATE_STRING (query,"SELECT schema FROM users WHERE schema is NOT NULL AND id='%s' LIMIT 10",id);
 	}
 	else
 	{
 		id = NULL;
-		CREATE_STRING (query,"SELECT id,schema FROM users WHERE schema is NOT NULL");
+		CREATE_STRING (query,"SELECT id,schema FROM users WHERE schema is NOT NULL LIMIT 10");
 	}
 
-    	PQclear(result);
-	result = PQexec(psql, (char *)query->data); 
+	RUN_QUERY (query,"unable to query catalog data");
+	
+	num_rows = kore_pgsql_ntuples(&sql);
 
-	if (PQresultStatus(result) != PGRES_TUPLES_OK)
-		FORBIDDEN("bad query"); // TODO fix
-
-	num_rows = PQntuples(result);
-
+	kore_buf_reset(response);
 	if (id == NULL) // get all data
 	{
 		kore_buf_append(response,"[",1);
 
 		for (i = 0; i < num_rows; ++i)
 		{
-			char *user = PQgetvalue(result,i,0);
-			char *schema = PQgetvalue(result,i,1);
+			char *user 	= kore_pgsql_getvalue(&sql,i,0);
+			char *schema 	= kore_pgsql_getvalue(&sql,i,1);
 
 			kore_buf_append(response,"{\"",2);
 			kore_buf_append(response,user,strlen(user));
@@ -758,7 +750,7 @@ ep_cat(struct http_request *req)
 		if (num_rows == 0)
 			BAD_REQUEST("not a valid id");
 
-		char *schema = PQgetvalue(result,0,0);
+		char *schema = kore_pgsql_getvalue(&sql,0,0);
 
 		kore_buf_append(response,schema,strlen(schema));
 	}
@@ -767,16 +759,15 @@ ep_cat(struct http_request *req)
 
 done:
 	http_response_header(req, "content-type", "application/json");
-	http_response(req, status, response->data, response->offset);
+	http_response(req, req->status, response->data, response->offset);
 
-	PQclear(result);
+	kore_pgsql_cleanup(&sql);
 
 	kore_buf_reset(query);
 	kore_buf_reset(response);
 
 	return (KORE_RESULT_OK);
 }
-
 
 int
 ep_register_owner(struct http_request *req)
@@ -789,13 +780,13 @@ ep_register_owner(struct http_request *req)
 	char entity_apikey	[33];
 	char password_hash	[65];
 
-	status = 403;
+	req->status = 403;
 
 	if (req->owner->addrtype == AF_INET)
 	{
 		if (req->owner->addr.ipv4.sin_addr.s_addr != htonl(INADDR_LOOPBACK))	
 		{
-			FORBIDDEN("unauthorized request");
+			FORBIDDEN("this api can only be called from localhost");
 		}
 	}
 
@@ -819,21 +810,16 @@ ep_register_owner(struct http_request *req)
 		BAD_REQUEST("entity name should be 1 to 32 chars long");
 
 	if (strcmp(id,"admin") != 0)
-		FORBIDDEN("unauthorized request");
+		FORBIDDEN("only admin can call this api");
 
-	if (! login_success(id,apikey))
+	if (! login_success("admin",apikey))
 		FORBIDDEN("wrong apikey");
 
 	// conflict if entity_name already exist
-	CREATE_STRING (query,"SELECT id FROM users WHERE id ='%s'",entity);
+	CREATE_STRING 	(query,"SELECT id FROM users WHERE id ='%s'",entity);
+	RUN_QUERY	(query,"could not query info about the owner");
 
-    	PQclear(result);    
-	result = PQexec(psql, (char *)query->data); 
-
-	if (PQresultStatus(result) != PGRES_TUPLES_OK)
-		FORBIDDEN("bad query");
-
-	if(PQntuples(result) > 0)
+	if(kore_pgsql_ntuples(&sql) > 0)
 		CONFLICT("id already used");
 
 	gen_salt_password_and_apikey (entity, salt, password_hash, entity_apikey);
@@ -845,13 +831,7 @@ ep_register_owner(struct http_request *req)
 				salt
 	);
 
-    	PQclear(result); 
-	result = PQexec(psql, (char *)query->data); 
-
-	debug_printf("Query was {%s}\n",query->data);
-
-	if (PQresultStatus(result) != PGRES_COMMAND_OK)
-		FORBIDDEN("bad query");
+	RUN_QUERY (query, "could not create a new owner");
 
 	kore_buf_reset(response);
 	kore_buf_append(response,"{\"id\":\"",7);
@@ -864,9 +844,9 @@ ep_register_owner(struct http_request *req)
 
 done:
 	http_response_header(req, "content-type", "application/json");
-	http_response(req, status, response->data, response->offset);
+	http_response(req, req->status, response->data, response->offset);
 
-	PQclear(result);
+	kore_pgsql_cleanup(&sql);
 
 	kore_buf_reset(query);
 	kore_buf_reset(response);
@@ -883,13 +863,13 @@ ep_deregister_owner(struct http_request *req)
 
 	// XXX to be done
 
-	status = 403;
+	req->status = 403;
 
 	if (req->owner->addrtype == AF_INET)
 	{
 		if (req->owner->addr.ipv4.sin_addr.s_addr != htonl(INADDR_LOOPBACK))	
 		{
-			FORBIDDEN("unauthorized request");
+			FORBIDDEN("this api can only be called from localhost");
 		}
 	}
 
@@ -913,47 +893,34 @@ ep_deregister_owner(struct http_request *req)
 		FORBIDDEN("cannot delete admin");
 
 	if (strcmp(id,"admin") != 0)
-		FORBIDDEN("unauthorized request");
+		FORBIDDEN("only admin can call this api");
 
-	if (! login_success(id,apikey))
+	if (! login_success("admin",apikey))
 		FORBIDDEN("wrong apikey");
+
+	// TODO say if the id does not exist
 
 	// XXX delete from follow table
 
 	// delete all acls
-	CREATE_STRING (query,"DELETE FROM acl WHERE id LIKE '%s/%%'",entity);
+	CREATE_STRING 	(query,"DELETE FROM acl WHERE id LIKE '%s/%%'",entity);
+	RUN_QUERY 	(query,"could not delete from acl table");
 
-    	PQclear(result);    
-	result = PQexec(psql, (char *)query->data); 
-
-	if (PQresultStatus(result) != PGRES_COMMAND_OK)
-		ERROR("could not delete from acl table");
-	
 	// delete all apps and devices of the owner
-	CREATE_STRING (query,"DELETE FROM users WHERE id LIKE '%s/%%'",entity);
-
-    	PQclear(result);    
-	result = PQexec(psql, (char *)query->data); 
-
-	if (PQresultStatus(result) != PGRES_COMMAND_OK)
-		ERROR("could not delete apps/devices of the entity");
+	CREATE_STRING 	(query,"DELETE FROM users WHERE id LIKE '%s/%%'",entity);
+	RUN_QUERY	(query,"could not delete apps/devices of the entity");
 
 	// finally delete the owner 
-	CREATE_STRING (query,"DELETE FROM users WHERE id = '%s'",entity);
-
-    	PQclear(result);    
-	result = PQexec(psql, (char *)query->data); 
-
-	if (PQresultStatus(result) != PGRES_COMMAND_OK)
-		ERROR("could not delete the entity");
+	CREATE_STRING 	(query,"DELETE FROM users WHERE id = '%s'",entity);
+	RUN_QUERY	(query,"could not delete the entity");
 
 	OK();
 
 done:
 	http_response_header(req, "content-type", "application/json");
-	http_response(req, status, response->data, response->offset);
+	http_response(req, req->status, response->data, response->offset);
 
-	PQclear(result);
+	kore_pgsql_cleanup(&sql);
 
 	kore_buf_reset(queue);
 	kore_buf_reset(response);
