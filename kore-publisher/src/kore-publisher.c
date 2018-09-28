@@ -707,12 +707,12 @@ ep_cat(struct http_request *req)
 		if (is_owner(id))
 			FORBIDDEN("id is not a valid entity");
 
-		CREATE_STRING (query,"SELECT schema FROM users WHERE schema is NOT NULL AND id='%s' LIMIT 10",id);
+		CREATE_STRING (query,"SELECT schema FROM users WHERE schema is NOT NULL AND id='%s'",id);
 	}
 	else
 	{
 		id = NULL;
-		CREATE_STRING (query,"SELECT id,schema FROM users WHERE schema is NOT NULL LIMIT 10");
+		CREATE_STRING (query,"SELECT id,schema FROM users WHERE schema is NOT NULL");
 	}
 
 	RUN_QUERY (query,"unable to query catalog data");
