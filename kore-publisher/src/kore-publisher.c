@@ -16,7 +16,7 @@
 
 #include <ctype.h>
 
-#if 1
+#if 0
 	#define debug_printf(...)
 #else
 	#define debug_printf(...) printf(__VA_ARGS__)
@@ -285,8 +285,8 @@ login_success (const char *id, const char *apikey)
 	if (kore_pgsql_ntuples(&sql) == 0)
 		goto done;	
 
-	salt 	 	= kore_pgsql_getvalue(&sql,0,1);
-	password_hash	= kore_pgsql_getvalue(&sql,0,2);
+	salt 	 	= kore_pgsql_getvalue(&sql,0,0);
+	password_hash	= kore_pgsql_getvalue(&sql,0,1);
 
 	// there is no salt or password hash in db ?
 	if (salt[0] == '\0' || password_hash[0] == '\0')
