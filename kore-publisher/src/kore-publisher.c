@@ -18,13 +18,13 @@
 
 #include <ctype.h>
 
-#if 0
+#if 1
 	#define debug_printf(...)
 #else
 	#define debug_printf(...) printf(__VA_ARGS__)
 #endif
 
-char password_chars[] = "-abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_@#./";
+char password_chars[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789~!@#$%^&*_-+=.?/";
 
 int init (int);
 int ep_cat(struct http_request *);
@@ -146,14 +146,10 @@ is_alpha_numeric (const char *str)
 	{
 		if (! isalnum(str[i]))
 		{
-			// support some extra chars
 			switch (str[i])
 			{
-				case '.':
-				case '@':
 				case '-':
 						break;
-				
 				default:
 						return false;	
 			}
@@ -189,11 +185,8 @@ looks_like_a_valid_entity (const char *str)
 				case '/':
 						++back_slash_count;
 						break;
-				case '.':
-				case '@':
 				case '-':
 						break;
-				
 				default:
 						return false;	
 			}
@@ -737,11 +730,16 @@ ep_deregister(struct http_request *req)
 	strlcat(entity_name,"/",34); 
 	strlcat(entity_name,entity,66); 
 
-	// TODO ? deny if entity_name is not in users db deny with msg
-
-	// TODO delete from acl where id = entity_name
 	// TODO delete from follow where from_entity = entity_name or to_entity = entity_name
-	// TODO delete from users where id = entity_name
+
+	// TODO run select query and delete all exchanges and queues of entity_name 
+
+	CREATE_STRING 	(query,"DELETE FROM acl WHERE id = '%s' or exchange='%s'",entity_name, entity_name);
+	RUN_QUERY 	(query,"could not delete from acl table");
+
+	CREATE_STRING 	(query,"DELETE FROM users WHERE id = '%s'",entity_name);
+	RUN_QUERY	(query,"could not delete the entity");
+
 
 	OK();
 
@@ -963,12 +961,12 @@ ep_deregister_owner(struct http_request *req)
 	if (! login_success("admin",apikey))
 		FORBIDDEN("wrong apikey");
 
-	// TODO say if the id does not exist
-
 	// XXX delete from follow table
 
+	// XXX run select query and delete each and every queue and exchange. This needs work
+
 	// delete all acls
-	CREATE_STRING 	(query,"DELETE FROM acl WHERE id LIKE '%s/%%'",entity);
+	CREATE_STRING 	(query,"DELETE FROM acl WHERE id LIKE '%s/%%' OR exchange LIKE '%s/%%'",entity);
 	RUN_QUERY 	(query,"could not delete from acl table");
 
 	// delete all apps and devices of the owner
