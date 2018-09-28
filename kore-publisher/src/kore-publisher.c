@@ -2,8 +2,6 @@
 #include <stdbool.h>
 #include <unistd.h>
 
-#include <libpq-fe.h>
-
 #include <kore/kore.h>
 #include <kore/http.h>
 #include <kore/pgsql.h>
@@ -26,16 +24,25 @@
 
 char password_chars[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789~!@#$%^&*_-+=.?/";
 
+
+int cat			(struct http_request *);
+
+int publish		(struct http_request *);
+int subscribe		(struct http_request *);
+
+int register_entity	(struct http_request *);
+int deregister_entity	(struct http_request *);
+
+int register_owner 	(struct http_request *);
+int deregister_owner 	(struct http_request *);
+
+int follow		(struct http_request *);
+int unfollow		(struct http_request *);
+
+int share		(struct http_request *);
+int unshare		(struct http_request *);
+
 int init (int);
-int ep_cat(struct http_request *);
-int ep_publish(struct http_request *);
-int ep_subscribe(struct http_request *);
-int ep_register(struct http_request *);
-int ep_deregister(struct http_request *);
-
-int ep_register_owner (struct http_request *);
-int ep_deregister_owner (struct http_request *);
-
 void gen_salt_password_and_apikey (const char *, char *, char *, char *);
 bool login_success (const char *, const char *);
 
@@ -51,7 +58,7 @@ bool login_success (const char *, const char *);
 	goto done;					\
 }
 
-#define FORBIDDEN(x) { 					\
+#define FORBIDDEN(x) {					\
 	req->status = 403;				\
 	kore_buf_reset(response); 			\
 	kore_buf_append(response,"{\"error\":\"",10); 	\
@@ -111,10 +118,10 @@ struct kore_pgsql sql;
 
 size_t i;
 
-#define CREATE_STRING(buf,...) 	{			\
-		kore_buf_reset(buf);			\
-		kore_buf_appendf(buf,__VA_ARGS__);	\
-		kore_buf_stringify(buf,NULL);		\
+#define CREATE_STRING(buf,...)	{		\
+	kore_buf_reset(buf);			\
+	kore_buf_appendf(buf,__VA_ARGS__);	\
+	kore_buf_stringify(buf,NULL);		\
 }
 
 int
@@ -139,7 +146,7 @@ is_alpha_numeric (const char *str)
 {
 	uint8_t strlen_str = strlen(str);
 
-	if (strlen_str == 0 || strlen_str > 32)
+	if (strlen_str < 3 || strlen_str > 32)
 		return false;
 
 	for (i = 0; i < strlen_str; ++i)
@@ -172,7 +179,7 @@ looks_like_a_valid_entity (const char *str)
 
 	uint8_t back_slash_count = 0;
 
-	if (strlen_str == 0 || strlen_str > 65)
+	if (strlen_str < 3 || strlen_str > 65)
 		return false;
 
 	for (i = 0; i < strlen_str; ++i)
@@ -260,7 +267,7 @@ login_success (const char *id, const char *apikey)
 	if (strchr(id,'\\') != NULL)
 		goto done;
 
-	CREATE_STRING (query,"SELECT blocked,salt,password_hash FROM users WHERE id='%s'",id);
+	CREATE_STRING (query,"SELECT salt,password_hash FROM users WHERE id='%s' and blocked='f'",id);
 
 	kore_pgsql_cleanup(&sql);
 	kore_pgsql_init(&sql);
@@ -276,9 +283,6 @@ login_success (const char *id, const char *apikey)
 	}
 
 	if (kore_pgsql_ntuples(&sql) == 0)
-		goto done;	
-
-	if (strcmp(kore_pgsql_getvalue(&sql,0,0),"t")  == 0)
 		goto done;	
 
 	salt 	 	= kore_pgsql_getvalue(&sql,0,1);
@@ -334,7 +338,7 @@ done:
 }
 
 int
-ep_publish (struct http_request *req)
+publish (struct http_request *req)
 {
 	const char *id;
 	const char *apikey;
@@ -430,7 +434,7 @@ done:
 }
 
 int
-ep_subscribe(struct http_request *req)
+subscribe(struct http_request *req)
 {
 	const char *id;
 	const char *apikey;
@@ -584,7 +588,7 @@ done:
 }
 
 int
-ep_register(struct http_request *req)
+register_entity (struct http_request *req)
 {
 	const char *id;
 	const char *apikey;
@@ -684,7 +688,47 @@ done:
 }
 
 int
-ep_deregister(struct http_request *req)
+delete_entity_from_rabbitmq (char *entity)
+{
+	if (! looks_like_a_valid_entity(entity))
+		return -1;
+
+/* XXX
+	amqp_exchange_delete (entity.public);
+	amqp_exchange_delete (entity.private);
+	amqp_exchange_delete (entity.protected);
+
+	amqp_queue_delete (entity);
+	amqp_queue_delete (entity.priority);
+*/
+	return 0;
+}
+
+int
+delete_owner_from_rabbitmq (char *owner)
+{
+	if (! looks_like_a_valid_owner(owner))
+		return -1;
+/*
+	CREATE_STRING 	(query, "SELECT * from users where id='%s'",owner); 
+	RUN_QUERY 	(query, "can't search entity in DB");
+
+	// login as admin in amqp
+
+	uint32_t num_rows = kore_pgsql_ntuples(&sql);
+	for (i = 0; i < num_rows; ++i)
+	{
+		entity = kore_pgsql_getvalue(&sql,i,0);
+		// delete_entity_from_rabbitmq (entity);
+	}
+*/
+
+done:
+	return 0;
+}
+
+int
+deregister_entity (struct http_request *req)
 {
 	const char *id;
 	const char *apikey;
@@ -716,16 +760,6 @@ ep_deregister(struct http_request *req)
 	if (! login_success(id,apikey))
 		FORBIDDEN("invalid id or apikey");
 
-	// deny if user is blocked
-	CREATE_STRING 	(query,"SELECT blocked,salt,password_hash FROM users WHERE id='%s'",id);
-	RUN_QUERY	(query,"failed to get entity info");
-
-	if (kore_pgsql_ntuples(&sql) == 0)
-		FORBIDDEN("entity not found");
-
-	if (strcmp(kore_pgsql_getvalue(&sql,0,0),"t") == 0)
-		FORBIDDEN("id is blocked");
-
 	strlcpy(entity_name,id,33); 
 	strlcat(entity_name,"/",34); 
 	strlcat(entity_name,entity,66); 
@@ -739,7 +773,6 @@ ep_deregister(struct http_request *req)
 
 	CREATE_STRING 	(query,"DELETE FROM users WHERE id = '%s'",entity_name);
 	RUN_QUERY	(query,"could not delete the entity");
-
 
 	OK();
 
@@ -756,7 +789,7 @@ done:
 }
 
 int
-ep_cat(struct http_request *req)
+cat(struct http_request *req)
 {
 	const char *entity;
 	uint32_t num_rows = 0;
@@ -833,7 +866,7 @@ done:
 }
 
 int
-ep_register_owner(struct http_request *req)
+register_owner(struct http_request *req)
 {
 	const char *id;
 	const char *apikey;
@@ -918,7 +951,7 @@ done:
 }
 
 int
-ep_deregister_owner(struct http_request *req)
+deregister_owner(struct http_request *req)
 {
 	const char *id;
 	const char *apikey;
@@ -988,5 +1021,29 @@ done:
 	kore_buf_reset(queue);
 	kore_buf_reset(response);
 
+	return (KORE_RESULT_OK);
+}
+
+int
+follow (struct http_request *req)
+{
+	return (KORE_RESULT_OK);
+}
+
+int
+unfollow (struct http_request *req)
+{
+	return (KORE_RESULT_OK);
+}
+
+int
+share (struct http_request *req)
+{
+	return (KORE_RESULT_OK);
+}
+
+int
+unshare (struct http_request *req)
+{
 	return (KORE_RESULT_OK);
 }

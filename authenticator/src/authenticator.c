@@ -73,7 +73,7 @@ is_alpha_numeric (const char *str)
 {
 	uint8_t strlen_str = strlen(str);
 
-	if (strlen_str == 0 || strlen_str > 32)
+	if (strlen_str < 3 || strlen_str > 32)
 		return false;
 
 	for (i = 0; i < strlen_str; ++i)
@@ -83,8 +83,6 @@ is_alpha_numeric (const char *str)
 			// support some extra chars
 			switch (str[i])
 			{
-				case '.':
-				case '@':
 				case '-':
 						break;
 				
@@ -110,7 +108,7 @@ looks_like_a_valid_entity (const char *str)
 
 	uint8_t back_slash_count = 0;
 
-	if (strlen_str == 0 || strlen_str > 65)
+	if (strlen_str < 3 || strlen_str > 65)
 		return false;
 
 	for (i = 0; i < strlen_str; ++i)
@@ -123,8 +121,6 @@ looks_like_a_valid_entity (const char *str)
 				case '/':
 						++back_slash_count;
 						break;
-				case '.':
-				case '@':
 				case '-':
 						break;
 				
@@ -245,22 +241,19 @@ auth_user(struct http_request *req)
 	GET_MANDATORY_FIELD(username);
 	GET_MANDATORY_FIELD(password);
 
-	// Also, kore's conf file contains a regex
-	if (	strlen(username) > 128
-			|| 
-		strchr(username,'\'')
-			|| 
-		strchr(username,'\\')
-	)
-	{
+	if (strlen(username) > 65) 
 		BAD_REQUEST();
-	}
 
 	if (login_success(username,password))	
 		OK();	
 done:
 	if (req->status == 200)
-		http_response(req, req->status, "allow", 5);
+	{
+		if (strcmp(username,"admin") == 0)
+			http_response(req, req->status, "allow administrator", 19);
+		else
+			http_response(req, req->status, "allow", 5);
+	}
 	else
 		http_response(req, req->status, "deny", 4);
 
@@ -312,13 +305,13 @@ auth_resource(struct http_request *req)
 	// admin can do anything ???
 	if (strcmp(username,"admin") == 0)
 		OK()
-	
-	// we do not allow users to configure
-	if (strcmp(permission,"configure") == 0)
-		DENY()
 
+	// except for admin no one can do configure
+	if (strcmp(permission,"configure") == 0)
+		DENY();
+	
 	// kore's conf file contains a regex
-	if (strlen(username) > 128 || strlen(name) > 128)
+	if (strlen(username) < 3 || strlen(name) > 65)
 		DENY()
 
 	// name should not look like a owner 
@@ -334,7 +327,7 @@ auth_resource(struct http_request *req)
 
 	debug_printf("Query = {%s}\n",query->data);
 
-	kore_pgsql_cleanup(&sql);				\
+	kore_pgsql_cleanup(&sql);
 	if (! kore_pgsql_setup(&sql,"db",KORE_PGSQL_SYNC))
 	{
 		kore_pgsql_logerror(&sql);
@@ -357,32 +350,21 @@ auth_resource(struct http_request *req)
 	{
 		// don't allow writes on queue
 		if (strcmp(permission,"write") == 0)
-			DENY()
+			DENY();
 
-		// if owner then allow in username.notify, username.follow
+		// deny if the resource does not begin with username
+		if (strncmp(name,username,strlen_username) != 0)
+			DENY();
+
 		if (looks_like_a_valid_owner(username))
 		{
-			// deny if the resource does not begin with username
-			if (strncmp(name,username,strlen_username) != 0)
-				DENY()
-
-			// if it ends with .notify or .follow
-			if (
-				(strcmp(name + strlen_username ,".notify") == 0) 
-						||
- 				(strcmp(name + strlen_username ,".follow") == 0)
-			)
-			{
+			// allow queue = username.notify
+			if (strcmp(name + strlen_username ,".notify") == 0)
 				OK();
-			}
 		}
 		else
 		{
-			// Deny if name does not begin with username
-			if (strncmp(name,username,strlen_username) != 0)
-				DENY();
-
-			// Else allow in queues = username and username.priority 
+			// allow in queues = username, username.priority and username.priority 
 			if (strcmp(name,username) == 0)
 			{
 				OK();
@@ -399,73 +381,68 @@ auth_resource(struct http_request *req)
 	}
 	else if (strcmp(resource,"exchange") == 0)
 	{
+		// ok to allow read as configure is not allowed
 		if (strcmp(permission,"read") == 0)
-		{
-			// ok to allow read as bind is not allowed
 			OK();
-		}
-		else if (strcmp(permission,"write") == 0)
+
+		/* now permission is "write" */
+
+		// owners cannot write to any exchange 
+		if (looks_like_a_valid_owner(username))
+			DENY();
+
+		// devices/apps can write to their own exchanges
+		if (strncmp(name,username,strlen_username) == 0 && (name[strlen_username + 1] != '.'))
 		{
-			if (strchr(username,'/') == NULL)
-			{	
-				// as owners can only manage their devices
-				debug_printf("You are an owner!\n");
+			// entities can write in to their 
+			// 	username.public
+			// 	username.private
+			// 	username.protected
+			// 	username.diagnostics
+
+			char *exchange_ends_with = name + strlen_username;
+
+			if (
+				strcmp(exchange_ends_with,".public") == 0
+						||
+				strcmp(exchange_ends_with,".private") == 0
+						||
+				strcmp(exchange_ends_with,".protected") == 0
+						||
+				strcmp(exchange_ends_with,".diagnostics") == 0
+			)
+			{
+				OK();
+			}
+		}
+		else
+		{
+			// else there must a share entry 
+
+			CREATE_STRING (query,
+			"SELECT permissions FROM acl WHERE id='%s' AND exchange='%s' and permissions='w'",
+				username,
+				name
+			);
+
+			debug_printf("query = '%s'\n",query->data);
+
+			kore_pgsql_cleanup(&sql);
+			if (! kore_pgsql_setup(&sql,"db",KORE_PGSQL_SYNC))
+			{
+				kore_pgsql_logerror(&sql);
+				DENY();
+			}
+			if (! kore_pgsql_query(&sql, (const char *)query->data))
+			{
+				kore_pgsql_logerror(&sql);
 				DENY();
 			}
 
-			if (strncmp(name,username,strlen_username) == 0 && (name[strlen_username + 1] != '.'))
-			{
-				// Devices/apps can write in to their 
-				// 	username.public
-				// 	username.private
-				// 	username.protected
-				// 	username.diagnostics
-
-				char *exchange_ends_with = name + strlen_username;
-
-				if (
-					strcmp(exchange_ends_with,".public") == 0
-							||
-					strcmp(exchange_ends_with,".private") == 0
-							||
-					strcmp(exchange_ends_with,".protected") == 0
-							||
-					strcmp(exchange_ends_with,".diagnostics") == 0
-				)
-				{
-					OK();
-				}
-			}
-			else
-			{
-				CREATE_STRING (query,
-						"SELECT permissions FROM acl WHERE id='%s' AND exchange='%s'",
-							username,
-							name
-				);
-				debug_printf("query = '%s'\n",query->data);
-
-				kore_pgsql_cleanup(&sql);				\
-				if (! kore_pgsql_setup(&sql,"db",KORE_PGSQL_SYNC))
-				{
-					kore_pgsql_logerror(&sql);
-					DENY();
-				}
-				if (! kore_pgsql_query(&sql, (const char *)query->data))
-				{
-					kore_pgsql_logerror(&sql);
-					DENY();
-				}
-
-				if (kore_pgsql_ntuples(&sql) != 1)
-					DENY();
-
-				// has write permission
-				if (strcmp(kore_pgsql_getvalue(&sql,0,0),"w")  == 0)
-					OK()
-				else
-					DENY()
-			}
+			// if we found a valid share entry
+			// TODO check validity date of share
+			if (kore_pgsql_ntuples(&sql) == 1)
+				OK();
 		}
 	}
 
