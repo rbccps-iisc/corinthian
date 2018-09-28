@@ -10,7 +10,9 @@
 #include <bsd/string.h>
 #include <bsd/stdlib.h>
 
-#if 0
+#include <ctype.h>
+
+#if 1
 	#define debug_printf(...)
 #else
 	#define debug_printf(...) printf(__VA_ARGS__)
@@ -19,7 +21,7 @@
 #define OK()    { req->status=200; goto done; }
 #define DENY()  { debug_printf("DENY %d\n",__LINE__);req->status=403; goto done; }
 #define ERROR() { req->status=500; goto done; }
-#define BAD_REQUEST() {req->status=400; goto done;}
+#define BAD_REQUEST() {debug_printf("BAD %d\n",__LINE__);req->status=400; goto done;}
 
 #define GET_MANDATORY_FIELD(x) \
 	if (! http_argument_get_string(req, "" #x "", &x))		\
@@ -39,14 +41,20 @@ int auth_user(struct http_request *);
 int auth_topic(struct http_request *);
 int auth_vhost(struct http_request *);
 int auth_resource(struct http_request *);
+
+bool looks_like_a_valid_owner (char *);
+bool looks_like_a_valid_entity(char *);
+
 bool login_success (const char *, const char *);
 
-uint8_t string_to_be_hashed 	[256];
+char 	string_to_be_hashed 	[256];
 uint8_t	binary_hash 		[SHA256_DIGEST_LENGTH];
-uint8_t hash_string		[SHA256_DIGEST_LENGTH*2 + 1];
+char 	hash_string		[SHA256_DIGEST_LENGTH*2 + 1];
 
 struct kore_buf *query = NULL;
 struct kore_pgsql sql;
+
+size_t i;
 
 int
 init (int state)
@@ -60,10 +68,50 @@ init (int state)
 	return KORE_RESULT_OK;
 }
 
-inline bool
-is_owner(const char *id)
+bool
+looks_like_a_valid_owner (char *str)
 {
-	return (strchr(id,'/') == NULL);
+	uint8_t strlen_str = strlen(str);
+
+	if (strlen_str == 0 || strlen_str > 32)
+		return false;
+
+	for (i = 0; i < strlen_str; ++i)
+	{
+		if (! isalnum(str[i]))
+			return false;	
+	}
+
+	return true;
+}
+
+bool
+looks_like_a_valid_entity (char *str)
+{
+	uint8_t strlen_str = strlen(str);
+
+	uint8_t slash_count = 0;
+
+	if (strlen_str == 0 || strlen_str > 32)
+		return false;
+
+	for (i = 0; i < strlen_str; ++i)
+	{
+		if (str[i] == '/')
+			++slash_count;
+		else
+		{
+			if (! isalnum(str[i])) {
+				return false;	
+			}
+		}
+
+		if (slash_count > 1) {
+			return false;
+		}
+	}
+
+	return true;
 }
 
 bool
@@ -77,6 +125,12 @@ login_success (const char *id, const char *apikey)
 	if (id == NULL || apikey == NULL || *id == '\0' || *apikey == '\0')
 		goto done;
 
+	if (strchr(id,'\'') != NULL)
+		goto done;
+
+	if (strchr(id,'\\') != NULL)
+		goto done;
+
 	CREATE_STRING 	(query,"SELECT blocked,salt,password_hash FROM users WHERE id='%s'",id);
 
 	debug_printf("login query = {%s}\n",query->data);
@@ -87,7 +141,7 @@ login_success (const char *id, const char *apikey)
 		kore_pgsql_logerror(&sql);
 		goto done;	
 	}
-	if (! kore_pgsql_query(&sql,query->data))
+	if (! kore_pgsql_query(&sql,(const char *)query->data))
 	{
 		kore_pgsql_logerror(&sql);
 		goto done;	
@@ -119,7 +173,7 @@ login_success (const char *id, const char *apikey)
 
 	sprintf	
 	(
-		(char *)hash_string,
+		hash_string,
 		"%02x%02x%02x%02x"
 		"%02x%02x%02x%02x"
 		"%02x%02x%02x%02x"
@@ -240,6 +294,14 @@ auth_resource(struct http_request *req)
 	if (strlen(username) > 128 || strlen(name) > 128)
 		DENY()
 
+	// name should not look like a owner 
+	if (looks_like_a_valid_owner(name))
+		DENY()
+
+	// name should be a valid entity
+	if (! looks_like_a_valid_entity(name))
+		DENY()
+
 	// get user info in acl, if blocked deny
 	CREATE_STRING (query,"SELECT blocked FROM users WHERE id='%s'",username);
 
@@ -251,7 +313,7 @@ auth_resource(struct http_request *req)
 		kore_pgsql_logerror(&sql);
 		DENY();
 	}
-	if (! kore_pgsql_query(&sql,query->data))
+	if (! kore_pgsql_query(&sql,(const char *)query->data))
 	{
 		kore_pgsql_logerror(&sql);
 		DENY();
@@ -271,7 +333,7 @@ auth_resource(struct http_request *req)
 			DENY()
 
 		// if owner then allow in username.notify, username.follow
-		if (is_owner(username))
+		if (looks_like_a_valid_owner(username))
 		{
 			// deny if the resource does not begin with username
 			if (strncmp(name,username,strlen_username) != 0)
@@ -362,7 +424,7 @@ auth_resource(struct http_request *req)
 					kore_pgsql_logerror(&sql);
 					DENY();
 				}
-				if (! kore_pgsql_query(&sql,query->data))
+				if (! kore_pgsql_query(&sql, (const char *)query->data))
 				{
 					kore_pgsql_logerror(&sql);
 					DENY();

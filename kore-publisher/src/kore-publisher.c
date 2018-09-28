@@ -18,7 +18,7 @@
 
 #include <ctype.h>
 
-#if 0
+#if 1
 	#define debug_printf(...)
 #else
 	#define debug_printf(...) printf(__VA_ARGS__)
@@ -38,8 +38,6 @@ int ep_deregister_owner (struct http_request *);
 
 void gen_salt_password_and_apikey (const char *, char *, char *, char *);
 bool login_success (const char *, const char *);
-
-inline bool is_owner(const char *);
 
 #define OK()    {req->status=200; goto done;}
 #define OK202() {req->status=202; goto done;}
@@ -85,7 +83,7 @@ inline bool is_owner(const char *);
 #define ERROR_if(x,msg) {if(x) { ERROR(msg); }}
 #define BAD_REQUEST_if(x,msg) {if(x) { BAD_REQUEST(msg); }}
 
-#define RUN_QUERY(query,err) {					\ 
+#define RUN_QUERY(query,err) {					\
 	debug_printf("RUN_QUERY ==> {%s}\n",query->data);	\
 	kore_pgsql_cleanup(&sql);				\
 	kore_pgsql_init(&sql);					\
@@ -94,7 +92,7 @@ inline bool is_owner(const char *);
 		kore_pgsql_logerror(&sql);			\
 		ERROR("DB error while setup");			\
 	}							\
-	if (! kore_pgsql_query(&sql,query->data))		\
+	if (! kore_pgsql_query(&sql, (char *)query->data))	\
 	{							\
 		kore_pgsql_logerror(&sql);			\
 		ERROR(err);					\
@@ -105,9 +103,9 @@ struct kore_buf *queue = NULL;
 struct kore_buf *query = NULL;
 struct kore_buf *response = NULL;
 
-uint8_t string_to_be_hashed 	[256];
+char 	string_to_be_hashed 	[256];
 uint8_t	binary_hash 		[SHA256_DIGEST_LENGTH];
-uint8_t hash_string		[SHA256_DIGEST_LENGTH*2 + 1];
+char 	hash_string		[SHA256_DIGEST_LENGTH*2 + 1];
 
 struct kore_pgsql sql;
 
@@ -137,7 +135,24 @@ init (int state)
 }
 
 inline bool
-is_valid_string(char *str)
+looks_like_a_valid_owner (const char *str)
+{
+	uint8_t strlen_str = strlen(str);
+
+	if (strlen_str == 0 || strlen_str > 32)
+		return false;
+
+	for (i = 0; i < strlen_str; ++i)
+	{
+		if (! isalnum(str[i]))
+			return false;	
+	}
+
+	return true;
+}
+
+inline bool
+looks_like_a_valid_entity (const char *str)
 {
 	uint8_t strlen_str = strlen(str);
 
@@ -152,7 +167,7 @@ is_valid_string(char *str)
 			++slash_count;
 		else
 		{
-			if (! isalpha(str[i]))
+			if (! isalnum(str[i]))
 				return false;	
 		}
 
@@ -218,8 +233,11 @@ login_success (const char *id, const char *apikey)
 	if (id == NULL || apikey == NULL || *id == '\0' || *apikey == '\0')
 		goto done;
 
-	if (! is_valid_string(id))
-		goto done;	
+	if (strchr(id,'\'') != NULL)
+		goto done;
+
+	if (strchr(id,'\\') != NULL)
+		goto done;
 
 	CREATE_STRING (query,"SELECT blocked,salt,password_hash FROM users WHERE id='%s'",id);
 
@@ -229,7 +247,7 @@ login_success (const char *id, const char *apikey)
 		kore_pgsql_logerror(&sql);
 		goto done;	
 	}
-	if (! kore_pgsql_query(&sql,query->data))
+	if (! kore_pgsql_query(&sql, (char *)query->data))
 	{
 		kore_pgsql_logerror(&sql);
 		goto done;	
@@ -387,12 +405,6 @@ done:
 	http_response(req, req->status, NULL, 0);
 
 	return (KORE_RESULT_OK);
-}
-
-inline bool
-is_owner(const char *id)
-{
-	return (strchr(id,'/') == NULL);
 }
 
 int
@@ -578,16 +590,11 @@ ep_register(struct http_request *req)
 	);
 
 	// deny if the user is not a owner	
-	if (! is_owner(id))
-		FORBIDDEN("id does not belong to a owner");
+	if (! looks_like_a_valid_owner(id))
+		FORBIDDEN("id is not valid");
 
-	if (! is_valid_string(id))
-		BAD_REQUEST("id should be alpha numeric");	
-
-	if (! is_valid_string(entity))
-		BAD_REQUEST("entity should be alpha numeric");	
-
-	/* XXX fix if entity name has '/' */ 
+	if (! looks_like_a_valid_entity(entity))
+		BAD_REQUEST("entity is not valid");	
 
 	BAD_REQUEST_if	
 	(
@@ -677,18 +684,12 @@ ep_deregister(struct http_request *req)
 	);
 
 	// deny if the user is not an owner
-	if (! is_owner(id))
+	if (! looks_like_a_valid_owner(id))
 		FORBIDDEN("id is not an owner");
 
-	if (! is_valid_string(id))
-		BAD_REQUEST("id should be alpha numeric");	
-
-	// deny if the entity looks like a owner 
-	if (is_owner(entity))
+	// deny if the entity is not valid 
+	if (! looks_like_a_valid_entity(entity))
 		FORBIDDEN("not a valid entity");
-
-	if (! is_valid_string(entity))
-		BAD_REQUEST("entity should be alpha numeric");	
 
 	if (! login_success(id,apikey))
 		FORBIDDEN("invalid id or apikey");
@@ -730,26 +731,23 @@ done:
 int
 ep_cat(struct http_request *req)
 {
-	const char *id;
+	const char *entity;
 	uint32_t num_rows = 0;
 
 	req->status = 403;
 
 	http_populate_get(req);
-	if (http_argument_get_string(req,"id",&id))
+	if (http_argument_get_string(req,"id",&entity))
 	{
 		// if not a valid entity
-		if (is_owner(id))
+		if (! looks_like_a_valid_entity(entity))
 			FORBIDDEN("id is not a valid entity");
 	
-		if (! is_valid_string(id))
-			BAD_REQUEST("id should be alpha numeric");	
-
-		CREATE_STRING (query,"SELECT schema FROM users WHERE schema is NOT NULL AND id='%s'",id);
+		CREATE_STRING (query,"SELECT schema FROM users WHERE schema is NOT NULL AND id='%s'",entity);
 	}
 	else
 	{
-		id = NULL;
+		entity = NULL;
 		CREATE_STRING (query,"SELECT id,schema FROM users WHERE schema is NOT NULL");
 	}
 
@@ -758,7 +756,7 @@ ep_cat(struct http_request *req)
 	num_rows = kore_pgsql_ntuples(&sql);
 
 	kore_buf_reset(response);
-	if (id == NULL) // get all data
+	if (entity == NULL) // get all data
 	{
 		kore_buf_append(response,"[",1);
 
@@ -848,12 +846,9 @@ ep_register_owner(struct http_request *req)
 		FORBIDDEN("only admin can call this api");
 
 	// it should look like an owner
-	if (! is_owner(entity))
+	if (! looks_like_a_valid_owner(entity))
 		BAD_REQUEST("entity should be an owner");	
 		
-	if (! is_valid_string(entity))
-		BAD_REQUEST("entity should be alpha numeric");	
-
 	if (! login_success("admin",apikey))
 		FORBIDDEN("wrong apikey");
 
@@ -934,11 +929,8 @@ ep_deregister_owner(struct http_request *req)
 		FORBIDDEN("cannot delete admin");
 
 	// it should look like an owner
-	if (! is_owner(entity))
+	if (! looks_like_a_valid_owner(entity))
 		BAD_REQUEST("entity should be an owner");	
-
-	if (! is_valid_string(entity))
-		BAD_REQUEST("entity should be alpha numeric");	
 
 	if (! login_success("admin",apikey))
 		FORBIDDEN("wrong apikey");
