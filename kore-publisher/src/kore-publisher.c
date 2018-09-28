@@ -135,7 +135,7 @@ init (int state)
 }
 
 inline bool
-looks_like_a_valid_owner (const char *str)
+is_alpha_numeric (const char *str)
 {
 	uint8_t strlen_str = strlen(str);
 
@@ -149,6 +149,12 @@ looks_like_a_valid_owner (const char *str)
 	}
 
 	return true;
+}
+
+inline bool
+looks_like_a_valid_owner (const char *str)
+{
+	return is_alpha_numeric(str);
 }
 
 inline bool
@@ -683,13 +689,13 @@ ep_deregister(struct http_request *req)
 		"inputs missing in headers"
 	);
 
-	// deny if the user is not an owner
+	// deny if the id does not look like an owner
 	if (! looks_like_a_valid_owner(id))
 		FORBIDDEN("id is not an owner");
 
 	// deny if the entity is not valid 
-	if (! looks_like_a_valid_entity(entity))
-		FORBIDDEN("not a valid entity");
+	if (! is_alpha_numeric(entity))
+		goto done;
 
 	if (! login_success(id,apikey))
 		FORBIDDEN("invalid id or apikey");
@@ -836,7 +842,6 @@ ep_register_owner(struct http_request *req)
 			,
 		"inputs missing in headers"
 	);
-
 
 	// cannot create an admin
 	if (strcmp(entity,"admin") == 0)
