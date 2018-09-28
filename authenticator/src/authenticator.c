@@ -42,8 +42,8 @@ int auth_topic(struct http_request *);
 int auth_vhost(struct http_request *);
 int auth_resource(struct http_request *);
 
-bool looks_like_a_valid_owner (char *);
-bool looks_like_a_valid_entity(char *);
+bool looks_like_a_valid_owner (const char *);
+bool looks_like_a_valid_entity(const char *);
 
 bool login_success (const char *, const char *);
 
@@ -68,8 +68,8 @@ init (int state)
 	return KORE_RESULT_OK;
 }
 
-bool
-looks_like_a_valid_owner (char *str)
+inline bool
+is_alpha_numeric (const char *str)
 {
 	uint8_t strlen_str = strlen(str);
 
@@ -79,36 +79,62 @@ looks_like_a_valid_owner (char *str)
 	for (i = 0; i < strlen_str; ++i)
 	{
 		if (! isalnum(str[i]))
-			return false;	
+		{
+			// support some extra chars
+			switch (str[i])
+			{
+				case '.':
+				case '@':
+				case '-':
+						break;
+				
+				default:
+						return false;	
+			}
+		}
 	}
 
 	return true;
 }
 
 bool
-looks_like_a_valid_entity (char *str)
+looks_like_a_valid_owner (const char *str)
+{
+	return is_alpha_numeric(str);
+}
+
+bool
+looks_like_a_valid_entity (const char *str)
 {
 	uint8_t strlen_str = strlen(str);
 
-	uint8_t slash_count = 0;
+	uint8_t back_slash_count = 0;
 
-	if (strlen_str == 0 || strlen_str > 32)
+	if (strlen_str == 0 || strlen_str > 65)
 		return false;
 
 	for (i = 0; i < strlen_str; ++i)
 	{
-		if (str[i] == '/')
-			++slash_count;
-		else
+		if (! isalnum(str[i]))
 		{
-			if (! isalnum(str[i])) {
-				return false;	
+			// support some extra chars but maximum 1 back slash
+			switch (str[i])
+			{
+				case '/':
+						++back_slash_count;
+						break;
+				case '.':
+				case '@':
+				case '-':
+						break;
+				
+				default:
+						return false;	
 			}
 		}
 
-		if (slash_count > 1) {
+		if (back_slash_count > 1)
 			return false;
-		}
 	}
 
 	return true;
@@ -136,6 +162,7 @@ login_success (const char *id, const char *apikey)
 	debug_printf("login query = {%s}\n",query->data);
 
 	kore_pgsql_cleanup(&sql);				\
+	kore_pgsql_init(&sql);
 	if (! kore_pgsql_setup(&sql,"db",KORE_PGSQL_SYNC))
 	{
 		kore_pgsql_logerror(&sql);

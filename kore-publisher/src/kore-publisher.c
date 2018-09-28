@@ -18,7 +18,7 @@
 
 #include <ctype.h>
 
-#if 1
+#if 0
 	#define debug_printf(...)
 #else
 	#define debug_printf(...) printf(__VA_ARGS__)
@@ -145,7 +145,19 @@ is_alpha_numeric (const char *str)
 	for (i = 0; i < strlen_str; ++i)
 	{
 		if (! isalnum(str[i]))
-			return false;	
+		{
+			// support some extra chars
+			switch (str[i])
+			{
+				case '.':
+				case '@':
+				case '-':
+						break;
+				
+				default:
+						return false;	
+			}
+		}
 	}
 
 	return true;
@@ -162,22 +174,32 @@ looks_like_a_valid_entity (const char *str)
 {
 	uint8_t strlen_str = strlen(str);
 
-	uint8_t slash_count = 0;
+	uint8_t back_slash_count = 0;
 
-	if (strlen_str == 0 || strlen_str > 32)
+	if (strlen_str == 0 || strlen_str > 65)
 		return false;
 
 	for (i = 0; i < strlen_str; ++i)
 	{
-		if (str[i] == '/')
-			++slash_count;
-		else
+		if (! isalnum(str[i]))
 		{
-			if (! isalnum(str[i]))
-				return false;	
+			// support some extra chars but maximum 1 back slash
+			switch (str[i])
+			{
+				case '/':
+						++back_slash_count;
+						break;
+				case '.':
+				case '@':
+				case '-':
+						break;
+				
+				default:
+						return false;	
+			}
 		}
 
-		if (slash_count > 1)
+		if (back_slash_count > 1)
 			return false;
 	}
 
@@ -248,6 +270,7 @@ login_success (const char *id, const char *apikey)
 	CREATE_STRING (query,"SELECT blocked,salt,password_hash FROM users WHERE id='%s'",id);
 
 	kore_pgsql_cleanup(&sql);
+	kore_pgsql_init(&sql);
 	if (! kore_pgsql_setup(&sql,"db",KORE_PGSQL_SYNC))
 	{
 		kore_pgsql_logerror(&sql);
@@ -262,7 +285,7 @@ login_success (const char *id, const char *apikey)
 	if (kore_pgsql_ntuples(&sql) == 0)
 		goto done;	
 
-	if (strcmp(kore_pgsql_getvalue(&sql,i,0),"t")  == 0)
+	if (strcmp(kore_pgsql_getvalue(&sql,0,0),"t")  == 0)
 		goto done;	
 
 	salt 	 	= kore_pgsql_getvalue(&sql,0,1);
