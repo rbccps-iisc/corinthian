@@ -1166,7 +1166,10 @@ follow (struct http_request *req)
 
 	if (strcmp(permission,"read") == 0)
 	{
-		CREATE_STRING (query, "INSERT INTO follow (follow_id,id_from,id_to,time,permission,topic,validity,status) values(DEFAULT,'%s','%s.protected',now(),'read','%s','%s','%s')",
+		CREATE_STRING (query, 
+			"INSERT INTO follow "
+			"(follow_id,id_from,id_to,time,permission,topic,validity,status) "
+			"values(DEFAULT,'%s','%s.protected',now(),'read','%s','%s','%s')",
 				from,
 				to,
 				topic,
@@ -1182,7 +1185,9 @@ follow (struct http_request *req)
 	}
 	else if (strcmp(permission,"write") == 0) 
 	{
-		CREATE_STRING (query, "INSERT INTO follow (follow_id,id_from,id_to,time,permission,topic,validity,status) values(DEFAULT,'%s','%s.command',now(),'write','%s','%s','%s')",
+		CREATE_STRING (query,
+			"INSERT INTO follow (follow_id,id_from,id_to,time,permission,topic,validity,status) "
+			"values(DEFAULT,'%s','%s.command',now(),'write','%s','%s','%s')",
 				from,
 				to,
 				"#",
@@ -1197,8 +1202,9 @@ follow (struct http_request *req)
 	}
 	else if (strcmp(permission,"read-write") == 0) 
 	{
-	printf("===========> read-write\n");
-		CREATE_STRING (query, "INSERT INTO follow (follow_id,id_from,id_to,time,permission,topic,validity,status) values(DEFAULT,'%s','%s.protected',now(),'read','%s','%s','%s')",
+		CREATE_STRING (query,
+			"INSERT INTO follow (follow_id,id_from,id_to,time,permission,topic,validity,status) "
+			"values(DEFAULT,'%s','%s.protected',now(),'read','%s','%s','%s')",
 				from,
 				to,
 				topic,
@@ -1214,7 +1220,9 @@ follow (struct http_request *req)
 
 		printf("Got read ={%s}\n",read_follow_id);
 
-		CREATE_STRING (query, "INSERT INTO follow (follow_id,id_from,id_to,time,permission,topic,validity,status) values(DEFAULT,'%s','%s.command',now(),'write','%s','%s','%s')",
+		CREATE_STRING (query,
+			"INSERT INTO follow (follow_id,id_from,id_to,time,permission,topic,validity,status) "
+			"values(DEFAULT,'%s','%s.command',now(),'write','%s','%s','%s')",
 				from,
 				to,
 				"#",
@@ -1242,55 +1250,88 @@ follow (struct http_request *req)
 		// add entry in acl
 		if (strcmp(permission,"read") == 0)
 		{
-			CREATE_STRING 	(query,"INSERT into acl (acl_id,id,exchange,follow_id,permission,topic,valid_till) "
+			CREATE_STRING (query,
+				"INSERT into acl (acl_id,id,exchange,follow_id,permission,topic,valid_till) "
 				"values(DEFAULT,'%s','%s.protected','%s','%s', '%s', now() + interval '%s  hours')",
-			        from, to, read_follow_id, "read", topic, validity);
+			        	from,
+					to,
+					read_follow_id,
+					"read",
+					topic,
+					validity
+			);
 
-			RUN_QUERY	(query,"could not run insert query on acl - read ");
+			RUN_QUERY (query,"could not run insert query on acl - read ");
 		}
 		else if (strcmp(permission,"write") == 0)
 		{
-			CREATE_STRING 	(query,"INSERT into acl (acl_id,id,exchange,follow_id,permission,topic,valid_till) "
+			CREATE_STRING (query,
+				"INSERT into acl (acl_id,id,exchange,follow_id,permission,topic,valid_till) "
 				"values(DEFAULT,'%s','%s.command','%s','%s', '%s', now() + interval '%s  hours')",
-			        from, to, write_follow_id, "write", topic, validity);
+			        	from,
+					to,
+					write_follow_id,
+					"write",
+					topic,
+					validity
+			);
 
-			RUN_QUERY	(query,"could not run insert query on acl - write");
+			RUN_QUERY (query,"could not run insert query on acl - write");
 		}
 		else if (strcmp(permission,"read-write") == 0)
 		{
-			CREATE_STRING 	(query,"INSERT into acl (acl_id,id,exchange,follow_id,permission,topic,valid_till) "
+			CREATE_STRING (query,
+				"INSERT into acl (acl_id,id,exchange,follow_id,permission,topic,valid_till) "
 				"values(DEFAULT,'%s','%s.protected','%s','%s', '%s', now() + interval '%s  hours')",
-			        from, to, read_follow_id, "read", topic, validity);
+			        	from,
+					to,
+					read_follow_id,
+					"read",
+					topic,
+					validity
+			);
 
-			RUN_QUERY	(query,"could not run insert query on acl - read/write -1 ");
+			RUN_QUERY(query,"could not run insert query on acl - read/write -1 ");
 
-			CREATE_STRING 	(query,"INSERT into acl (acl_id,id,exchange,follow_id,permission,topic,valid_till) "
+			CREATE_STRING (query,
+				"INSERT into acl (acl_id,id,exchange,follow_id,permission,topic,valid_till) "
 				"values(DEFAULT,'%s','%s.command','%s','%s', '%s', now() + interval '%s  hours')",
-			        from, to, write_follow_id, "write", topic, validity);
+			        	from,
+					to,
+					write_follow_id,
+					"write",
+					topic,
+					validity
+			);
 
-			RUN_QUERY	(query,"could not run insert query on acl - read/write - 2");
+			RUN_QUERY (query,"could not run insert query on acl - read/write - 2");
 		}
 
 		req->status = 200;	
 	}
 	else
 	{
-
 		// we have sent the request,
 		// but the owner of the "to" device must approve
 		req->status = 202;
 	}
 
 	kore_buf_reset(response);
-	kore_buf_append(response,"[",1);
+	kore_buf_append(response,"{",1);
 
 	if (strlen(read_follow_id) > 0)
-		kore_buf_appendf(response,"{\"follow-id\":%s},",read_follow_id);
+		kore_buf_appendf(response,"\"follow-id-read\":%s",read_follow_id);
 
 	if (strlen(write_follow_id) > 0)
-		kore_buf_appendf(response,"{\"follow-id\":%s},",write_follow_id);
+	{
+		// put a comma
+		if (strlen(read_follow_id) > 0)
+			kore_buf_append(response,",",1);			
 
-	kore_buf_append(response,"]",1);
+		kore_buf_appendf(response,"\"follow-id-write\":%s",write_follow_id);
+	}
+
+	kore_buf_append(response,"}",1);
 
 done:
 	http_response_header(req, "content-type", "application/json");
@@ -1342,11 +1383,11 @@ get_follow_requests (struct http_request *req)
 
 	if (strcmp(status,"all") == 0)
 	{
-		CREATE_STRING(query, "SELECT * FROM follow WHERE id_to LIKE '%s/%%.%%'",id);
+		CREATE_STRING(query,"SELECT * FROM follow WHERE id_to LIKE '%s/%%.%%'",id);
 	}
 	else
 	{
-		CREATE_STRING(query, "SELECT * FROM follow WHERE id_to LIKE '%s/%%.%%' and status='%s'",id, status);
+		CREATE_STRING(query,"SELECT * FROM follow WHERE id_to LIKE '%s/%%.%%' and status='%s'",id, status);
 	}
 
 	RUN_QUERY(query, "could not get follow requests");
@@ -1428,7 +1469,8 @@ share (struct http_request *req)
 		FORBIDDEN("invalid id or apikey");
 
 	CREATE_STRING (query, 
-		"SELECT id_from,id_to,permission,validity,topic FROM follow where follow_id = '%s' and id_to LIKE '%s/%%.%%' and status='pending'",
+		"SELECT id_from,id_to,permission,validity,topic FROM follow "
+		"WHERE follow_id = '%s' AND id_to LIKE '%s/%%.%%' and status='pending'",
 			follow_id,
 			id
 	);
@@ -1446,27 +1488,27 @@ share (struct http_request *req)
 	char *validity_hours 	= kore_pgsql_getvalue(&sql,0,3); 
 	char *topic 	 	= kore_pgsql_getvalue(&sql,0,4); 
 
-	// XXX fix all posgres select dont use *
-	// XXX XXX XXX FIX ALL INSERTS by adding fields XXX XXX XXX 
-
-	// XXX CHECK ALL inputs for injection XXX
-
 	// NOTE: follow_id is primary key 
 	CREATE_STRING 	(query,"UPDATE follow SET status='approved' WHERE follow_id = '%s'",follow_id);
 	RUN_QUERY	(query,"could not run update query on follow");
 
 	// add entry in acl
-	CREATE_STRING 	(query,"INSERT into acl (acl_id,id,exchange,follow_id,permission,topic,valid_till) "
-			"values(DEFAULT,'%s','%s','%s','%s', '%s', now() + interval '%s  hours')",
-			        id_from, exchange, follow_id, permission, topic, validity_hours);
+	CREATE_STRING 	(query,
+				"INSERT into acl (acl_id,id,exchange,follow_id,permission,topic,valid_till) "
+				"values(DEFAULT,'%s','%s','%s','%s', '%s', now() + interval '%s  hours')",
+			        	id_from,
+					exchange,
+					follow_id,
+					permission,
+					topic,
+					validity_hours
+	);
 
-	RUN_QUERY	(query,"could not run insert query on acl");
+	RUN_QUERY (query,"could not run insert query on acl");
 
 	OK();
 
 done:
-	/* XXX if req->offset is 0 no need to set response header */	
-
 	http_response_header(req, "content-type", "application/json");
 	http_response(req, req->status, response->data, response->offset);
 
