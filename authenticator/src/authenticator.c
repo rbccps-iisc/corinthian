@@ -12,7 +12,7 @@
 
 #include <ctype.h>
 
-#if 1
+#if 0
 	#define debug_printf(...)
 #else
 	#define debug_printf(...) printf(__VA_ARGS__)
@@ -132,6 +132,10 @@ looks_like_a_valid_entity (const char *str)
 		if (back_slash_count > 1)
 			return false;
 	}
+
+	// there should be one back slash
+	if (back_slash_count != 1)
+		return false;
 
 	return true;
 }
@@ -318,10 +322,6 @@ auth_resource(struct http_request *req)
 	if (looks_like_a_valid_owner(name))
 		DENY()
 
-	// name should be a valid entity
-	if (! looks_like_a_valid_entity(name))
-		DENY()
-
 	// get user info in acl, if blocked deny
 	CREATE_STRING (query,"SELECT blocked FROM users WHERE id='%s'",username);
 
@@ -392,7 +392,7 @@ auth_resource(struct http_request *req)
 			DENY();
 
 		// devices/apps can write to their own exchanges
-		if (strncmp(name,username,strlen_username) == 0 && (name[strlen_username + 1] != '.'))
+		if (strncmp(name,username,strlen_username) == 0 && (name[strlen_username] != '.'))
 		{
 			// entities can write in to their 
 			// 	username.public
@@ -420,13 +420,11 @@ auth_resource(struct http_request *req)
 			// else there must a share entry 
 
 			CREATE_STRING (query,
-			"SELECT permissions FROM acl WHERE id='%s' AND exchange='%s' and permissions='w'",
+			"SELECT permission FROM acl WHERE id='%s' AND exchange='%s' and permission='write'"
+			" AND now() < valid_till",
 				username,
 				name
 			);
-
-			debug_printf("query = '%s'\n",query->data);
-
 			kore_pgsql_cleanup(&sql);
 			if (! kore_pgsql_setup(&sql,"db",KORE_PGSQL_SYNC))
 			{
@@ -439,8 +437,8 @@ auth_resource(struct http_request *req)
 				DENY();
 			}
 
-			// if we found a valid share entry
-			// TODO check validity date of share
+			printf("for query = {%s} got {%d] results\n",query->data,kore_pgsql_ntuples(&sql));
+
 			if (kore_pgsql_ntuples(&sql) == 1)
 				OK();
 		}

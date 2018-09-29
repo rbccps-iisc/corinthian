@@ -16,7 +16,7 @@
 
 #include <ctype.h>
 
-#if 0
+#if 1
 	#define debug_printf(...)
 #else
 	#define debug_printf(...) printf(__VA_ARGS__)
@@ -45,6 +45,10 @@ int unshare		(struct http_request *);
 int init (int);
 void gen_salt_password_and_apikey (const char *, char *, char *, char *);
 bool login_success (const char *, const char *);
+
+
+bool looks_like_a_valid_owner(const char *str);
+bool looks_like_a_valid_entity (const char *str);
 
 #define OK()    {req->status=200; goto done;}
 #define OK202() {req->status=202; goto done;}
@@ -106,7 +110,7 @@ bool login_success (const char *, const char *);
 	}							\
 }
 
-struct kore_buf *queue = NULL;
+struct kore_buf *Q = NULL;
 struct kore_buf *query = NULL;
 struct kore_buf *response = NULL;
 
@@ -122,13 +126,14 @@ size_t i;
 	kore_buf_reset(buf);			\
 	kore_buf_appendf(buf,__VA_ARGS__);	\
 	kore_buf_stringify(buf,NULL);		\
+	printf("Got buf = {%s}\n",buf->data);	\
 }
 
 int
 init (int state)
 {
-	if (queue == NULL)
-		queue = kore_buf_alloc(256);
+	if (Q == NULL)
+		Q = kore_buf_alloc(256);
 
 	if (query == NULL)
 		query = kore_buf_alloc(512);
@@ -141,7 +146,7 @@ init (int state)
 	return KORE_RESULT_OK;
 }
 
-inline bool
+bool
 is_alpha_numeric (const char *str)
 {
 	uint8_t strlen_str = strlen(str);
@@ -166,13 +171,13 @@ is_alpha_numeric (const char *str)
 	return true;
 }
 
-inline bool
+bool
 looks_like_a_valid_owner (const char *str)
 {
 	return is_alpha_numeric(str);
 }
 
-inline bool
+bool
 looks_like_a_valid_entity (const char *str)
 {
 	uint8_t strlen_str = strlen(str);
@@ -202,6 +207,10 @@ looks_like_a_valid_entity (const char *str)
 		if (back_slash_count > 1)
 			return false;
 	}
+
+	// there should be one back slash
+	if (back_slash_count != 1)
+		return false;
 
 	return true;
 }
@@ -326,6 +335,8 @@ login_success (const char *id, const char *apikey)
 
 	hash_string[64] = '\0';
 
+	printf("Expecting it to be {%s} got {%s}\n",password_hash, hash_string);
+
 	if (strncmp(hash_string,password_hash,64) == 0)
 		login_result = true;
 
@@ -428,7 +439,11 @@ done:
 	if (socket)
 		free(socket);
 
-	http_response(req, req->status, NULL, 0);
+	http_response_header(req, "content-type", "application/json");
+	http_response(req, req->status, response->data, response->offset);
+
+	kore_buf_reset(Q);
+	kore_buf_reset(response);
 
 	return (KORE_RESULT_OK);
 }
@@ -466,15 +481,15 @@ subscribe(struct http_request *req)
 		"inputs missing in headers"
 	);
 
-	kore_buf_append(queue,id,strlen(id));
+	kore_buf_append(Q,id,strlen(id));
 	if (KORE_RESULT_OK == http_request_header(req, "message-type", &message_type))
 	{
 		if (strcmp(message_type,"priority") == 0)
 		{
-			kore_buf_append (queue,".priority",9);
+			kore_buf_append (Q,".priority",9);
 		}
 	}
-	kore_buf_append(queue,"\0",1);
+	kore_buf_append(Q,"\0",1);
 
 	/* XXX TO BE DONE */
 	int_num_messages = 10;
@@ -517,7 +532,7 @@ subscribe(struct http_request *req)
 	if (rpc_reply.reply_type != AMQP_RESPONSE_NORMAL)
 		FORBIDDEN("did not receive expected response from the broker");
 
-	amqp_basic_consume(connection, 1, amqp_cstring_bytes((char const *)queue->data), amqp_empty_bytes, 0, 1, 0, amqp_empty_table);
+	amqp_basic_consume(connection, 1, amqp_cstring_bytes((char const *)Q->data), amqp_empty_bytes, 0, 1, 0, amqp_empty_table);
 
 	kore_buf_append(response,"[",1);
 
@@ -581,11 +596,13 @@ done:
 	http_response_header(req, "content-type", "application/json");
 	http_response(req, req->status, response->data, response->offset);
 
-	kore_buf_reset(queue);
+	kore_buf_reset(Q);
 	kore_buf_reset(response);
 
 	return (KORE_RESULT_OK);
 }
+
+// one with register-bulk
 
 int
 register_entity (struct http_request *req)
@@ -619,7 +636,7 @@ register_entity (struct http_request *req)
 	if (! looks_like_a_valid_owner(id))
 		FORBIDDEN("id is not valid");
 
-	if (! looks_like_a_valid_entity(entity))
+	if (! is_alpha_numeric(entity))
 		BAD_REQUEST("entity is not valid");	
 
 	BAD_REQUEST_if	
@@ -658,7 +675,7 @@ register_entity (struct http_request *req)
 	} 
 
 	CREATE_STRING (query,
-			"INSERT INTO users values('%s','%s','%s','f')",
+			"INSERT INTO users (id,password_hash,schema,salt,blocked) values('%s','%s','%s','f')",
 			entity_name,
 			password_hash,
 			body,		// schema
@@ -749,16 +766,25 @@ deregister_entity (struct http_request *req)
 		"inputs missing in headers"
 	);
 
+printf("=========== 1 ==============\n");
+
 	// deny if the id does not look like an owner
 	if (! looks_like_a_valid_owner(id))
 		FORBIDDEN("id is not an owner");
+
+printf("=========== 2 ==============\n");
 
 	// deny if the entity is not valid 
 	if (! is_alpha_numeric(entity))
 		goto done;
 
+printf("=========== 3 ==============\n");
+
 	if (! login_success(id,apikey))
 		FORBIDDEN("invalid id or apikey");
+
+
+printf("=========== 4 ==============\n");
 
 	strlcpy(entity_name,id,33); 
 	strlcat(entity_name,"/",34); 
@@ -771,8 +797,12 @@ deregister_entity (struct http_request *req)
 	CREATE_STRING 	(query,"DELETE FROM acl WHERE id = '%s' or exchange='%s'",entity_name, entity_name);
 	RUN_QUERY 	(query,"could not delete from acl table");
 
+printf("=========== 5 ==============\n");
+
 	CREATE_STRING 	(query,"DELETE FROM users WHERE id = '%s'",entity_name);
 	RUN_QUERY	(query,"could not delete the entity");
+
+printf("=========== 6 ==============\n");
 
 	OK();
 
@@ -921,7 +951,7 @@ register_owner(struct http_request *req)
 	gen_salt_password_and_apikey (entity, salt, password_hash, entity_apikey);
 
 	CREATE_STRING (query,
-			"INSERT INTO users values('%s','%s',NULL,'%s','f')",
+			"INSERT INTO users (id,password_hash,schema,salt,blocked) values('%s','%s',NULL,'%s','f')",
 				entity,
 				password_hash,
 				salt
@@ -1018,7 +1048,7 @@ done:
 
 	kore_pgsql_cleanup(&sql);
 
-	kore_buf_reset(queue);
+	kore_buf_reset(query);
 	kore_buf_reset(response);
 
 	return (KORE_RESULT_OK);
@@ -1027,17 +1057,374 @@ done:
 int
 follow (struct http_request *req)
 {
+	const char *id;
+	const char *apikey;
+
+	const char *from;
+	const char *to;
+
+	const char *permission; // read, write, or, read-write
+
+	const char *topic; // topics the subscriber is interested in
+
+	const char *validity; // in hours 
+
+	char *status = "pending";
+
+	req->status = 403;
+
+	BAD_REQUEST_if
+	(
+		KORE_RESULT_OK != http_request_header(req, "id", &id)
+				||
+		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+				||
+		KORE_RESULT_OK != http_request_header(req, "from", &from)
+				||
+		KORE_RESULT_OK != http_request_header(req, "to", &to)
+				||
+		KORE_RESULT_OK != http_request_header(req, "permission", &permission)
+				||
+		KORE_RESULT_OK != http_request_header(req, "validity", &validity)
+			,
+		"inputs missing in headers"
+	);
+
+	if (strcmp(permission,"read") == 0 || strcmp(permission,"read-write") == 0)
+	{
+		if (KORE_RESULT_OK != http_request_header(req, "topic", &topic))
+		{
+			BAD_REQUEST ("topic is missing in headers");
+		}
+	}
+
+	if (! looks_like_a_valid_owner(id))
+		BAD_REQUEST("id is not valid owner");	
+
+	uint8_t strlen_id = strlen(id);
+
+	if (! looks_like_a_valid_entity(from))
+		FORBIDDEN("from is not a valid entity");
+	
+	if (! looks_like_a_valid_entity(to))
+		FORBIDDEN("to is not a valid entity");
+
+	// check if the he is the owner of from 
+	if (strncmp(id,from,strlen_id) != 0)
+		FORBIDDEN("you are not the owner of from entity");
+
+	if (! login_success(id,apikey))
+		FORBIDDEN("invalid id or apikey");
+
+	// if both from and to are owned by id
+	if (
+		(from[strlen_id] == '/')
+				&&
+		(strncmp(id,to,strlen_id) == 0)
+				&&
+		(to[strlen_id] == '/')
+	)
+	{
+		status = "approved";	
+	}
+
+	char *read_follow_id = "";
+	char *write_follow_id = "";
+
+	if (strcmp(permission,"read") == 0)
+	{
+		CREATE_STRING (query, "INSERT INTO follow (follow_id,id_from,id_to,time,permission,topic,validity,status) values(DEFAULT,'%s','%s.protected',now(),'read','%s','%s','%s')",
+				from,
+				to,
+				topic,
+				validity,
+				status
+		);
+		RUN_QUERY (query, "failed to insert follow - read");
+
+		CREATE_STRING 	(query,"SELECT currval(pg_get_serial_sequence('follow','follow_id'))");
+		RUN_QUERY 	(query,"failed pg_get_serial read");
+		read_follow_id = kore_pgsql_getvalue(&sql,0,0);
+	}
+	else if (strcmp(permission,"write") == 0) 
+	{
+		CREATE_STRING (query, "INSERT INTO follow (follow_id,id_from,id_to,time,permission,topic,validity,status) values(DEFAULT,'%s','%s.command',now(),'write','%s','%s','%s')",
+				from,
+				to,
+				"#",
+				validity,
+				status
+		);
+		RUN_QUERY (query, "failed to insert follow - write");
+
+		CREATE_STRING 	(query,"SELECT currval(pg_get_serial_sequence('follow','follow_id'))");
+		RUN_QUERY 	(query, "failed pg_get_serial write");
+		write_follow_id = kore_pgsql_getvalue(&sql,0,0);
+	}
+	else if (strcmp(permission,"read-write") == 0) 
+	{
+		CREATE_STRING (query, "INSERT INTO follow (follow_id,id_from,id_to,time,permission,topic,validity,status) values(DEFAULT,'%s','%s.protected',now(),'read','%s','%s','%s')",
+				from,
+				to,
+				topic,
+				validity,
+				status
+		);
+		RUN_QUERY (query, "failed to insert follow - read");
+
+		CREATE_STRING 	(query,"SELECT currval(pg_get_serial_sequence('follow','follow_id'))");
+		RUN_QUERY 	(query,"failed pg_get_serial read in read-write");
+		read_follow_id = kore_pgsql_getvalue(&sql,0,0);
+
+		CREATE_STRING (query, "INSERT INTO follow (follow_id,id_from,id_to,time,permission,topic,validity,status) values(DEFAULT,'%s','%s.command',now(),'write','%s','%s','%s')",
+				from,
+				to,
+				"#",
+				validity,
+				status
+		);
+		RUN_QUERY (query, "failed to insert follow - write");
+
+		CREATE_STRING 	(query,"SELECT currval(pg_get_serial_sequence('follow','follow_id'))");
+		RUN_QUERY 	(query,"failed pg_get_serial write in read-write");
+		write_follow_id = kore_pgsql_getvalue(&sql,0,0);
+	}
+	else
+	{
+		BAD_REQUEST("invalid permission type");
+	}
+
+	if (strcmp(status,"approved") == 0)
+	{
+		// add entry in acl
+		if (strcmp(permission,"read") == 0)
+		{
+			CREATE_STRING 	(query,"INSERT into acl (acl_id,id,exchange,follow_id,permission,topic,valid_till) "
+				"values(DEFAULT,'%s','%s.protected','%s','%s', '%s', now() + interval '%s  hours')",
+			        from, to, read_follow_id, "read", topic, validity);
+
+			RUN_QUERY	(query,"could not run insert query on acl - read ");
+		}
+		else if (strcmp(permission,"write") == 0)
+		{
+			CREATE_STRING 	(query,"INSERT into acl (acl_id,id,exchange,follow_id,permission,topic,valid_till) "
+				"values(DEFAULT,'%s','%s.command','%s','%s', '%s', now() + interval '%s  hours')",
+			        from, to, write_follow_id, "write", topic, validity);
+
+			RUN_QUERY	(query,"could not run insert query on acl - write");
+		}
+		else if (strcmp(permission,"read-write") == 0)
+		{
+			CREATE_STRING 	(query,"INSERT into acl (acl_id,id,exchange,follow_id,permission,topic,valid_till) "
+				"values(DEFAULT,'%s','%s.protected','%s','%s', '%s', now() + interval '%s  hours')",
+			        from, to, read_follow_id, "read", topic, validity);
+
+			RUN_QUERY	(query,"could not run insert query on acl - read/write -1 ");
+
+			CREATE_STRING 	(query,"INSERT into acl (acl_id,id,exchange,follow_id,permission,topic,valid_till) "
+				"values(DEFAULT,'%s','%s.command','%s','%s', '%s', now() + interval '%s  hours')",
+			        from, to, write_follow_id, "write", topic, validity);
+
+			RUN_QUERY	(query,"could not run insert query on acl - read/write - 2");
+		}
+
+		OK();
+	}
+	else
+	{
+		// we have sent the request,
+		// but the owner of the "to" device must approve
+		OK202();
+	}
+
+done:
+	http_response_header(req, "content-type", "application/json");
+	http_response(req, req->status, response->data, response->offset);
+
+	kore_pgsql_cleanup(&sql);
+
+	kore_buf_reset(query);
+	kore_buf_reset(response);
+
 	return (KORE_RESULT_OK);
 }
 
 int
-unfollow (struct http_request *req)
+get_follow_requests (struct http_request *req)
 {
+	const char *id;
+	const char *apikey;
+	const char *status;
+
+	req->status = 403;
+
+	BAD_REQUEST_if
+	(
+		KORE_RESULT_OK != http_request_header(req, "id", &id)
+				||
+		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+		,
+		
+		"inputs missing in headers"
+	);
+
+	if (KORE_RESULT_OK != http_request_header(req, "status", &status))
+		status = "all";
+
+	if (	
+		strcmp(status,"pending")  != 0 && 
+		strcmp(status,"approved") != 0 &&
+		strcmp(status,"rejected") != 0 &&
+		strcmp(status,"all") 	  != 0
+	)
+		BAD_REQUEST("status can be pending, approved, rejected, or all");
+
+	if (! looks_like_a_valid_owner(id))
+		BAD_REQUEST("id is not valid owner");	
+
+	if (! login_success(id,apikey))
+		FORBIDDEN("invalid id or apikey");
+
+	if (strcmp(status,"all") == 0)
+	{
+		CREATE_STRING(query, "SELECT * FROM follow WHERE id_to LIKE '%s/%%.%%'",id);
+	}
+	else
+	{
+		CREATE_STRING(query, "SELECT * FROM follow WHERE id_to LIKE '%s/%%.%%' and status='%s'",id, status);
+	}
+
+	RUN_QUERY(query, "could not get follow requests");
+
+	uint32_t num_rows = kore_pgsql_ntuples(&sql);
+
+	kore_buf_reset(response);
+	kore_buf_append(response,"[",1);
+	for (i = 0; i < num_rows; ++i)
+	{
+		kore_buf_appendf(
+			response,
+			"{\"id\":\"%s\","
+			"\"from\":\"%s\","
+			"\"to\":\"%s\","
+			"\"time\":\"%s\","
+			"\"permission\":\"%s\","
+			"\"topic\":\"%s\","
+			"\"validity\":\"%s\","
+			"\"status\":\"%s\"},"
+			,
+			kore_pgsql_getvalue(&sql,i,0),
+			kore_pgsql_getvalue(&sql,i,1),
+			kore_pgsql_getvalue(&sql,i,2),
+			kore_pgsql_getvalue(&sql,i,3),
+			kore_pgsql_getvalue(&sql,i,4),
+			kore_pgsql_getvalue(&sql,i,5),
+			kore_pgsql_getvalue(&sql,i,6),
+			kore_pgsql_getvalue(&sql,i,7)
+		);
+	}
+	if (num_rows > 0)
+	{
+		// remove the last COMMA 
+		--(response->offset);
+	}
+
+	kore_buf_append(response,"]",1);
+
+	OK();
+
+done:
+	http_response_header(req, "content-type", "application/json");
+	http_response(req, req->status, response->data, response->offset);
+
+	kore_pgsql_cleanup(&sql);
+
+	kore_buf_reset(query);
+	kore_buf_reset(response);
+
 	return (KORE_RESULT_OK);
 }
 
 int
 share (struct http_request *req)
+{
+	const char *id;
+	const char *apikey;
+	const char *follow_id;
+
+	req->status = 403;
+
+	BAD_REQUEST_if
+	(
+		KORE_RESULT_OK != http_request_header(req, "id", &id)
+				||
+		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+				||
+		KORE_RESULT_OK != http_request_header(req, "follow-id", &follow_id)
+		,
+		
+		"inputs missing in headers"
+	);
+
+	if (! looks_like_a_valid_owner(id))
+		BAD_REQUEST("id is not valid owner");	
+
+	if (! login_success(id,apikey))
+		FORBIDDEN("invalid id or apikey");
+
+	CREATE_STRING (query, 
+		"SELECT id_from,id_to,permission,validity,topic FROM follow where follow_id = '%s' and id_to LIKE '%s/%%.%%' and status='pending'",
+			follow_id,
+			id
+	);
+
+	RUN_QUERY (query,"could not run select query on follow");
+
+	uint32_t num_rows = kore_pgsql_ntuples(&sql);
+
+	if (num_rows != 1)
+		BAD_REQUEST("follow-id is not valid");
+
+	char *id_from 	 	= kore_pgsql_getvalue(&sql,0,0);
+	char *exchange 	 	= kore_pgsql_getvalue(&sql,0,1);
+	char *permission 	= kore_pgsql_getvalue(&sql,0,2); 
+	char *validity_hours 	= kore_pgsql_getvalue(&sql,0,3); 
+	char *topic 	 	= kore_pgsql_getvalue(&sql,0,4); 
+
+	// XXX fix all posgres select dont use *
+	// XXX XXX XXX FIX ALL INSERTS by adding fields XXX XXX XXX 
+
+	// XXX CHECK ALL inputs for injection XXX
+
+	// NOTE: follow_id is primary key 
+	CREATE_STRING 	(query,"UPDATE follow SET status='approved' WHERE follow_id = '%s'",follow_id);
+	RUN_QUERY	(query,"could not run update query on follow");
+
+	// add entry in acl
+	CREATE_STRING 	(query,"INSERT into acl (acl_id,id,exchange,follow_id,permission,topic,valid_till) "
+			"values(DEFAULT,'%s','%s','%s','%s', '%s', now() + interval '%s  hours')",
+			        id_from, exchange, follow_id, permission, topic, validity_hours);
+
+	RUN_QUERY	(query,"could not run insert query on acl");
+
+	OK();
+
+done:
+	/* XXX if req->offset is 0 no need to set response header */	
+
+	http_response_header(req, "content-type", "application/json");
+	http_response(req, req->status, response->data, response->offset);
+
+	kore_pgsql_cleanup(&sql);
+
+	kore_buf_reset(query);
+	kore_buf_reset(response);
+
+	return (KORE_RESULT_OK);
+}
+
+int
+unfollow (struct http_request *req)
 {
 	return (KORE_RESULT_OK);
 }
