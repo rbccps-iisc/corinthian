@@ -16,7 +16,7 @@
 
 #include <ctype.h>
 
-#if 1
+#if 0
 	#define debug_printf(...)
 #else
 	#define debug_printf(...) printf(__VA_ARGS__)
@@ -770,9 +770,8 @@ deregister_entity (struct http_request *req)
 	if (! looks_like_a_valid_owner(id))
 		FORBIDDEN("id is not an owner");
 
-	// deny if the entity is not valid 
-	if (! looks_like_a_valid_entity(entity))
-		goto done;
+	if (! is_alpha_numeric(entity))
+		FORBIDDEN("entity is not valid");
 
 	if (! login_success(id,apikey))
 		FORBIDDEN("invalid id or apikey");
@@ -785,11 +784,28 @@ deregister_entity (struct http_request *req)
 
 	// TODO run select query and delete all exchanges and queues of entity_name 
 
-	CREATE_STRING 	(query,"DELETE FROM acl WHERE id = '%s' or exchange='%s'",entity_name, entity_name);
-	RUN_QUERY 	(query,"could not delete from acl table");
+	CREATE_STRING (
+		query,
+		"DELETE FROM acl WHERE id = '%s' or exchange LIKE '%s.%%'",
+		entity_name,
+		entity_name
+	);
 
-	CREATE_STRING 	(query,"DELETE FROM users WHERE id = '%s'",entity_name);
+	RUN_QUERY(query,"could not delete from acl table");
+
+	CREATE_STRING (
+		query,
+		"DELETE FROM follow WHERE id_from = '%s' or id_to LIKE '%s.%%'",
+		entity_name,
+		entity_name
+	);
+
+	RUN_QUERY(query,"could not delete from follow table");
+
+	CREATE_STRING (query,"DELETE FROM users WHERE id = '%s'",entity_name);
+	printf("RAN2 ===> {%s}\n",query->data);
 	RUN_QUERY	(query,"could not delete the entity");
+
 
 	OK();
 
@@ -1320,7 +1336,7 @@ follow (struct http_request *req)
 	kore_buf_append(response,"{",1);
 
 	if (strlen(read_follow_id) > 0)
-		kore_buf_appendf(response,"\"follow-id-read\":%s",read_follow_id);
+		kore_buf_appendf(response,"\"follow-id-read\":\"%s\"",read_follow_id);
 
 	if (strlen(write_follow_id) > 0)
 	{
@@ -1328,7 +1344,7 @@ follow (struct http_request *req)
 		if (strlen(read_follow_id) > 0)
 			kore_buf_append(response,",",1);			
 
-		kore_buf_appendf(response,"\"follow-id-write\":%s",write_follow_id);
+		kore_buf_appendf(response,"\"follow-id-write\":\"%s\"",write_follow_id);
 	}
 
 	kore_buf_append(response,"}",1);
