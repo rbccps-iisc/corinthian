@@ -675,7 +675,7 @@ register_entity (struct http_request *req)
 	} 
 
 	CREATE_STRING (query,
-			"INSERT INTO users (id,password_hash,schema,salt,blocked) values('%s','%s','%s','f')",
+			"INSERT INTO users (id,password_hash,schema,salt,blocked) values('%s','%s','%s','%s','f')",
 			entity_name,
 			password_hash,
 			body,		// schema
@@ -766,25 +766,16 @@ deregister_entity (struct http_request *req)
 		"inputs missing in headers"
 	);
 
-printf("=========== 1 ==============\n");
-
 	// deny if the id does not look like an owner
 	if (! looks_like_a_valid_owner(id))
 		FORBIDDEN("id is not an owner");
 
-printf("=========== 2 ==============\n");
-
 	// deny if the entity is not valid 
-	if (! is_alpha_numeric(entity))
+	if (! looks_like_a_valid_entity(entity))
 		goto done;
-
-printf("=========== 3 ==============\n");
 
 	if (! login_success(id,apikey))
 		FORBIDDEN("invalid id or apikey");
-
-
-printf("=========== 4 ==============\n");
 
 	strlcpy(entity_name,id,33); 
 	strlcat(entity_name,"/",34); 
@@ -797,12 +788,8 @@ printf("=========== 4 ==============\n");
 	CREATE_STRING 	(query,"DELETE FROM acl WHERE id = '%s' or exchange='%s'",entity_name, entity_name);
 	RUN_QUERY 	(query,"could not delete from acl table");
 
-printf("=========== 5 ==============\n");
-
 	CREATE_STRING 	(query,"DELETE FROM users WHERE id = '%s'",entity_name);
 	RUN_QUERY	(query,"could not delete the entity");
-
-printf("=========== 6 ==============\n");
 
 	OK();
 
@@ -881,6 +868,54 @@ cat(struct http_request *req)
 		kore_buf_append(response,schema,strlen(schema));
 	}
 
+	OK();
+
+done:
+	http_response_header(req, "content-type", "application/json");
+	http_response(req, req->status, response->data, response->offset);
+
+	kore_pgsql_cleanup(&sql);
+
+	kore_buf_reset(query);
+	kore_buf_reset(response);
+
+	return (KORE_RESULT_OK);
+}
+
+int
+db_cleanup (struct http_request *req)
+{
+	const char *id;
+	const char *apikey;
+
+	req->status = 403;
+
+	if (req->owner->addrtype == AF_INET)
+	{
+		if (req->owner->addr.ipv4.sin_addr.s_addr != htonl(INADDR_LOOPBACK))	
+		{
+			FORBIDDEN("this api can only be called from localhost");
+		}
+	}
+
+	BAD_REQUEST_if
+	(
+		KORE_RESULT_OK != http_request_header(req, "id", &id)
+				||
+		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+			,
+		"inputs missing in headers"
+	);
+
+	if (strcmp(id,"admin") != 0)
+		FORBIDDEN("only admin can call this api");
+
+	if (! login_success("admin",apikey))
+		FORBIDDEN("wrong apikey");
+
+	CREATE_STRING 	(query,"DELETE FROM acl WHERE now() > valid_till");
+	RUN_QUERY 	(query,"could not delete old entiries from acl table");
+	
 	OK();
 
 done:
@@ -986,8 +1021,6 @@ deregister_owner(struct http_request *req)
 	const char *id;
 	const char *apikey;
 	const char *entity;
-
-	// XXX to be done
 
 	req->status = 403;
 
@@ -1128,8 +1161,8 @@ follow (struct http_request *req)
 		status = "approved";	
 	}
 
-	char *read_follow_id = "";
-	char *write_follow_id = "";
+	char read_follow_id  [10];
+	char write_follow_id [10];
 
 	if (strcmp(permission,"read") == 0)
 	{
@@ -1144,7 +1177,8 @@ follow (struct http_request *req)
 
 		CREATE_STRING 	(query,"SELECT currval(pg_get_serial_sequence('follow','follow_id'))");
 		RUN_QUERY 	(query,"failed pg_get_serial read");
-		read_follow_id = kore_pgsql_getvalue(&sql,0,0);
+
+		strlcpy(read_follow_id,kore_pgsql_getvalue(&sql,0,0),10);
 	}
 	else if (strcmp(permission,"write") == 0) 
 	{
@@ -1159,10 +1193,11 @@ follow (struct http_request *req)
 
 		CREATE_STRING 	(query,"SELECT currval(pg_get_serial_sequence('follow','follow_id'))");
 		RUN_QUERY 	(query, "failed pg_get_serial write");
-		write_follow_id = kore_pgsql_getvalue(&sql,0,0);
+		strlcpy(write_follow_id,kore_pgsql_getvalue(&sql,0,0),10);
 	}
 	else if (strcmp(permission,"read-write") == 0) 
 	{
+	printf("===========> read-write\n");
 		CREATE_STRING (query, "INSERT INTO follow (follow_id,id_from,id_to,time,permission,topic,validity,status) values(DEFAULT,'%s','%s.protected',now(),'read','%s','%s','%s')",
 				from,
 				to,
@@ -1174,7 +1209,10 @@ follow (struct http_request *req)
 
 		CREATE_STRING 	(query,"SELECT currval(pg_get_serial_sequence('follow','follow_id'))");
 		RUN_QUERY 	(query,"failed pg_get_serial read in read-write");
-		read_follow_id = kore_pgsql_getvalue(&sql,0,0);
+
+		strlcpy(read_follow_id,kore_pgsql_getvalue(&sql,0,0),10);
+
+		printf("Got read ={%s}\n",read_follow_id);
 
 		CREATE_STRING (query, "INSERT INTO follow (follow_id,id_from,id_to,time,permission,topic,validity,status) values(DEFAULT,'%s','%s.command',now(),'write','%s','%s','%s')",
 				from,
@@ -1187,7 +1225,12 @@ follow (struct http_request *req)
 
 		CREATE_STRING 	(query,"SELECT currval(pg_get_serial_sequence('follow','follow_id'))");
 		RUN_QUERY 	(query,"failed pg_get_serial write in read-write");
-		write_follow_id = kore_pgsql_getvalue(&sql,0,0);
+
+		strlcpy(write_follow_id,kore_pgsql_getvalue(&sql,0,0),10);
+
+		printf("Got read ={%s}\n",read_follow_id);
+		printf("Got write ={%s}\n",write_follow_id);
+
 	}
 	else
 	{
@@ -1228,14 +1271,26 @@ follow (struct http_request *req)
 			RUN_QUERY	(query,"could not run insert query on acl - read/write - 2");
 		}
 
-		OK();
+		req->status = 200;	
 	}
 	else
 	{
+
 		// we have sent the request,
 		// but the owner of the "to" device must approve
-		OK202();
+		req->status = 202;
 	}
+
+	kore_buf_reset(response);
+	kore_buf_append(response,"[",1);
+
+	if (strlen(read_follow_id) > 0)
+		kore_buf_appendf(response,"{\"follow-id\":%s},",read_follow_id);
+
+	if (strlen(write_follow_id) > 0)
+		kore_buf_appendf(response,"{\"follow-id\":%s},",write_follow_id);
+
+	kore_buf_append(response,"]",1);
 
 done:
 	http_response_header(req, "content-type", "application/json");
