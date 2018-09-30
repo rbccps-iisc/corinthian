@@ -4,7 +4,6 @@
 
 #echo "postgres:$pwd" > postgres_pwd
 
-psql -U postgres -c "create database db" >> file
-psql -U postgres db < db.schema >> file
+psql -U postgres postgres  < db.schema >> file
 psql -U postgres -c "alter user postgres with password 'password'" >> file
 
