@@ -12,7 +12,7 @@
 
 #include <ctype.h>
 
-#if 0
+#if 1
 	#define debug_printf(...)
 #else
 	#define debug_printf(...) printf(__VA_ARGS__)
@@ -34,6 +34,7 @@
 		kore_buf_reset(buf);			\
 		kore_buf_appendf(buf,__VA_ARGS__);	\
 		kore_buf_stringify(buf,NULL);		\
+		debug_printf("BUF => {%s}\n",buf->data);\
 }
 
 int init(int);
@@ -46,6 +47,8 @@ bool looks_like_a_valid_owner (const char *);
 bool looks_like_a_valid_entity(const char *);
 
 bool login_success (const char *, const char *);
+
+char *sanitize (char *string);
 
 char 	string_to_be_hashed 	[256];
 uint8_t	binary_hash 		[SHA256_DIGEST_LENGTH];
@@ -106,7 +109,7 @@ looks_like_a_valid_entity (const char *str)
 {
 	uint8_t strlen_str = strlen(str);
 
-	uint8_t back_slash_count = 0;
+	uint8_t front_slash_count = 0;
 
 	if (strlen_str < 3 || strlen_str > 65)
 		return false;
@@ -115,11 +118,11 @@ looks_like_a_valid_entity (const char *str)
 	{
 		if (! isalnum(str[i]))
 		{
-			// support some extra chars but maximum 1 back slash
+			// support some extra chars
 			switch (str[i])
 			{
 				case '/':
-						++back_slash_count;
+						++front_slash_count;
 						break;
 				case '-':
 						break;
@@ -129,12 +132,12 @@ looks_like_a_valid_entity (const char *str)
 			}
 		}
 
-		if (back_slash_count > 1)
+		if (front_slash_count > 1)
 			return false;
 	}
 
-	// there should be one back slash
-	if (back_slash_count != 1)
+	// there should be one front slash
+	if (front_slash_count != 1)
 		return false;
 
 	return true;
@@ -154,14 +157,14 @@ login_success (const char *id, const char *apikey)
 	if (strchr(id,'\'') != NULL)
 		goto done;
 
-	if (strchr(id,'\\') != NULL)
-		goto done;
-
-	CREATE_STRING 	(query,"SELECT blocked,salt,password_hash FROM users WHERE id='%s'",id);
+	CREATE_STRING (query,
+			"SELECT blocked,salt,password_hash FROM users WHERE id='%s'",
+				sanitize(id)
+	);
 
 	debug_printf("login query = {%s}\n",query->data);
 
-	kore_pgsql_cleanup(&sql);				\
+	kore_pgsql_cleanup(&sql);
 	kore_pgsql_init(&sql);
 	if (! kore_pgsql_setup(&sql,"db",KORE_PGSQL_SYNC))
 	{
@@ -323,7 +326,10 @@ auth_resource(struct http_request *req)
 		DENY()
 
 	// get user info in acl, if blocked deny
-	CREATE_STRING (query,"SELECT blocked FROM users WHERE id='%s'",username);
+	CREATE_STRING (query,
+			"SELECT blocked FROM users WHERE id='%s'",
+				sanitize(username)
+	);
 
 	debug_printf("Query = {%s}\n",query->data);
 
@@ -420,10 +426,11 @@ auth_resource(struct http_request *req)
 			// else there must a share entry 
 
 			CREATE_STRING (query,
-			"SELECT permission FROM acl WHERE id='%s' AND exchange='%s' and permission='write'"
-			" AND now() < valid_till",
-				username,
-				name
+				"SELECT permission FROM acl "
+					"WHERE id='%s' AND exchange='%s' and permission='write'"
+						" AND now() < valid_till",
+				sanitize(username),
+				sanitize(name)
 			);
 			kore_pgsql_cleanup(&sql);
 			if (! kore_pgsql_setup(&sql,"db",KORE_PGSQL_SYNC))
@@ -456,4 +463,21 @@ done:
 	kore_pgsql_cleanup(&sql);				\
 
 	return (KORE_RESULT_OK);
+}
+
+char*
+sanitize (char *string)
+{
+	char *p = string;
+	while (*p)
+	{
+		/* replace ' with " 
+		  we will have problem with read only strings */
+		if (*p == '\'')
+			*p = '\"';
+
+		++p;
+	}
+	
+	return string;
 }

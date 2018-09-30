@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 #include <kore/kore.h>
 #include <kore/http.h>
@@ -8,6 +9,7 @@
 
 #include <amqp.h>
 #include <amqp_tcp_socket.h>
+#include <amqp_framing.h>
 
 #include <bsd/stdlib.h>
 #include <bsd/string.h>
@@ -18,7 +20,7 @@
 
 #include "ht.h"
 
-#if 1
+#if 0
 	#define debug_printf(...)
 #else
 	#define debug_printf(...) printf(__VA_ARGS__)
@@ -53,6 +55,11 @@ bool login_success (const char *, const char *);
 bool looks_like_a_valid_owner(const char *str);
 bool looks_like_a_valid_entity (const char *str);
 bool is_alpha_numeric (const char *str);
+
+bool create_queues 	(const char *id);
+bool create_exchanges 	(const char *id);
+
+char *sanitize (char *string);
 
 #define OK()    {req->status=200; goto done;}
 #define OK202() {req->status=202; goto done;}
@@ -130,11 +137,12 @@ size_t i;
 	kore_buf_reset(buf);				\
 	kore_buf_appendf(buf,__VA_ARGS__);		\
 	kore_buf_stringify(buf,NULL);			\
-	debug_printf("Got buf = {%s}\n",buf->data);	\
+	debug_printf("BUF => {%s}\n",buf->data);	\
 }
 
-
 ht connection_ht;
+
+char admin_apikey[33];
 
 int
 init (int state)
@@ -142,6 +150,35 @@ init (int state)
 	// https
 	if (worker->id == 0)
 		return KORE_RESULT_OK;
+
+	int fd = open("admin.apikey",O_RDONLY);
+	if (fd < 0)
+	{
+		perror("could not open admin.apikey");
+		exit(-1);
+	}
+
+	if (! read(fd,admin_apikey,32))
+	{
+		perror("could not read from admin.apikey");
+		exit(-1);
+	}
+
+	admin_apikey[32] = '\0';
+	int strlen_admin_apikey = strlen(admin_apikey);
+
+	for (i = 0; i < strlen_admin_apikey; ++i)
+	{
+		if (isspace(admin_apikey[i]))
+		{
+			admin_apikey[i] = '\0';
+			break;
+		}
+	} 
+
+	close (fd);
+
+	// TODO drop privilages to read admin.apikey file
 
 	ht_init (&connection_ht);
 
@@ -195,7 +232,7 @@ looks_like_a_valid_entity (const char *str)
 {
 	uint8_t strlen_str = strlen(str);
 
-	uint8_t back_slash_count = 0;
+	uint8_t front_slash_count = 0;
 
 	if (strlen_str < 3 || strlen_str > 65)
 		return false;
@@ -208,7 +245,7 @@ looks_like_a_valid_entity (const char *str)
 			switch (str[i])
 			{
 				case '/':
-						++back_slash_count;
+						++front_slash_count;
 						break;
 				case '-':
 						break;
@@ -217,12 +254,12 @@ looks_like_a_valid_entity (const char *str)
 			}
 		}
 
-		if (back_slash_count > 1)
+		if (front_slash_count > 1)
 			return false;
 	}
 
-	// there should be one back slash
-	if (back_slash_count != 1)
+	// there should be one front slash
+	if (front_slash_count != 1)
 		return false;
 
 	return true;
@@ -286,10 +323,10 @@ login_success (const char *id, const char *apikey)
 	if (strchr(id,'\'') != NULL)
 		goto done;
 
-	if (strchr(id,'\\') != NULL)
-		goto done;
-
-	CREATE_STRING (query,"SELECT salt,password_hash FROM users WHERE id='%s' and blocked='f'",id);
+	CREATE_STRING (query,
+			"SELECT salt,password_hash FROM users WHERE id='%s' and blocked='f'",
+				sanitize(id)
+	);
 
 	kore_pgsql_cleanup(&sql);
 	kore_pgsql_init(&sql);
@@ -372,6 +409,8 @@ publish (struct http_request *req)
 	const char *topic;
 	const char *message;
 
+	const char *content_type;
+
 	amqp_basic_properties_t props;
 
 	amqp_rpc_reply_t 	login_reply;
@@ -398,7 +437,11 @@ publish (struct http_request *req)
 			BAD_REQUEST("no body found in request");
 	}
 
-	// TODO get content-type and set in props
+	// get content-type and set in props
+	if (http_request_header(req, "content-type", &content_type) != KORE_RESULT_OK)
+	{
+		content_type = "";
+	}
 
 	if (! looks_like_a_valid_entity(id))
 		BAD_REQUEST("id is not a valid entity");
@@ -458,7 +501,10 @@ reconnect:
 	}
 
 	memset(&props, 0, sizeof props);
-	props.user_id = amqp_cstring_bytes(id);
+	props.user_id 		= amqp_cstring_bytes(id);
+	props.content_type 	= amqp_cstring_bytes(content_type);
+
+	debug_printf("Got content-type {%s}\n",content_type);
 
 	//FORBIDDEN_if
 	ERROR_if
@@ -482,8 +528,6 @@ reconnect:
 done:
 	if (req->status == 500)
 	{
-		printf("cleanup here ...\n");
-
 		if (cached_conn)
 		{
 			amqp_channel_close	(*cached_conn, 1, AMQP_REPLY_SUCCESS);
@@ -538,15 +582,15 @@ subscribe(struct http_request *req)
 	{
 		if (strcmp(message_type,"priority") == 0)
 		{
-			kore_buf_append (Q,".priority",9);
+			kore_buf_append (Q,".priority",sizeof(".priority") - 1);
 		}
 		else if (strcmp(message_type,"command") == 0)
 		{
-			kore_buf_append (Q,".command",8);
+			kore_buf_append (Q,".command",sizeof(".command") - 1);
 		}
 		else if (strcmp(message_type,"notification") == 0)
 		{
-			kore_buf_append (Q,".notification",13);
+			kore_buf_append (Q,".notification",sizeof(".notification") - 1);
 		}
 		else
 		{
@@ -634,13 +678,14 @@ subscribe(struct http_request *req)
 		if (res.reply.id != AMQP_BASIC_GET_OK_METHOD)
 			break;
 
+		if (res.reply_type != AMQP_RESPONSE_NORMAL)
+			break;
+
 		amqp_basic_get_ok_t *header = (amqp_basic_get_ok_t *) res.reply.decoded;
          
 		amqp_read_message(connection, 1, &message, 0);
 
-		if (res.reply_type != AMQP_RESPONSE_NORMAL)
-			break;
-
+		/* construct the response */
 		kore_buf_append(response,"{\"sent-by\":\"",12);
 
 		if (message.properties.user_id.len == 0)
@@ -650,7 +695,6 @@ subscribe(struct http_request *req)
 				message.properties.user_id.len);
 
 
-		/* construct the response */
 		kore_buf_append(response,"\",\"from\":\"",10);
 		if(header->exchange.len > 0)
 			kore_buf_append(response,header->exchange.bytes, header->exchange.len);
@@ -755,33 +799,34 @@ register_entity (struct http_request *req)
 	strlcat(entity_name,entity,66);
 
 	// conflict if entity_name already exist
-	CREATE_STRING	(query,"SELECT id from users WHERE id='%s'",entity_name);
-	RUN_QUERY	(query,"could not get info about entity");
+
+	CREATE_STRING(query,
+		 	"SELECT id from users WHERE id='%s'",
+				sanitize(entity_name)
+	);
+
+	RUN_QUERY (query,"could not get info about entity");
 
 	if (kore_pgsql_ntuples(&sql) > 0)
 		CONFLICT("id already used");
 
 	gen_salt_password_and_apikey (entity_name, salt, password_hash, entity_apikey);
 
-	// sanitize body
-	size_t s = strlen(body);
-	for (i = 0; i < s; ++i)
-	{
-		if (body[i] == '\'')
-			body[i] = '\"';
-		else if (body[i] == '\\')
-			body[i] = ' ';
-	} 
-
 	CREATE_STRING (query,
 			"INSERT INTO users (id,password_hash,schema,salt,blocked) values('%s','%s','%s','%s','f')",
-			entity_name,
-			password_hash,
-			body,		// schema
-			salt
+			sanitize(entity_name),
+			sanitize(password_hash),
+			sanitize(body),		// schema
+			sanitize(salt)
 	);
 	RUN_QUERY (query,"failed to create the entity");
 
+	// create entries in to RMQ
+	// create_exchanges (id);
+	// create_queues    (id);
+	// bind them
+	
+	// generate response
 	kore_buf_reset(response);
 	kore_buf_append(response,"{\"id\":\"",7);
 	kore_buf_append(response,entity_name,strlen(entity_name));
@@ -826,8 +871,11 @@ delete_owner_from_rabbitmq (char *owner)
 	if (! looks_like_a_valid_owner(owner))
 		return -1;
 /*
-	CREATE_STRING 	(query, "SELECT * from users where id='%s'",owner); 
-	RUN_QUERY 	(query, "can't search entity in DB");
+	CREATE_STRING (query,
+				"SELECT * from users where id='%s'",
+					sanitize(owner)
+	); 
+	RUN_QUERY (query, "can't search entity in DB");
 
 	// login as admin in amqp
 
@@ -886,8 +934,8 @@ deregister_entity (struct http_request *req)
 	CREATE_STRING (
 		query,
 		"DELETE FROM acl WHERE id = '%s' or exchange LIKE '%s.%%'",
-		entity_name,
-		entity_name
+		sanitize(entity_name),
+		sanitize(entity_name)
 	);
 
 	RUN_QUERY(query,"could not delete from acl table");
@@ -895,14 +943,17 @@ deregister_entity (struct http_request *req)
 	CREATE_STRING (
 		query,
 		"DELETE FROM follow WHERE id_from = '%s' or id_to LIKE '%s.%%'",
-		entity_name,
-		entity_name
+		sanitize(entity_name),
+		sanitize(entity_name)
 	);
 
 	RUN_QUERY(query,"could not delete from follow table");
 
-	CREATE_STRING (query,"DELETE FROM users WHERE id = '%s'",entity_name);
-	RUN_QUERY	(query,"could not delete the entity");
+	CREATE_STRING (query,
+			"DELETE FROM users WHERE id = '%s'",
+				sanitize(entity_name)
+	);
+	RUN_QUERY (query,"could not delete the entity");
 
 
 	OK();
@@ -934,7 +985,10 @@ cat(struct http_request *req)
 		if (! looks_like_a_valid_entity(entity))
 			FORBIDDEN("id is not a valid entity");
 	
-		CREATE_STRING (query,"SELECT schema FROM users WHERE schema is NOT NULL AND id='%s'",entity);
+		CREATE_STRING (query,
+				"SELECT schema FROM users WHERE schema is NOT NULL AND id='%s'",
+					sanitize(entity)
+		);
 	}
 	else
 	{
@@ -1091,8 +1145,11 @@ register_owner(struct http_request *req)
 		FORBIDDEN("wrong apikey");
 
 	// conflict if entity_name already exist
-	CREATE_STRING 	(query,"SELECT id FROM users WHERE id ='%s'",entity);
-	RUN_QUERY	(query,"could not query info about the owner");
+	CREATE_STRING (query,
+			"SELECT id FROM users WHERE id ='%s'",
+				sanitize(entity)
+	);
+	RUN_QUERY (query,"could not query info about the owner");
 
 	if(kore_pgsql_ntuples(&sql) > 0)
 		CONFLICT("id already used");
@@ -1101,9 +1158,9 @@ register_owner(struct http_request *req)
 
 	CREATE_STRING (query,
 			"INSERT INTO users (id,password_hash,schema,salt,blocked) values('%s','%s',NULL,'%s','f')",
-				entity,
-				password_hash,
-				salt
+				sanitize(entity),
+				sanitize(password_hash),
+				sanitize(salt)
 	);
 
 	RUN_QUERY (query, "could not create a new owner");
@@ -1176,16 +1233,26 @@ deregister_owner(struct http_request *req)
 	// XXX run select query and delete each and every queue and exchange. This needs work
 
 	// delete all acls
-	CREATE_STRING 	(query,"DELETE FROM acl WHERE id LIKE '%s/%%' OR exchange LIKE '%s/%%'",entity);
-	RUN_QUERY 	(query,"could not delete from acl table");
+	CREATE_STRING (query,
+			"DELETE FROM acl WHERE id LIKE '%s/%%' OR exchange LIKE '%s/%%'",
+				sanitize(entity)
+	);
+
+	RUN_QUERY (query,"could not delete from acl table");
 
 	// delete all apps and devices of the owner
-	CREATE_STRING 	(query,"DELETE FROM users WHERE id LIKE '%s/%%'",entity);
-	RUN_QUERY	(query,"could not delete apps/devices of the entity");
+	CREATE_STRING (query,
+		"DELETE FROM users WHERE id LIKE '%s/%%'",
+			sanitize(entity)
+	);
+	RUN_QUERY (query,"could not delete apps/devices of the entity");
 
 	// finally delete the owner 
-	CREATE_STRING 	(query,"DELETE FROM users WHERE id = '%s'",entity);
-	RUN_QUERY	(query,"could not delete the entity");
+	CREATE_STRING (query,
+			"DELETE FROM users WHERE id = '%s'",
+				sanitize(entity)
+	);
+	RUN_QUERY (query,"could not delete the entity");
 
 	OK();
 
@@ -1284,11 +1351,11 @@ follow (struct http_request *req)
 			"INSERT INTO follow "
 			"(follow_id,id_from,id_to,time,permission,topic,validity,status) "
 			"values(DEFAULT,'%s','%s.protected',now(),'read','%s','%s','%s')",
-				from,
-				to,
-				topic,
-				validity,
-				status
+				sanitize(from),
+				sanitize(to),
+				sanitize(topic),
+				sanitize(validity),
+				sanitize(status)
 		);
 		RUN_QUERY (query, "failed to insert follow - read");
 
@@ -1302,16 +1369,16 @@ follow (struct http_request *req)
 		CREATE_STRING (query,
 			"INSERT INTO follow (follow_id,id_from,id_to,time,permission,topic,validity,status) "
 			"values(DEFAULT,'%s','%s.command',now(),'write','%s','%s','%s')",
-				from,
-				to,
+				sanitize(from),
+				sanitize(to),
 				"#",
-				validity,
-				status
+				sanitize(validity),
+				sanitize(status)
 		);
 		RUN_QUERY (query, "failed to insert follow - write");
 
 		CREATE_STRING 	(query,"SELECT currval(pg_get_serial_sequence('follow','follow_id'))");
-		RUN_QUERY 	(query, "failed pg_get_serial write");
+		RUN_QUERY 	(query,"failed pg_get_serial write");
 		strlcpy(write_follow_id,kore_pgsql_getvalue(&sql,0,0),10);
 	}
 	else if (strcmp(permission,"read-write") == 0) 
@@ -1319,11 +1386,11 @@ follow (struct http_request *req)
 		CREATE_STRING (query,
 			"INSERT INTO follow (follow_id,id_from,id_to,time,permission,topic,validity,status) "
 			"values(DEFAULT,'%s','%s.protected',now(),'read','%s','%s','%s')",
-				from,
-				to,
-				topic,
-				validity,
-				status
+				sanitize(from),
+				sanitize(to),
+				sanitize(topic),
+				sanitize(validity),
+				sanitize(status)
 		);
 		RUN_QUERY (query, "failed to insert follow - read");
 
@@ -1335,11 +1402,11 @@ follow (struct http_request *req)
 		CREATE_STRING (query,
 			"INSERT INTO follow (follow_id,id_from,id_to,time,permission,topic,validity,status) "
 			"values(DEFAULT,'%s','%s.command',now(),'write','%s','%s','%s')",
-				from,
-				to,
+				sanitize(from),
+				sanitize(to),
 				"#",
-				validity,
-				status
+				sanitize(validity),
+				sanitize(status)
 		);
 		RUN_QUERY (query, "failed to insert follow - write");
 
@@ -1361,12 +1428,12 @@ follow (struct http_request *req)
 			CREATE_STRING (query,
 				"INSERT into acl (acl_id,id,exchange,follow_id,permission,topic,valid_till) "
 				"values(DEFAULT,'%s','%s.protected','%s','%s', '%s', now() + interval '%s  hours')",
-			        	from,
-					to,
-					read_follow_id,
+			        	sanitize(from),
+					sanitize(to),
+					sanitize(read_follow_id),
 					"read",
-					topic,
-					validity
+					sanitize(topic),
+					sanitize(validity)
 			);
 
 			RUN_QUERY (query,"could not run insert query on acl - read ");
@@ -1376,12 +1443,12 @@ follow (struct http_request *req)
 			CREATE_STRING (query,
 				"INSERT into acl (acl_id,id,exchange,follow_id,permission,topic,valid_till) "
 				"values(DEFAULT,'%s','%s.command','%s','%s', '%s', now() + interval '%s  hours')",
-			        	from,
-					to,
-					write_follow_id,
+			        	sanitize(from),
+					sanitize(to),
+					sanitize(write_follow_id),
 					"write",
-					topic,
-					validity
+					sanitize(topic),
+					sanitize(validity)
 			);
 
 			RUN_QUERY (query,"could not run insert query on acl - write");
@@ -1391,12 +1458,12 @@ follow (struct http_request *req)
 			CREATE_STRING (query,
 				"INSERT into acl (acl_id,id,exchange,follow_id,permission,topic,valid_till) "
 				"values(DEFAULT,'%s','%s.protected','%s','%s', '%s', now() + interval '%s  hours')",
-			        	from,
-					to,
-					read_follow_id,
+			        	sanitize(from),
+					sanitize(to),
+					sanitize(read_follow_id),
 					"read",
-					topic,
-					validity
+					sanitize(topic),
+					sanitize(validity)
 			);
 
 			RUN_QUERY(query,"could not run insert query on acl - read/write -1 ");
@@ -1404,12 +1471,12 @@ follow (struct http_request *req)
 			CREATE_STRING (query,
 				"INSERT into acl (acl_id,id,exchange,follow_id,permission,topic,valid_till) "
 				"values(DEFAULT,'%s','%s.command','%s','%s', '%s', now() + interval '%s  hours')",
-			        	from,
-					to,
-					write_follow_id,
+			        	sanitize(from),
+					sanitize(to),
+					sanitize(write_follow_id),
 					"write",
-					topic,
-					validity
+					sanitize(topic),
+					sanitize(validity)
 			);
 
 			RUN_QUERY (query,"could not run insert query on acl - read/write - 2");
@@ -1491,11 +1558,18 @@ get_follow_requests (struct http_request *req)
 
 	if (strcmp(status,"all") == 0)
 	{
-		CREATE_STRING(query,"SELECT * FROM follow WHERE id_to LIKE '%s/%%.%%'",id);
+		CREATE_STRING(query,
+				"SELECT * FROM follow WHERE id_to LIKE '%s/%%.%%'",
+					sanitize(id)
+		);
 	}
 	else
 	{
-		CREATE_STRING(query,"SELECT * FROM follow WHERE id_to LIKE '%s/%%.%%' and status='%s'",id, status);
+		CREATE_STRING (query,
+				"SELECT * FROM follow WHERE id_to LIKE '%s/%%.%%' and status='%s'",
+					sanitize(id),
+					sanitize(status)
+		);
 	}
 
 	RUN_QUERY(query, "could not get follow requests");
@@ -1579,8 +1653,8 @@ share (struct http_request *req)
 	CREATE_STRING (query, 
 		"SELECT id_from,id_to,permission,validity,topic FROM follow "
 		"WHERE follow_id = '%s' AND id_to LIKE '%s/%%.%%' and status='pending'",
-			follow_id,
-			id
+			sanitize(follow_id),
+			sanitize(id)
 	);
 
 	RUN_QUERY (query,"could not run select query on follow");
@@ -1597,19 +1671,22 @@ share (struct http_request *req)
 	char *topic 	 	= kore_pgsql_getvalue(&sql,0,4); 
 
 	// NOTE: follow_id is primary key 
-	CREATE_STRING 	(query,"UPDATE follow SET status='approved' WHERE follow_id = '%s'",follow_id);
-	RUN_QUERY	(query,"could not run update query on follow");
+	CREATE_STRING (query,
+			"UPDATE follow SET status='approved' WHERE follow_id = '%s'",
+				sanitize(follow_id)
+	);
+	RUN_QUERY (query,"could not run update query on follow");
 
 	// add entry in acl
 	CREATE_STRING 	(query,
 				"INSERT into acl (acl_id,id,exchange,follow_id,permission,topic,valid_till) "
 				"values(DEFAULT,'%s','%s','%s','%s', '%s', now() + interval '%s  hours')",
-			        	id_from,
-					exchange,
-					follow_id,
-					permission,
-					topic,
-					validity_hours
+			        	sanitize(id_from),
+					sanitize(exchange),
+					sanitize(follow_id),
+					sanitize(permission),
+					sanitize(topic),
+					sanitize(validity_hours)
 	);
 
 	RUN_QUERY (query,"could not run insert query on acl");
@@ -1638,4 +1715,133 @@ int
 unshare (struct http_request *req)
 {
 	return (KORE_RESULT_OK);
+}
+
+bool
+create_exchanges (const char *id)
+{
+	bool is_success = false;
+
+	char exchange[128];
+
+	amqp_rpc_reply_t 	login_reply;
+	amqp_rpc_reply_t 	rpc_reply;
+
+	amqp_connection_state_t	conn;
+	amqp_socket_t *socket = NULL;
+
+	conn = amqp_new_connection();
+	socket = amqp_tcp_socket_new(conn);
+
+	if (socket == NULL)
+		goto done;
+
+	if (amqp_socket_open(socket, "broker", 5672))
+		goto done;	
+
+	login_reply = amqp_login(conn, 
+		"/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN, "admin", admin_apikey);
+
+	if (login_reply.reply_type != AMQP_RESPONSE_NORMAL)
+	{
+		debug_printf("invalid id or apikey");
+		goto done;	
+	}
+
+	if(! amqp_channel_open(conn, 1))
+	{
+		debug_printf("could not open an AMQP connection");
+		goto done;	
+	}
+
+	rpc_reply = amqp_get_rpc_reply(conn);
+	if (rpc_reply.reply_type != AMQP_RESPONSE_NORMAL)
+	{
+		debug_printf("did not receive expected response from the broker");
+		goto done;
+	}
+
+	if (looks_like_a_valid_owner(id))
+	{
+		snprintf(exchange,128,"%s.notification",id);
+
+/*
+	printf("1. Creating {%s}\n",exchange);
+		if (! amqp_exchange_declare(
+			conn,
+			1,
+			amqp_cstring_bytes(exchange),
+			amqp_cstring_bytes(""),
+			0,
+			0,
+			0,
+			0,
+			amqp_empty_table
+		))
+		{
+			perror("Something went wrong ");
+		}
+	printf("2. Done {%s}\n",exchange);
+*/
+	}
+	else
+	{
+		char *e[] = {".public", ".private", ".protected"};
+
+		for (i = 0; i < 3; ++i)
+		{
+			snprintf(exchange,128,"%s.notification",id, e[i]);
+
+	debug_printf("2. Creating {%s}\n",exchange);
+
+			amqp_exchange_declare (
+				conn,
+				1,
+				amqp_cstring_bytes(exchange),
+				amqp_cstring_bytes("amq.topic"),
+				0,
+				0,
+				0,
+				0,
+				amqp_empty_table
+			);
+		}
+	}
+
+	is_success = true;
+
+done:
+	if (socket)
+	{
+		amqp_channel_close	(conn, 1, AMQP_REPLY_SUCCESS);
+		amqp_connection_close	(conn,    AMQP_REPLY_SUCCESS);
+		amqp_destroy_connection	(conn);
+	}
+
+	printf("Retruning %s\n",is_success ? "ok" : "failed");
+	
+	return is_success;
+}
+
+bool
+create_queues (const char *id)
+{
+	return true;
+}
+
+char*
+sanitize (char *string)
+{
+	char *p = string;
+	while (*p)
+	{
+		/* replace ' with " 
+		  we will have problem with read only strings */
+		if (*p == '\'')
+			*p = '\"';
+
+		++p;
+	}
+	
+	return string;
 }
