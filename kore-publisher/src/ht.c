@@ -58,6 +58,44 @@ void ht_insert (ht *h, const char *key, void *value)
 	h->list[hash]->head	= new_node;
 }
 
+void ht_delete(ht *h, const char *key)
+{
+	node *n 	= NULL;
+	node *prev_n 	= NULL;
+
+	node *tmp;
+
+	unsigned int hash;
+
+	if (!h || !key)
+		return;
+
+	hash = hash_function (key);
+
+	n = h->list[hash]->head;
+
+	while (n)
+	{
+		if (strcmp(key, n->key) == 0)
+		{
+			if (prev_n == NULL)
+			{
+				h->list[hash]->head = n->next;	
+				free(n);
+			}
+			else
+			{
+				tmp = n;
+				prev_n->next = n->next;
+				free(tmp);
+			}
+			return;
+		}
+
+		prev_n = n;
+		n = n->next;
+	}
+}
 
 node* ht_search (ht *h, const char *key)
 {

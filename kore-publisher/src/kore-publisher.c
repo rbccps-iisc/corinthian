@@ -16,14 +16,15 @@
 
 #include <ctype.h>
 
-#if 0
+#include "ht.h"
+
+#if 1
 	#define debug_printf(...)
 #else
 	#define debug_printf(...) printf(__VA_ARGS__)
 #endif
 
 char password_chars[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789~!@#$%^&*_-+=.?/";
-
 
 int cat			(struct http_request *);
 
@@ -39,6 +40,8 @@ int deregister_owner 	(struct http_request *);
 int follow		(struct http_request *);
 int unfollow		(struct http_request *);
 
+int get_follow_requests (struct http_request *);
+
 int share		(struct http_request *);
 int unshare		(struct http_request *);
 
@@ -49,6 +52,7 @@ bool login_success (const char *, const char *);
 
 bool looks_like_a_valid_owner(const char *str);
 bool looks_like_a_valid_entity (const char *str);
+bool is_alpha_numeric (const char *str);
 
 #define OK()    {req->status=200; goto done;}
 #define OK202() {req->status=202; goto done;}
@@ -122,16 +126,25 @@ struct kore_pgsql sql;
 
 size_t i;
 
-#define CREATE_STRING(buf,...)	{		\
-	kore_buf_reset(buf);			\
-	kore_buf_appendf(buf,__VA_ARGS__);	\
-	kore_buf_stringify(buf,NULL);		\
-	printf("Got buf = {%s}\n",buf->data);	\
+#define CREATE_STRING(buf,...)	{			\
+	kore_buf_reset(buf);				\
+	kore_buf_appendf(buf,__VA_ARGS__);		\
+	kore_buf_stringify(buf,NULL);			\
+	debug_printf("Got buf = {%s}\n",buf->data);	\
 }
+
+
+ht connection_ht;
 
 int
 init (int state)
 {
+	// https
+	if (worker->id == 0)
+		return KORE_RESULT_OK;
+
+	ht_init (&connection_ht);
+
 	if (Q == NULL)
 		Q = kore_buf_alloc(256);
 
@@ -335,10 +348,12 @@ login_success (const char *id, const char *apikey)
 
 	hash_string[64] = '\0';
 
-	printf("Expecting it to be {%s} got {%s}\n",password_hash, hash_string);
+	debug_printf("Expecting it to be {%s} got {%s}\n",password_hash, hash_string);
 
-	if (strncmp(hash_string,password_hash,64) == 0)
+	if (strncmp(hash_string,password_hash,64) == 0) {
 		login_result = true;
+		debug_printf("Login OK\n");
+	}
 
 done:
 	kore_buf_reset(query);
@@ -358,11 +373,6 @@ publish (struct http_request *req)
 	const char *message;
 
 	amqp_basic_properties_t props;
-
-	amqp_socket_t 			*socket = NULL;
-	amqp_connection_state_t		connection;
-
-	// TODO set connection.state = uninitalized
 
 	amqp_rpc_reply_t 	login_reply;
 	amqp_rpc_reply_t 	rpc_reply;
@@ -388,33 +398,73 @@ publish (struct http_request *req)
 			BAD_REQUEST("no body found in request");
 	}
 
-	connection 	= amqp_new_connection();
-	socket		= amqp_tcp_socket_new(connection);
+	// TODO get content-type and set in props
 
-	if (socket == NULL)
-		ERROR("could not create a new socket");
+	if (! looks_like_a_valid_entity(id))
+		BAD_REQUEST("id is not a valid entity");
 
-	if (amqp_socket_open(socket, "broker", 5672))
-		ERROR("could not open a socket");
+	// let it not go to the broker
+	if (! login_success(id,apikey))
+		BAD_REQUEST("invalid id or apikey");
 
-	login_reply = amqp_login(connection, "/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN, id, apikey);
-	if (login_reply.reply_type != AMQP_RESPONSE_NORMAL)
-		FORBIDDEN("invalid id or apikey");
+	amqp_socket_t *socket = NULL;
 
-	if(! amqp_channel_open(connection, 1))
-		ERROR("could not open an AMQP connection");
+	node *n = NULL;
 
-	rpc_reply = amqp_get_rpc_reply(connection);
-	if (rpc_reply.reply_type != AMQP_RESPONSE_NORMAL)
-		FORBIDDEN("did not receive expected response from the broker");
+	amqp_connection_state_t	*cached_conn = NULL;
+
+	if ((n = ht_search(&connection_ht,id)) != NULL)
+	{
+		cached_conn = n->value;
+
+		if (cached_conn == NULL)
+		{
+			goto reconnect;
+		}
+
+		// TODO also check if connection is still open 
+	}
+	else
+	{
+reconnect:
+		cached_conn = malloc(sizeof(amqp_connection_state_t));
+
+		if (cached_conn == NULL)
+			ERROR("out of memory");
+
+		*cached_conn = amqp_new_connection();
+		socket = amqp_tcp_socket_new(*cached_conn);
+		
+		if (socket == NULL)
+			ERROR("could not create a new socket");
+
+		if (amqp_socket_open(socket, "broker", 5672))
+			ERROR("could not open a socket");
+
+		login_reply = amqp_login(*cached_conn, 
+			"/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN, id, apikey);
+
+		if (login_reply.reply_type != AMQP_RESPONSE_NORMAL)
+			FORBIDDEN("invalid id or apiey ...");
+
+		if(! amqp_channel_open(*cached_conn, 1))
+			ERROR("could not open an AMQP connection");
+
+		rpc_reply = amqp_get_rpc_reply(*cached_conn);
+		if (rpc_reply.reply_type != AMQP_RESPONSE_NORMAL)
+			ERROR("did not receive expected response from the broker");
+
+		ht_insert (&connection_ht, id, cached_conn);
+	}
 
 	memset(&props, 0, sizeof props);
 	props.user_id = amqp_cstring_bytes(id);
 
-	FORBIDDEN_if
+	//FORBIDDEN_if
+	ERROR_if
 	(
 		AMQP_STATUS_OK != amqp_basic_publish (	
-			connection,
+			*cached_conn,
 			1,
 			amqp_cstring_bytes(exchange),
         		amqp_cstring_bytes(topic),
@@ -430,14 +480,19 @@ publish (struct http_request *req)
 	OK202();
 
 done:
-	// TODO if connection.state != uninitalized
+	if (req->status == 500)
+	{
+		printf("cleanup here ...\n");
 
-	amqp_channel_close	(connection, 1, AMQP_REPLY_SUCCESS);
-	amqp_connection_close	(connection, AMQP_REPLY_SUCCESS);
-	amqp_destroy_connection	(connection);
+		if (cached_conn)
+		{
+			amqp_channel_close	(*cached_conn, 1, AMQP_REPLY_SUCCESS);
+			amqp_connection_close	(*cached_conn,    AMQP_REPLY_SUCCESS);
+			amqp_destroy_connection	(*cached_conn);
 
-	if (socket)
-		free(socket);
+			ht_delete(&connection_ht,id);
+		}
+	}
 
 	http_response_header(req, "content-type", "application/json");
 	http_response(req, req->status, response->data, response->offset);
@@ -461,14 +516,12 @@ subscribe(struct http_request *req)
 	amqp_socket_t 			*socket = NULL;
 	amqp_connection_state_t		connection;
 
-	// TODO set connection.state = uninitalized
+	bool connection_opened = false;
 
 	amqp_rpc_reply_t 	login_reply;
 	amqp_rpc_reply_t 	rpc_reply;
 
 	req->status = 403;
-
-	printf("= 0 ===>\n");
 
 	BAD_REQUEST_if
 	(
@@ -493,7 +546,7 @@ subscribe(struct http_request *req)
 		}
 		else if (strcmp(message_type,"notification") == 0)
 		{
-			kore_buf_append (Q,".notification",8);
+			kore_buf_append (Q,".notification",13);
 		}
 		else
 		{
@@ -510,17 +563,23 @@ subscribe(struct http_request *req)
 			int_num_messages = 10;
 	}
 
-	// TODO Should we use login_success to check ?
+	if (! looks_like_a_valid_entity(id))
+		BAD_REQUEST("id is not a valid entity");
+
+	// let it not go to the broker
+	if (! login_success(id,apikey))
+		BAD_REQUEST("invalid id or apikey");
 
 	connection 	= amqp_new_connection();
 	socket		= amqp_tcp_socket_new(connection);
+
+	connection_opened = true;
 
 	if (socket == NULL)
 		ERROR("could not create a new socket");
 
 	if (amqp_socket_open(socket, "broker", 5672))
 		ERROR("could not open a socket");
-
 
 	login_reply = amqp_login(connection, 
 			"/",
@@ -552,20 +611,21 @@ subscribe(struct http_request *req)
 		
 		time_t t;
 		t = time(NULL);
+		int time_spent = 0;
 
 		do
 		{
 			res = amqp_basic_get(
 					connection,
 					1,
-					amqp_cstring_bytes(Q->data),
+					amqp_cstring_bytes((const char *)Q->data),
 					/*no ack*/ 1
 			);
 
 		} while (
 			(res.reply_type == AMQP_RESPONSE_NORMAL) 	&&
            		(res.reply.id 	== AMQP_BASIC_GET_EMPTY_METHOD) &&
-           		((time(NULL) - t) < 1)
+           		((time_spent = (time(NULL) - t)) < 1)
 		);
 
 		if (AMQP_RESPONSE_NORMAL != res.reply_type)
@@ -609,6 +669,10 @@ subscribe(struct http_request *req)
 		kore_buf_append(response,"\",\"body\":\"",10);
 		kore_buf_append(response,message.body.bytes, message.body.len);
 		kore_buf_append(response,"\"},",3);
+
+		// we waited for messages for atleast a second
+		if (time_spent >= 1)
+			break;
 	}
 
 
@@ -621,10 +685,12 @@ subscribe(struct http_request *req)
 	OK();
 
 done:
-
-	amqp_channel_close	(connection, 1, AMQP_REPLY_SUCCESS);
-	amqp_connection_close	(connection,    AMQP_REPLY_SUCCESS);
-	amqp_destroy_connection	(connection);
+	if (connection_opened)
+	{	
+		amqp_channel_close	(connection, 1, AMQP_REPLY_SUCCESS);
+		amqp_connection_close	(connection,    AMQP_REPLY_SUCCESS);
+		amqp_destroy_connection	(connection);
+	}
 
 	http_response_header(req, "content-type", "application/json");
 	http_response(req, req->status, response->data, response->offset);
@@ -681,16 +747,12 @@ register_entity (struct http_request *req)
 		"no body found in request"	
 	);	
 
-        printf("before check\n");
-
 	if (! login_success(id,apikey))
 		FORBIDDEN("invalid id or apikey");
-        
-        printf("after check\n");
 
-	strlcpy(entity_name,id,128);
+	strlcpy(entity_name,id,32);
 	strcat(entity_name,"/");
-	strlcat(entity_name,entity,256);
+	strlcat(entity_name,entity,66);
 
 	// conflict if entity_name already exist
 	CREATE_STRING	(query,"SELECT id from users WHERE id='%s'",entity_name);
@@ -840,7 +902,6 @@ deregister_entity (struct http_request *req)
 	RUN_QUERY(query,"could not delete from follow table");
 
 	CREATE_STRING (query,"DELETE FROM users WHERE id = '%s'",entity_name);
-	printf("RAN2 ===> {%s}\n",query->data);
 	RUN_QUERY	(query,"could not delete the entity");
 
 
@@ -1271,8 +1332,6 @@ follow (struct http_request *req)
 
 		strlcpy(read_follow_id,kore_pgsql_getvalue(&sql,0,0),10);
 
-		printf("Got read ={%s}\n",read_follow_id);
-
 		CREATE_STRING (query,
 			"INSERT INTO follow (follow_id,id_from,id_to,time,permission,topic,validity,status) "
 			"values(DEFAULT,'%s','%s.command',now(),'write','%s','%s','%s')",
@@ -1288,10 +1347,6 @@ follow (struct http_request *req)
 		RUN_QUERY 	(query,"failed pg_get_serial write in read-write");
 
 		strlcpy(write_follow_id,kore_pgsql_getvalue(&sql,0,0),10);
-
-		printf("Got read ={%s}\n",read_follow_id);
-		printf("Got write ={%s}\n",write_follow_id);
-
 	}
 	else
 	{

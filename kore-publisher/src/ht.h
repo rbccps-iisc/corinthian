@@ -31,6 +31,7 @@ typedef struct ht
 unsigned int hash_function (const void *key);
 void ht_init (ht *h);
 void ht_insert (ht *h, const char *key, void *value);
+void ht_delete(ht *h, const char *key);
 node* ht_search (ht *h, const char *key);
 
 #endif

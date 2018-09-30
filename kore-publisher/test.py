@@ -1,5 +1,10 @@
+import random
 import sys
 import requests
+
+admin_api = "x"
+
+num_devices = 10
 
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
@@ -14,45 +19,91 @@ def post(api, headers, data = "dummy"):
 
 def check(r,c):
 	if (r.status_code != c):
-		print "Failed : ",r.url
+		print "Failed : expected ",c,"got ",r.status_code, "url = ",r.url
 		print r.text
 		sys.exit(0)
+	else:
+		print "---> Ok ",r.url, r.text
 
 # delete owners
-r = get("deregister-owner", { "id":"admin", "apikey":"x", "entity":"owner-a" })
+r = get("deregister-owner", { "id":"admin", "apikey":admin_api, "entity":"owner-a" })
 check(r, 200)
 
-r = get("deregister-owner", { "id":"admin", "apikey":"x", "entity":"owner-b" })
+r = get("deregister-owner", { "id":"admin", "apikey":admin_api, "entity":"owner-b" })
 check(r, 200)
 
 # add them
-r = get("register-owner", { "id":"admin", "apikey":"x", "entity":"owner-a" })
+r = get("register-owner", { "id":"admin", "apikey":admin_api, "entity":"owner-a" })
 check(r, 200)
 owner_a_apikey = r.json()['apikey']
 
-r = get("register-owner", { "id":"admin", "apikey":"x", "entity":"owner-b" })
+r = get("register-owner", { "id":"admin", "apikey":admin_api, "entity":"owner-b" })
 check(r, 200)
 owner_b_apikey = r.json()['apikey']
 
-r = post("register", {"id":"owner-a", "apikey":owner_a_apikey, "entity":"device"},'{"x":"y"}')
-check(r, 200)
-device 		= r.json()['id']
-device_apikey 	= r.json()['apikey']
+a = {}
+b = {} 
 
-r = post("register", {"id":"owner-b", "apikey":owner_b_apikey, "entity":"app"},'{"x":"y"}')
-check(r, 200)
-app = r.json()['id']
-app_apikey = r.json()['apikey']
+for i in xrange(0,num_devices):
 
-print device, app
+	r = post("register", {"id":"owner-a", "apikey":owner_a_apikey, "entity":"device-"+str(i)},'{"x":"y"}')
+	check(r, 200)
+	device 		= r.json()['id']
+	device_apikey 	= r.json()['apikey']
 
-r = get("follow", {"id":"owner-b", "apikey":owner_b_apikey, "from": app, "to":device, "validity":"2", "permission" :"read", "topic":"hello"})
-check(r,202)
-follow_id = r.json()['follow-id-read']
+	r = post("register", {"id":"owner-b", "apikey":owner_b_apikey, "entity":"app-"+str(i)},'{"x":"y"}')
+	check(r, 200)
+	app = r.json()['id']
+	app_apikey = r.json()['apikey']
 
-r = get("share", {"id":"owner-a", "apikey":owner_a_apikey, "follow-id":follow_id})
-check(r,200)
+	print "Registered device",device
+	print "Registered app", app
+	
+	a[device] = {}
+	b[app] = {}
+	
+	a[device]['name'] = device 
+	a[device]['apikey'] = device_apikey
+
+	b[app]['name'] = app 
+	b[app]['apikey'] = app_apikey	
+	
+
+for i in xrange(0,num_devices):
+
+	a_info = a[ a.keys()[random.randint(0,len(a.keys()) - 1) ]]
+	b_info = b[ b.keys()[random.randint(0,len(b.keys()) - 1) ]]
+
+	device = a_info['name']	
+	app = b_info['name']	
+
+	device_apikey =	a_info['apikey']
+	app_apikey = 	b_info['apikey']
+
+	r = get("follow", {"id":"owner-b", "apikey":owner_b_apikey, "from": app, "to":device, "validity":"2", "permission" :"read", "topic":"hello"})
+	check(r,202)
+
+	follow_id = r.json()['follow-id-read']
+	print "Follow id for following ",device, "from ", app , "is ",follow_id
+
+	r = get("share", {"id":"owner-a", "apikey":owner_a_apikey, "follow-id":follow_id})
+	check(r,200)
+
+	print "Follow id ",follow_id,"approved"
+
+	"""
+	# publish
+	print "publishing {"+device+"} with {"+device_apikey+"}"
+	r = post("publish",{"id":device,"apikey":device_apikey,"message":"hello", "to":device+".protected", "topic":"hello"})
+	check(r,202)
+	
+	# subscribe
+	"""
 
 r = get("deregister", {"id":"owner-a", "apikey":owner_a_apikey, "entity":"device"})
-print "Got ",r.status_code
-print "And ",r.text
+check(r,200)
+
+r = get("deregister", {"id":"owner-b", "apikey":owner_b_apikey, "entity":"app"})
+check(r,200)
+
+print "Done"
