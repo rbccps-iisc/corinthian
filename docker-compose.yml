@@ -9,6 +9,7 @@ services:
   kore:
     image: ideam/kore
     container_name: kore
+    hostname: kore
     restart: always
     hostname: kore
     ports:
@@ -18,16 +19,11 @@ services:
     cap_add:
       - ALL
 
-  scylla:
-    image: scylladb/scylla
-    networks:
-      - kore-net
-    cap_add:
-     - ALL
-  
   broker:
-    image: ideam/broker
-    
+    image: ideam/kore-broker
+    container_name: kore-broker 
+    restart: always
+    hostname: kore-broker
     ports:
       - "5672:5672"
       - "1883:1883"
@@ -39,6 +35,9 @@ services:
   
   postgres:
     image: postgres:10.5-alpine
+    container_name: kore-postgres
+    hostname: kore-postgres
+    restart: always
     networks:
       - kore-net
     cap_add:

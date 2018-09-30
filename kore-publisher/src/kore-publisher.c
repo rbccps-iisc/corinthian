@@ -136,7 +136,7 @@ init (int state)
 	if (response == NULL)
 		response = kore_buf_alloc(65536);
 
-	kore_pgsql_register("db","user=postgres password=password");
+	kore_pgsql_register("db","host=postgres user=postgres password=password");
 
 	return KORE_RESULT_OK;
 }

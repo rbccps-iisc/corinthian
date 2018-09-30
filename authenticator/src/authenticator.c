@@ -63,7 +63,7 @@ init (int state)
 		query = kore_buf_alloc(512);
 
 	// XXX this user must only have read permissions on DB
-	kore_pgsql_register("db","user=postgres password=password");
+	kore_pgsql_register("db","host=postgres user=postgres password=password");
 
 	return KORE_RESULT_OK;
 }
