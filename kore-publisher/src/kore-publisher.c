@@ -141,7 +141,7 @@ init (int state)
 	if (response == NULL)
 		response = kore_buf_alloc(65536);
 
-	kore_pgsql_register("db","host=postgres user=postgres password=password");
+	kore_pgsql_register("db","host=kore-postgres user=postgres password=password");
 
 	return KORE_RESULT_OK;
 }
@@ -681,8 +681,12 @@ register_entity (struct http_request *req)
 		"no body found in request"	
 	);	
 
+        printf("before check\n");
+
 	if (! login_success(id,apikey))
 		FORBIDDEN("invalid id or apikey");
+        
+        printf("after check\n");
 
 	strlcpy(entity_name,id,128);
 	strcat(entity_name,"/");
