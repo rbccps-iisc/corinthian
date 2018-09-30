@@ -455,12 +455,8 @@ subscribe(struct http_request *req)
 	const char *apikey;
 	const char *message_type;
 	const char *num_messages;
-	const char *time_out;
 
-	uint8_t int_time_out;
-
-	uint8_t int_num_messages;
-	uint8_t num_messages_read;
+	uint8_t int_num_messages = 1;
 
 	amqp_socket_t 			*socket = NULL;
 	amqp_connection_state_t		connection;
@@ -472,6 +468,8 @@ subscribe(struct http_request *req)
 
 	req->status = 403;
 
+	printf("= 0 ===>\n");
+
 	BAD_REQUEST_if
 	(
 		KORE_RESULT_OK != http_request_header(req, "id", &id)
@@ -481,6 +479,7 @@ subscribe(struct http_request *req)
 		"inputs missing in headers"
 	);
 
+	kore_buf_reset(Q);
 	kore_buf_append(Q,id,strlen(id));
 	if (KORE_RESULT_OK == http_request_header(req, "message-type", &message_type))
 	{
@@ -491,26 +490,13 @@ subscribe(struct http_request *req)
 	}
 	kore_buf_append(Q,"\0",1);
 
-	/* XXX TO BE DONE */
-	int_num_messages = 10;
 	if (KORE_RESULT_OK == http_request_header(req, "num-messages", &num_messages))
 	{
 		int_num_messages = atoi(num_messages);
 
-		if (int_num_messages > 10 || int_time_out < 0)
-			int_time_out = 10;
+		if (int_num_messages > 10 || int_num_messages < 1)
+			int_num_messages = 10;
 	}
-
-	int_time_out = 3;
-	if (KORE_RESULT_OK != http_request_header(req, "time-out", &message_type))
-	{
-		int_time_out = atoi(time_out);
-
-		if (int_time_out > 3 || int_time_out < 0)
-			int_time_out = 3;
-	}
-
-	/* XXX TO BE DONE */
 
 	connection 	= amqp_new_connection();
 	socket		= amqp_tcp_socket_new(connection);
@@ -521,7 +507,17 @@ subscribe(struct http_request *req)
 	if (amqp_socket_open(socket, "broker", 5672))
 		ERROR("could not open a socket");
 
-	login_reply = amqp_login(connection, "/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN, id, apikey);
+
+	login_reply = amqp_login(connection, 
+			"/",
+			0,
+			131072,
+			0,
+			AMQP_SASL_METHOD_PLAIN,
+			id,
+			apikey
+	);
+
 	if (login_reply.reply_type != AMQP_RESPONSE_NORMAL)
 		FORBIDDEN("invalid id or apikey");
 
@@ -532,66 +528,96 @@ subscribe(struct http_request *req)
 	if (rpc_reply.reply_type != AMQP_RESPONSE_NORMAL)
 		FORBIDDEN("did not receive expected response from the broker");
 
-	amqp_basic_consume(connection, 1, amqp_cstring_bytes((char const *)Q->data), amqp_empty_bytes, 0, 1, 0, amqp_empty_table);
-
+	kore_buf_reset(response);
 	kore_buf_append(response,"[",1);
 
-	for (num_messages_read = 0; num_messages_read <= int_num_messages; ++num_messages_read)
+	for (i = 0; i < int_num_messages; ++i)
 	{
-		amqp_rpc_reply_t res;
-		amqp_envelope_t envelope;
-		amqp_maybe_release_buffers(connection);
+		amqp_rpc_reply_t 	res;
+		amqp_message_t message;
+		
+		time_t t;
+		t = time(NULL);
 
-		// TODO check for timeout
-		// TODO check for message size 
+		do
+		{
+			res = amqp_basic_get(
+					connection,
+					1,
+                               		amqp_cstring_bytes(Q->data),
+					/*no ack*/ 1
+			);
 
-		res = amqp_consume_message(connection, &envelope, NULL, 0);
-		if (AMQP_RESPONSE_NORMAL != res.reply_type) {
+		} while (
+			(res.reply_type == AMQP_RESPONSE_NORMAL) 	&&
+           		(res.reply.id 	== AMQP_BASIC_GET_EMPTY_METHOD) &&
+           		((time(NULL) - t) < 1)
+		);
+
+		if (AMQP_RESPONSE_NORMAL != res.reply_type)
 			break;
-		}
 
-		kore_buf_append(response,"{\"from\":\"",9);
-		if (envelope.message.properties.user_id.len == 0)
-			kore_buf_append (response,"<unknown>",9);
+		if (res.reply.id != AMQP_BASIC_GET_OK_METHOD)
+			break;
+
+		amqp_basic_get_ok_t *header = (amqp_basic_get_ok_t *) res.reply.decoded;
+         
+		amqp_read_message(connection, 1, &message, 0);
+
+		if (res.reply_type != AMQP_RESPONSE_NORMAL)
+			break;
+
+		kore_buf_append(response,"{\"sent-by\":\"",12);
+
+		if (message.properties.user_id.len == 0)
+			kore_buf_append (response,"\"\"",2);
 		else
-			kore_buf_append (response,envelope.message.properties.user_id.bytes,
-				envelope.message.properties.user_id.len);
+			kore_buf_append (response,message.properties.user_id.bytes,
+				message.properties.user_id.len);
 
-		kore_buf_append(response,"\",\"to\":\"",8);
-		kore_buf_append(response,envelope.exchange.bytes, envelope.exchange.len);
-		kore_buf_append(response,"\",\"message-type\":\"",18);
-		kore_buf_append(response,envelope.routing_key.bytes, envelope.routing_key.len);
+
+		kore_buf_append(response,"\",\"from\":\"",10);
+		if(header->exchange.len > 0)
+			kore_buf_append(response,header->exchange.bytes, header->exchange.len);
+
+		kore_buf_append(response,"\",\"topic\":\"",11);
+		if (header->routing_key.len > 0)
+			kore_buf_append(response,header->routing_key.bytes, header->routing_key.len);
+
+		//kore_buf_append(response,"\",\"to\":\"",8);
+		//kore_buf_append(response,envelope.exchange.bytes, envelope.exchange.len);
+		//kore_buf_append(response,"\",\"message-type\":\"",18);
+		//kore_buf_append(response,envelope.routing_key.bytes, envelope.routing_key.len);
+		//kore_buf_append(response,"\",\"content-type\":\"",18);
+		//kore_buf_append(response,envelope.routing_key.bytes, envelope.routing_key.len);
+
 		kore_buf_append(response,"\",\"content-type\":\"",18);
-		kore_buf_append(response,envelope.routing_key.bytes, envelope.routing_key.len);
 
-		if (envelope.message.properties._flags & AMQP_BASIC_CONTENT_TYPE_FLAG)
+		if (message.properties._flags & AMQP_BASIC_CONTENT_TYPE_FLAG)
 		{
-			kore_buf_append(response,envelope.message.properties.content_type.bytes,
-				envelope.message.properties.content_type.len);
-		}
-		else
-		{
-			kore_buf_append(response,"<unspecified>",13);
+			kore_buf_append(response,message.properties.content_type.bytes,
+				message.properties.content_type.len);
 		}
 
 		kore_buf_append(response,"\",\"body\":\"",10);
-		kore_buf_append(response,envelope.message.body.bytes, envelope.message.body.len);
+		kore_buf_append(response,message.body.bytes, message.body.len);
 		kore_buf_append(response,"\"},",3);
 	}
+
+
+	// remove the last comma
+	if (i > 0)
+		--(response->offset);
 
 	kore_buf_append(response,"]",1);
 
 	OK();
 
 done:
-	// TODO if connection.state != uninitalized
 
 	amqp_channel_close	(connection, 1, AMQP_REPLY_SUCCESS);
-	amqp_connection_close	(connection, AMQP_REPLY_SUCCESS);
+	amqp_connection_close	(connection,    AMQP_REPLY_SUCCESS);
 	amqp_destroy_connection	(connection);
-
-	if (socket)
-		free(socket);
 
 	http_response_header(req, "content-type", "application/json");
 	http_response(req, req->status, response->data, response->offset);
