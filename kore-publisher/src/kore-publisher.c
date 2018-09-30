@@ -421,7 +421,7 @@ publish (struct http_request *req)
 			0,
 			0,
 			&props,
-               		amqp_cstring_bytes(message)
+			amqp_cstring_bytes(message)
 		),
 
 		"broker refused publish message"
@@ -487,6 +487,18 @@ subscribe(struct http_request *req)
 		{
 			kore_buf_append (Q,".priority",9);
 		}
+		else if (strcmp(message_type,"command") == 0)
+		{
+			kore_buf_append (Q,".command",8);
+		}
+		else if (strcmp(message_type,"notification") == 0)
+		{
+			kore_buf_append (Q,".notification",8);
+		}
+		else
+		{
+			BAD_REQUEST("invalid message-type");
+		}
 	}
 	kore_buf_append(Q,"\0",1);
 
@@ -497,6 +509,8 @@ subscribe(struct http_request *req)
 		if (int_num_messages > 10 || int_num_messages < 1)
 			int_num_messages = 10;
 	}
+
+	// TODO Should we use login_success to check ?
 
 	connection 	= amqp_new_connection();
 	socket		= amqp_tcp_socket_new(connection);
@@ -544,7 +558,7 @@ subscribe(struct http_request *req)
 			res = amqp_basic_get(
 					connection,
 					1,
-                               		amqp_cstring_bytes(Q->data),
+					amqp_cstring_bytes(Q->data),
 					/*no ack*/ 1
 			);
 
@@ -576,6 +590,7 @@ subscribe(struct http_request *req)
 				message.properties.user_id.len);
 
 
+		/* construct the response */
 		kore_buf_append(response,"\",\"from\":\"",10);
 		if(header->exchange.len > 0)
 			kore_buf_append(response,header->exchange.bytes, header->exchange.len);
@@ -584,15 +599,7 @@ subscribe(struct http_request *req)
 		if (header->routing_key.len > 0)
 			kore_buf_append(response,header->routing_key.bytes, header->routing_key.len);
 
-		//kore_buf_append(response,"\",\"to\":\"",8);
-		//kore_buf_append(response,envelope.exchange.bytes, envelope.exchange.len);
-		//kore_buf_append(response,"\",\"message-type\":\"",18);
-		//kore_buf_append(response,envelope.routing_key.bytes, envelope.routing_key.len);
-		//kore_buf_append(response,"\",\"content-type\":\"",18);
-		//kore_buf_append(response,envelope.routing_key.bytes, envelope.routing_key.len);
-
 		kore_buf_append(response,"\",\"content-type\":\"",18);
-
 		if (message.properties._flags & AMQP_BASIC_CONTENT_TYPE_FLAG)
 		{
 			kore_buf_append(response,message.properties.content_type.bytes,

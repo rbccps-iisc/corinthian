@@ -358,8 +358,8 @@ auth_resource(struct http_request *req)
 
 		if (looks_like_a_valid_owner(username))
 		{
-			// allow queue = username.notify
-			if (strcmp(name + strlen_username ,".notify") == 0)
+			// allow queue = username.notification
+			if (strcmp(name + strlen_username ,".notififcation") == 0)
 				OK();
 		}
 		else
