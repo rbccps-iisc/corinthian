@@ -204,33 +204,38 @@ init (int state)
 	socket = amqp_tcp_socket_new(cached_admin_conn);
 
 	if (socket == NULL)
+	{
+		perror("Could not open a socket ");
 		return KORE_RESULT_ERROR;
+	}
 
-	if (amqp_socket_open(socket, "broker", 5672))
+	if (amqp_socket_open(socket, "kore-broker", 5672))
+	{
+		perror("Could not connect to kore-broker ");
 		return KORE_RESULT_ERROR;	
+	}
 
 	login_reply = amqp_login(cached_admin_conn, 
-		"/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN, "guest", admin_apikey);
+		"/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN, "admin", admin_apikey);
 
 	if (login_reply.reply_type != AMQP_RESPONSE_NORMAL)
 	{
-		debug_printf("invalid id or apikey");
+		perror("invalid id or apikey ");
 		return KORE_RESULT_ERROR;	
 	}
 
 	if(! amqp_channel_open(cached_admin_conn, 1))
 	{
-		debug_printf("could not open an AMQP connection");
+		perror ("could not open an AMQP connection");
 		return KORE_RESULT_ERROR;	
 	}
 
 	rpc_reply = amqp_get_rpc_reply(cached_admin_conn);
 	if (rpc_reply.reply_type != AMQP_RESPONSE_NORMAL)
 	{
-		debug_printf("did not receive expected response from the broker");
+		perror ("did not receive expected response from the broker");
 		return KORE_RESULT_ERROR;	
 	}
-
 
 	// TODO drop privilages to read admin.apikey file
 
