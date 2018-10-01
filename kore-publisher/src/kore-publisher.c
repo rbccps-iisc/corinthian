@@ -26,7 +26,7 @@
 	#define debug_printf(...) printf(__VA_ARGS__)
 #endif
 
-char password_chars[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789~!@#$%^&*_-+=.?/";
+char password_chars[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789~!@#$^&*-+=.?/";
 
 int cat			(struct http_request *);
 
@@ -69,7 +69,7 @@ char *sanitize (char *string);
 	kore_buf_reset(response); 			\
 	kore_buf_append(response,"{\"error\":\"",10); 	\
 	kore_buf_append(response,x,strlen(x));	 	\
-	kore_buf_append(response,"\"}",2);	 	\
+	kore_buf_append(response,"\"}\n",3);	 	\
 	goto done;					\
 }
 
@@ -78,7 +78,7 @@ char *sanitize (char *string);
 	kore_buf_reset(response); 			\
 	kore_buf_append(response,"{\"error\":\"",10); 	\
 	kore_buf_append(response,x,strlen(x));	 	\
-	kore_buf_append(response,"\"}",2);	 	\
+	kore_buf_append(response,"\"}\n",3);	 	\
 	goto done;					\
 }
 
@@ -87,7 +87,7 @@ char *sanitize (char *string);
 	kore_buf_reset(response); 			\
 	kore_buf_append(response,"{\"error\":\"",10); 	\
 	kore_buf_append(response,x,strlen(x));	 	\
-	kore_buf_append(response,"\"}",2);	 	\
+	kore_buf_append(response,"\"}\n",3);	 	\
 	goto done;					\
 }
 
@@ -96,7 +96,7 @@ char *sanitize (char *string);
 	kore_buf_reset(response); 			\
 	kore_buf_append(response,"{\"error\":\"",10); 	\
 	kore_buf_append(response,x,strlen(x));	 	\
-	kore_buf_append(response,"\"}",2);	 	\
+	kore_buf_append(response,"\"}\n",3);	 	\
 	goto done;					\
 }
 
@@ -832,7 +832,7 @@ register_entity (struct http_request *req)
 	kore_buf_append(response,entity_name,strlen(entity_name));
 	kore_buf_append(response,"\",\"apikey\":\"",12);
 	kore_buf_append(response,entity_apikey,strlen(entity_apikey));
-	kore_buf_append(response,"\"}",2);
+	kore_buf_append(response,"\"}\n",3);
 
 	OK();
 
@@ -1170,7 +1170,7 @@ register_owner(struct http_request *req)
 	kore_buf_append(response,entity,strlen(entity));
 	kore_buf_append(response,"\",\"apikey\":\"",12);
 	kore_buf_append(response,entity_apikey,strlen(entity_apikey));
-	kore_buf_append(response,"\"}",2);
+	kore_buf_append(response,"\"}\n",3);
 
 	OK();
 
@@ -1235,6 +1235,7 @@ deregister_owner(struct http_request *req)
 	// delete all acls
 	CREATE_STRING (query,
 			"DELETE FROM acl WHERE id LIKE '%s/%%' OR exchange LIKE '%s/%%'",
+				sanitize(entity),
 				sanitize(entity)
 	);
 
@@ -1509,7 +1510,7 @@ follow (struct http_request *req)
 		kore_buf_appendf(response,"\"follow-id-write\":\"%s\"",write_follow_id);
 	}
 
-	kore_buf_append(response,"}",1);
+	kore_buf_append(response,"}\n",2);
 
 done:
 	http_response_header(req, "content-type", "application/json");
@@ -1838,10 +1839,18 @@ sanitize (char *string)
 	char *p = string;
 	while (*p)
 	{
-		/* replace ' with " 
+		/* replace single quotes with double quotes.
+
+		   underscores and % with spaces
+
 		  we will have problem with read only strings */
+
 		if (*p == '\'')
 			*p = '\"';
+		else if (*p == '_')
+			*p = ' ';
+		else if (*p == '%')
+			*p = ' ';
 
 		++p;
 	}
