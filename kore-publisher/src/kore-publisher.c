@@ -56,6 +56,7 @@ bool looks_like_a_valid_entity (const char *str);
 bool is_alpha_numeric (const char *str);
 
 bool create_exchanges_and_queues (const char *id);
+bool delete_exchanges_and_queues (const char *id);
 
 char *sanitize (char *string);
 
@@ -140,7 +141,10 @@ size_t i;
 
 ht connection_ht;
 
+amqp_table_t lazy_queue_table;
+
 char admin_apikey[33];
+amqp_connection_state_t	*cached_admin_conn = NULL;
 
 int
 init (int state)
@@ -148,6 +152,24 @@ init (int state)
 	// https
 	if (worker->id == 0)
 		return KORE_RESULT_OK;
+
+	amqp_rpc_reply_t 	login_reply;
+	amqp_rpc_reply_t 	rpc_reply;
+
+	//////////////
+	// lazy queues
+	//////////////
+	lazy_queue_table.num_entries = 1;
+	lazy_queue_table.entries = malloc(lazy_queue_table.num_entries * sizeof(amqp_table_entry_t));
+
+	if (! lazy_queue_table.entries)
+		exit(-1);
+
+	amqp_table_entry_t * entry = &lazy_queue_table.entries[0];
+	entry->key = amqp_cstring_bytes("x-queue-mode");
+	entry->value.kind = AMQP_FIELD_KIND_UTF8;
+	entry->value.value.bytes = amqp_cstring_bytes("lazy");
+	//////////////
 
 	int fd = open("admin.apikey",O_RDONLY);
 	if (fd < 0)
@@ -172,9 +194,43 @@ init (int state)
 			admin_apikey[i] = '\0';
 			break;
 		}
-	} 
+	}
 
 	close (fd);
+
+	amqp_socket_t *socket = NULL;
+
+	cached_admin_conn = amqp_new_connection();
+	socket = amqp_tcp_socket_new(cached_admin_conn);
+
+	if (socket == NULL)
+		return KORE_RESULT_ERROR;
+
+	if (amqp_socket_open(socket, "broker", 5672))
+		return KORE_RESULT_ERROR;	
+
+	login_reply = amqp_login(cached_admin_conn, 
+		"/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN, "guest", admin_apikey);
+
+	if (login_reply.reply_type != AMQP_RESPONSE_NORMAL)
+	{
+		debug_printf("invalid id or apikey");
+		return KORE_RESULT_ERROR;	
+	}
+
+	if(! amqp_channel_open(cached_admin_conn, 1))
+	{
+		debug_printf("could not open an AMQP connection");
+		return KORE_RESULT_ERROR;	
+	}
+
+	rpc_reply = amqp_get_rpc_reply(cached_admin_conn);
+	if (rpc_reply.reply_type != AMQP_RESPONSE_NORMAL)
+	{
+		debug_printf("did not receive expected response from the broker");
+		return KORE_RESULT_ERROR;	
+	}
+
 
 	// TODO drop privilages to read admin.apikey file
 
@@ -924,6 +980,7 @@ deregister_entity (struct http_request *req)
 	strlcat(entity_name,entity,66); 
 
 	// TODO delete from follow where from_entity = entity_name or to_entity = entity_name
+	delete_exchanges_and_queues (entity_name);
 
 	// TODO run select query and delete all exchanges and queues of entity_name 
 
@@ -1162,7 +1219,7 @@ register_owner(struct http_request *req)
 	RUN_QUERY (query, "could not create a new owner");
 
 	// create entries in to RabbitMQ
-	create_exchanges_and_queues (id);
+	create_exchanges_and_queues (owner);
 
 	kore_buf_reset(response);
 	kore_buf_append(response,"{\"id\":\"",7);
@@ -1227,9 +1284,8 @@ deregister_owner(struct http_request *req)
 	if (! login_success("admin",apikey))
 		FORBIDDEN("wrong apikey");
 
-	// XXX delete from follow table
-
-	// XXX run select query and delete each and every queue and exchange. This needs work
+	delete_exchanges_and_queues (owner);
+	// XXX TODO delete all entities of the owner
 
 	// delete all acls
 	CREATE_STRING (query,
@@ -1728,67 +1784,14 @@ create_exchanges_and_queues (const char *id)
 	char exchange[128];
 	char q[128];
 
-	amqp_rpc_reply_t 	login_reply;
-	amqp_rpc_reply_t 	rpc_reply;
-
-	amqp_connection_state_t	conn;
-	amqp_socket_t *socket = NULL;
-
-	conn = amqp_new_connection();
-	socket = amqp_tcp_socket_new(conn);
-
-	if (socket == NULL)
-		goto done;
-
-	if (amqp_socket_open(socket, "broker", 5672))
-		goto done;	
-
-	login_reply = amqp_login(conn, 
-		"/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN, "admin", admin_apikey);
-
-	if (login_reply.reply_type != AMQP_RESPONSE_NORMAL)
-	{
-		debug_printf("invalid id or apikey");
-		goto done;	
-	}
-
-	if(! amqp_channel_open(conn, 1))
-	{
-		debug_printf("could not open an AMQP connection");
-		goto done;	
-	}
-
-	rpc_reply = amqp_get_rpc_reply(conn);
-	if (rpc_reply.reply_type != AMQP_RESPONSE_NORMAL)
-	{
-		debug_printf("did not receive expected response from the broker");
-		goto done;
-	}
-
-//////////////
-// lazy queues
-//////////////
-	amqp_table_t lazy_queue_table;
-	lazy_queue_table.num_entries = 1;
-	lazy_queue_table.entries = malloc(lazy_queue_table.num_entries * sizeof(amqp_table_entry_t));
-
-	if (! lazy_queue_table.entries)
-		goto done;
-
-	amqp_table_entry_t * entry = &lazy_queue_table.entries[0];
-	entry->key = amqp_cstring_bytes("x-queue-mode");
-	entry->value.kind = AMQP_FIELD_KIND_UTF8;
-	entry->value.value.bytes = amqp_cstring_bytes("lazy");
-//////////////
-
 	if (looks_like_a_valid_owner(id))
 	{
 		snprintf(exchange,128,"%s.notification",id);
 
 		debug_printf("[owner] creating exchange {%s}\n",exchange);
 
-		if (! amqp_exchange_declare(
-			conn,
+		if (! amqp_exchange_declare (
+			cached_admin_conn,
 			1,
 			amqp_cstring_bytes(exchange),
 			amqp_cstring_bytes("topic"),
@@ -1806,8 +1809,8 @@ create_exchanges_and_queues (const char *id)
 
 		snprintf(q,128,"%s.notification",id);
 		debug_printf("[owner] creating queue {%s}\n",q);
-		if (! amqp_queue_declare(
-			conn,
+		if (! amqp_queue_declare (
+			cached_admin_conn,
 			1,
 			amqp_cstring_bytes(q),
 			0,
@@ -1832,7 +1835,7 @@ create_exchanges_and_queues (const char *id)
 			debug_printf("[entity] creating exchange {%s}\n",exchange);
 
 			if (! amqp_exchange_declare (
-					conn,
+					cached_admin_conn,
 					1,
 					amqp_cstring_bytes(exchange),
 					amqp_cstring_bytes("topic"),
@@ -1857,7 +1860,7 @@ create_exchanges_and_queues (const char *id)
 
 		debug_printf("[entity] creating queue {%s}\n",q);
 			if (! amqp_queue_declare (
-				conn,
+				cached_admin_conn,
 				1,
 				amqp_cstring_bytes(q),
 				0,
@@ -1876,16 +1879,97 @@ create_exchanges_and_queues (const char *id)
 	is_success = true;
 
 done:
-	if (lazy_queue_table.entries)
-		free(lazy_queue_table.entries);
+	return is_success;
+}
 
-	if (socket)
+bool
+delete_exchanges_and_queues (const char *id)
+{
+	bool is_success = false;
+
+	char exchange[128];
+	char q[128];
+
+	if (looks_like_a_valid_owner(id))
 	{
-		amqp_channel_close	(conn, 1, AMQP_REPLY_SUCCESS);
-		amqp_connection_close	(conn,    AMQP_REPLY_SUCCESS);
-		amqp_destroy_connection	(conn);
+		snprintf(exchange,128,"%s.notification",id);
+
+		debug_printf("[owner] deleting exchange {%s}\n",exchange);
+
+		if (! amqp_exchange_delete (
+			cached_admin_conn,
+			1,
+			amqp_cstring_bytes(exchange),
+			0
+		))
+		{
+			perror("amqp_exchange_delete failed ");
+			goto done;
+		}
+		debug_printf("[owner] done creating exchange {%s}\n",exchange);
+
+		snprintf(q,128,"%s.notification",id);
+		debug_printf("[owner] deleting queue {%s}\n",q);
+		if (! amqp_queue_delete (
+			cached_admin_conn,
+			1,
+			amqp_cstring_bytes(q),
+			0,
+			0
+		))
+		{
+			perror("amqp_queue_delete failed ");
+			goto done;
+		}
+	}
+	else
+	{
+		char *_e[] = {".public", ".private", ".protected", ".command"};
+
+		for (i = 0; i < 4; ++i)
+		{
+			snprintf(exchange,128,"%s%s",id,_e[i]);
+
+			debug_printf("[entity] deleting exchange {%s}\n",exchange);
+
+			if (! amqp_exchange_delete (
+					cached_admin_conn,
+					1,
+					amqp_cstring_bytes(exchange),
+					0
+				)
+			)
+			{
+				perror("something went wrong with exchange deletion");
+				goto done;
+			}
+			debug_printf("[entity] DONE deleting exchange {%s}\n",exchange);
+		}
+
+		char *_q[] = {"\0", ".priority", ".command"};
+		for (i = 0; i < 3; ++i)
+		{
+			snprintf(q,128,"%s%s",id,_q[i]);
+
+			debug_printf("[entity] deleting queue {%s}\n",q);
+
+			if (! amqp_queue_delete (
+				cached_admin_conn,
+				1,
+				amqp_cstring_bytes(q),
+				0,
+				0
+			))
+			{
+				perror("amqp_queue_delete failed ");
+				goto done;
+			}
+		}
 	}
 
+	is_success = true;
+
+done:
 	return is_success;
 }
 
