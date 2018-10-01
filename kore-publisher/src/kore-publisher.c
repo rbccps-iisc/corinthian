@@ -205,13 +205,13 @@ init (int state)
 
 	if (socket == NULL)
 	{
-		perror("Could not open a socket ");
+		printf("Could not open a socket ");
 		return KORE_RESULT_ERROR;
 	}
 
 	if (amqp_socket_open(socket, "kore-broker", 5672))
 	{
-		perror("Could not connect to kore-broker ");
+		printf("Could not connect to kore-broker ");
 		return KORE_RESULT_ERROR;	
 	}
 
@@ -226,16 +226,17 @@ init (int state)
 
 	if(! amqp_channel_open(cached_admin_conn, 1))
 	{
-		perror ("could not open an AMQP connection");
+		printf("could not open an AMQP connection");
 		return KORE_RESULT_ERROR;	
 	}
 
 	rpc_reply = amqp_get_rpc_reply(cached_admin_conn);
 	if (rpc_reply.reply_type != AMQP_RESPONSE_NORMAL)
 	{
-		perror ("did not receive expected response from the broker");
+		printf("did not receive expected response from the broker");
 		return KORE_RESULT_ERROR;	
 	}
+
 
 	// TODO drop privilages to read admin.apikey file
 
@@ -912,6 +913,7 @@ delete_entity_from_rabbitmq (char *entity)
 {
 	if (! looks_like_a_valid_entity(entity))
 		return -1;
+
 
 /* XXX
 	amqp_exchange_delete (entity.public);
@@ -1880,6 +1882,7 @@ create_exchanges_and_queues (const char *id)
 				perror("amqp_queue_declare failed ");
 				goto done;
 			}
+		debug_printf("[entity] DONE creating queue {%s}\n",q);
 		}
 	}
 
@@ -1928,6 +1931,7 @@ delete_exchanges_and_queues (const char *id)
 			perror("amqp_queue_delete failed ");
 			goto done;
 		}
+		debug_printf("[owner] DONE deleting queue {%s}\n",q);
 	}
 	else
 	{
@@ -1971,6 +1975,7 @@ delete_exchanges_and_queues (const char *id)
 				perror("amqp_queue_delete failed ");
 				goto done;
 			}
+			debug_printf("[entity] DONE deleting queue {%s}\n",q);
 		}
 	}
 
