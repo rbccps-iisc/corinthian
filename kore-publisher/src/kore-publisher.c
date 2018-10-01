@@ -55,8 +55,7 @@ bool looks_like_a_valid_owner(const char *str);
 bool looks_like_a_valid_entity (const char *str);
 bool is_alpha_numeric (const char *str);
 
-bool create_queues 	(const char *id);
-bool create_exchanges 	(const char *id);
+bool create_exchanges_and_queues (const char *id);
 
 char *sanitize (char *string);
 
@@ -240,7 +239,7 @@ looks_like_a_valid_entity (const char *str)
 	{
 		if (! isalnum(str[i]))
 		{
-			// support some extra chars but maximum 1 back slash
+			// support some extra chars
 			switch (str[i])
 			{
 				case '/':
@@ -820,10 +819,8 @@ register_entity (struct http_request *req)
 	);
 	RUN_QUERY (query,"failed to create the entity");
 
-	// create entries in to RMQ
-	// create_exchanges (id);
-	// create_queues    (id);
-	// bind them
+	// create entries in to RabbitMQ
+	create_exchanges_and_queues (entity_name);
 	
 	// generate response
 	kore_buf_reset(response);
@@ -1102,10 +1099,10 @@ register_owner(struct http_request *req)
 {
 	const char *id;
 	const char *apikey;
-	const char *entity;
+	const char *owner;
 
 	char salt		[33];
-	char entity_apikey	[33];
+	char owner_apikey	[33];
 	char password_hash	[65];
 
 	req->status = 403;
@@ -1124,20 +1121,20 @@ register_owner(struct http_request *req)
 				||
 		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
 				||
-		KORE_RESULT_OK != http_request_header(req, "entity", &entity)
+		KORE_RESULT_OK != http_request_header(req, "owner", &owner)
 			,
 		"inputs missing in headers"
 	);
 
 	// cannot create an admin
-	if (strcmp(entity,"admin") == 0)
+	if (strcmp(owner,"admin") == 0)
 		FORBIDDEN("cannot create admin");
 
 	if (strcmp(id,"admin") != 0)
 		FORBIDDEN("only admin can call this api");
 
 	// it should look like an owner
-	if (! looks_like_a_valid_owner(entity))
+	if (! looks_like_a_valid_owner(owner))
 		BAD_REQUEST("entity should be an owner");	
 		
 	if (! login_success("admin",apikey))
@@ -1146,29 +1143,32 @@ register_owner(struct http_request *req)
 	// conflict if entity_name already exist
 	CREATE_STRING (query,
 			"SELECT id FROM users WHERE id ='%s'",
-				sanitize(entity)
+				sanitize(owner)
 	);
 	RUN_QUERY (query,"could not query info about the owner");
 
 	if(kore_pgsql_ntuples(&sql) > 0)
 		CONFLICT("id already used");
 
-	gen_salt_password_and_apikey (entity, salt, password_hash, entity_apikey);
+	gen_salt_password_and_apikey (owner, salt, password_hash, owner_apikey);
 
 	CREATE_STRING (query,
 			"INSERT INTO users (id,password_hash,schema,salt,blocked) values('%s','%s',NULL,'%s','f')",
-				sanitize(entity),
+				sanitize(owner),
 				sanitize(password_hash),
 				sanitize(salt)
 	);
 
 	RUN_QUERY (query, "could not create a new owner");
 
+	// create entries in to RabbitMQ
+	create_exchanges_and_queues (id);
+
 	kore_buf_reset(response);
 	kore_buf_append(response,"{\"id\":\"",7);
-	kore_buf_append(response,entity,strlen(entity));
+	kore_buf_append(response,owner,strlen(owner));
 	kore_buf_append(response,"\",\"apikey\":\"",12);
-	kore_buf_append(response,entity_apikey,strlen(entity_apikey));
+	kore_buf_append(response,owner_apikey,strlen(owner_apikey));
 	kore_buf_append(response,"\"}\n",3);
 
 	OK();
@@ -1190,7 +1190,7 @@ deregister_owner(struct http_request *req)
 {
 	const char *id;
 	const char *apikey;
-	const char *entity;
+	const char *owner;
 
 	req->status = 403;
 
@@ -1208,7 +1208,7 @@ deregister_owner(struct http_request *req)
 				||
 		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
 				||
-		KORE_RESULT_OK != http_request_header(req, "entity", &entity)
+		KORE_RESULT_OK != http_request_header(req, "owner", &owner)
 			,
 		"inputs missing in headers"
 	);
@@ -1217,12 +1217,12 @@ deregister_owner(struct http_request *req)
 		FORBIDDEN("only admin can call this api");
 
 	// cannot delete admin
-	if (strcmp(entity,"admin") == 0)
+	if (strcmp(owner,"admin") == 0)
 		FORBIDDEN("cannot delete admin");
 
 	// it should look like an owner
-	if (! looks_like_a_valid_owner(entity))
-		BAD_REQUEST("entity should be an owner");	
+	if (! looks_like_a_valid_owner(owner))
+		BAD_REQUEST("not a valid owner");	
 
 	if (! login_success("admin",apikey))
 		FORBIDDEN("wrong apikey");
@@ -1234,8 +1234,8 @@ deregister_owner(struct http_request *req)
 	// delete all acls
 	CREATE_STRING (query,
 			"DELETE FROM acl WHERE id LIKE '%s/%%' OR exchange LIKE '%s/%%'",
-				sanitize(entity),
-				sanitize(entity)
+				sanitize(owner),
+				sanitize(owner)
 	);
 
 	RUN_QUERY (query,"could not delete from acl table");
@@ -1243,16 +1243,16 @@ deregister_owner(struct http_request *req)
 	// delete all apps and devices of the owner
 	CREATE_STRING (query,
 		"DELETE FROM users WHERE id LIKE '%s/%%'",
-			sanitize(entity)
+			sanitize(owner)
 	);
-	RUN_QUERY (query,"could not delete apps/devices of the entity");
+	RUN_QUERY (query,"could not delete apps/devices of the owner");
 
 	// finally delete the owner 
 	CREATE_STRING (query,
 			"DELETE FROM users WHERE id = '%s'",
-				sanitize(entity)
+				sanitize(owner)
 	);
-	RUN_QUERY (query,"could not delete the entity");
+	RUN_QUERY (query,"could not delete the owner");
 
 	OK();
 
@@ -1721,11 +1721,12 @@ unshare (struct http_request *req)
 }
 
 bool
-create_exchanges (const char *id)
+create_exchanges_and_queues (const char *id)
 {
 	bool is_success = false;
 
 	char exchange[128];
+	char q[128];
 
 	amqp_rpc_reply_t 	login_reply;
 	amqp_rpc_reply_t 	rpc_reply;
@@ -1764,56 +1765,120 @@ create_exchanges (const char *id)
 		goto done;
 	}
 
+//////////////
+// lazy queues
+//////////////
+	amqp_table_t lazy_queue_table;
+	lazy_queue_table.num_entries = 1;
+	lazy_queue_table.entries = malloc(lazy_queue_table.num_entries * sizeof(amqp_table_entry_t));
+
+	if (! lazy_queue_table.entries)
+		goto done;
+
+	amqp_table_entry_t * entry = &lazy_queue_table.entries[0];
+	entry->key = amqp_cstring_bytes("x-queue-mode");
+	entry->value.kind = AMQP_FIELD_KIND_UTF8;
+	entry->value.value.bytes = amqp_cstring_bytes("lazy");
+//////////////
+
 	if (looks_like_a_valid_owner(id))
 	{
 		snprintf(exchange,128,"%s.notification",id);
 
-/*
-	printf("1. Creating {%s}\n",exchange);
+		debug_printf("[owner] creating exchange {%s}\n",exchange);
+
 		if (! amqp_exchange_declare(
 			conn,
 			1,
 			amqp_cstring_bytes(exchange),
-			amqp_cstring_bytes(""),
+			amqp_cstring_bytes("topic"),
 			0,
-			0,
+			1, /* durable */
 			0,
 			0,
 			amqp_empty_table
 		))
 		{
-			perror("Something went wrong ");
+			perror("amqp_exchange_declare failed ");
+			goto done;
 		}
-	printf("2. Done {%s}\n",exchange);
-*/
+		debug_printf("[owner] done creating exchange {%s}\n",exchange);
+
+		snprintf(q,128,"%s.notification",id);
+		debug_printf("[owner] creating queue {%s}\n",q);
+		if (! amqp_queue_declare(
+			conn,
+			1,
+			amqp_cstring_bytes(q),
+			0,
+			1, /* durable */
+			0,
+			0,
+			lazy_queue_table	
+		))
+		{
+			perror("amqp_queue_declare failed ");
+			goto done;
+		}
 	}
 	else
 	{
-		char *e[] = {".public", ".private", ".protected"};
+		char *_e[] = {".public", ".private", ".protected", ".command"};
 
+		for (i = 0; i < 4; ++i)
+		{
+			snprintf(exchange,128,"%s%s",id,_e[i]);
+
+			debug_printf("[entity] creating exchange {%s}\n",exchange);
+
+			if (! amqp_exchange_declare (
+					conn,
+					1,
+					amqp_cstring_bytes(exchange),
+					amqp_cstring_bytes("topic"),
+					0,
+					1, /* durable */
+					0,
+					0,
+					amqp_empty_table
+				)
+			)
+			{
+				perror("something went wrong with exchange creation ");
+				goto done;
+			}
+			debug_printf("[entity] DONE creating exchange {%s}\n",exchange);
+		}
+
+		char *_q[] = {"\0", ".priority", ".command"};
 		for (i = 0; i < 3; ++i)
 		{
-			snprintf(exchange,128,"%s.notification",id, e[i]);
+			snprintf(q,128,"%s%s",id,_q[i]);
 
-	debug_printf("2. Creating {%s}\n",exchange);
-
-			amqp_exchange_declare (
+		debug_printf("[entity] creating queue {%s}\n",q);
+			if (! amqp_queue_declare (
 				conn,
 				1,
-				amqp_cstring_bytes(exchange),
-				amqp_cstring_bytes("amq.topic"),
+				amqp_cstring_bytes(q),
+				0,
+				1, /* durable */
 				0,
 				0,
-				0,
-				0,
-				amqp_empty_table
-			);
+				lazy_queue_table	
+			))
+			{
+				perror("amqp_queue_declare failed ");
+				goto done;
+			}
 		}
 	}
 
 	is_success = true;
 
 done:
+	if (lazy_queue_table.entries)
+		free(lazy_queue_table.entries);
+
 	if (socket)
 	{
 		amqp_channel_close	(conn, 1, AMQP_REPLY_SUCCESS);
@@ -1821,15 +1886,7 @@ done:
 		amqp_destroy_connection	(conn);
 	}
 
-	printf("Retruning %s\n",is_success ? "ok" : "failed");
-	
 	return is_success;
-}
-
-bool
-create_queues (const char *id)
-{
-	return true;
 }
 
 char*
@@ -1844,12 +1901,9 @@ sanitize (char *string)
 
 		  we will have problem with read only strings */
 
-		if (*p == '\'')
-			*p = '\"';
-		else if (*p == '_')
-			*p = ' ';
-		else if (*p == '%')
-			*p = ' ';
+			if (*p == '\'') *p = '\"';
+		else 	if (*p == '_' ) *p = ' ';
+		else 	if (*p == '%' ) *p = ' ';
 
 		++p;
 	}
