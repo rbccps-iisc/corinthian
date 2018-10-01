@@ -17,10 +17,11 @@
 #include <openssl/sha.h>
 
 #include <ctype.h>
+#include <pthread.h>
 
 #include "ht.h"
 
-#if 0
+#if 1
 	#define debug_printf(...)
 #else
 	#define debug_printf(...) printf(__VA_ARGS__)
@@ -55,8 +56,8 @@ bool looks_like_a_valid_owner(const char *str);
 bool looks_like_a_valid_entity (const char *str);
 bool is_alpha_numeric (const char *str);
 
-bool create_exchanges_and_queues (const char *id);
-bool delete_exchanges_and_queues (const char *id);
+void *create_exchanges_and_queues (void *);
+void *delete_exchanges_and_queues (void *);
 
 char *sanitize (char *string);
 
@@ -824,6 +825,9 @@ register_entity (struct http_request *req)
 	char entity_apikey	[33];
 	char password_hash	[65];
 
+	pthread_t thread;
+	bool thread_started = false; 
+
 	req->status = 403;
 
 	BAD_REQUEST_if
@@ -860,6 +864,10 @@ register_entity (struct http_request *req)
 	strcat(entity_name,"/");
 	strlcat(entity_name,entity,66);
 
+	// create entries in to RabbitMQ
+	pthread_create(&thread,NULL,create_exchanges_and_queues,(void *)&entity_name); 
+	thread_started = true;
+
 	// conflict if entity_name already exist
 
 	CREATE_STRING(query,
@@ -883,9 +891,6 @@ register_entity (struct http_request *req)
 	);
 	RUN_QUERY (query,"failed to create the entity");
 
-	// create entries in to RabbitMQ
-	create_exchanges_and_queues (entity_name);
-	
 	// generate response
 	kore_buf_reset(response);
 	kore_buf_append(response,"{\"id\":\"",7);
@@ -897,6 +902,20 @@ register_entity (struct http_request *req)
 	OK();
 
 done:
+	// wait for thread ...
+	if (thread_started)
+	{
+		bool *result;
+		pthread_join(thread,&result);
+
+		if (! *result) {
+			req->status = 500;
+			kore_buf_reset(response);
+		}
+
+		free(result);
+	}
+
 	http_response_header(req, "content-type", "application/json");
 	http_response(req, req->status, response->data, response->offset);
 
@@ -961,6 +980,9 @@ deregister_entity (struct http_request *req)
 
 	char entity_name [66];
 
+	pthread_t thread;
+	bool thread_started = false; 
+
 	req->status = 403;
 
 	BAD_REQUEST_if
@@ -989,7 +1011,9 @@ deregister_entity (struct http_request *req)
 	strlcat(entity_name,entity,66); 
 
 	// TODO delete from follow where from_entity = entity_name or to_entity = entity_name
-	delete_exchanges_and_queues (entity_name);
+	// delete entries in to RabbitMQ
+	pthread_create(&thread,NULL,delete_exchanges_and_queues,(void *)&entity_name); 
+	thread_started = true;
 
 	// TODO run select query and delete all exchanges and queues of entity_name 
 
@@ -1021,6 +1045,20 @@ deregister_entity (struct http_request *req)
 	OK();
 
 done:
+	// wait for thread ...
+	if (thread_started)
+	{
+		bool *result;
+		pthread_join(thread,&result);
+
+		if (! *result) {
+			req->status = 500;
+			kore_buf_reset(response);
+		}
+
+		free(result);
+	}
+
 	http_response_header(req, "content-type", "application/json");
 	http_response(req, req->status, response->data, response->offset);
 
@@ -1171,6 +1209,9 @@ register_owner(struct http_request *req)
 	char owner_apikey	[33];
 	char password_hash	[65];
 
+	pthread_t thread;
+	bool thread_started = false;
+
 	req->status = 403;
 
 	if (req->owner->addrtype == AF_INET)
@@ -1216,6 +1257,9 @@ register_owner(struct http_request *req)
 	if(kore_pgsql_ntuples(&sql) > 0)
 		CONFLICT("id already used");
 
+	pthread_create(&thread,NULL,create_exchanges_and_queues,(void *)owner); 
+	thread_started = true;
+
 	gen_salt_password_and_apikey (owner, salt, password_hash, owner_apikey);
 
 	CREATE_STRING (query,
@@ -1227,9 +1271,6 @@ register_owner(struct http_request *req)
 
 	RUN_QUERY (query, "could not create a new owner");
 
-	// create entries in to RabbitMQ
-	create_exchanges_and_queues (owner);
-
 	kore_buf_reset(response);
 	kore_buf_append(response,"{\"id\":\"",7);
 	kore_buf_append(response,owner,strlen(owner));
@@ -1240,6 +1281,20 @@ register_owner(struct http_request *req)
 	OK();
 
 done:
+	// wait for thread ...
+	if (thread_started)
+	{
+		bool *result;
+		pthread_join(thread,&result);
+
+		if (! *result) {
+			req->status = 500;
+			kore_buf_reset(response);
+		}
+
+		free(result);
+	}
+
 	http_response_header(req, "content-type", "application/json");
 	http_response(req, req->status, response->data, response->offset);
 
@@ -1257,6 +1312,9 @@ deregister_owner(struct http_request *req)
 	const char *id;
 	const char *apikey;
 	const char *owner;
+
+	pthread_t thread;
+	bool thread_started = false; 
 
 	req->status = 403;
 
@@ -1279,6 +1337,9 @@ deregister_owner(struct http_request *req)
 		"inputs missing in headers"
 	);
 
+	id 	= sanitize(id);
+	owner 	= sanitize(owner);
+
 	if (strcmp(id,"admin") != 0)
 		FORBIDDEN("only admin can call this api");
 
@@ -1293,14 +1354,16 @@ deregister_owner(struct http_request *req)
 	if (! login_success("admin",apikey))
 		FORBIDDEN("wrong apikey");
 
-	delete_exchanges_and_queues (owner);
+	// delete entries in to RabbitMQ
+	pthread_create(&thread,NULL,delete_exchanges_and_queues,(void *)owner); 
+	thread_started = true;
 	// XXX TODO delete all entities of the owner
 
 	// delete all acls
 	CREATE_STRING (query,
 			"DELETE FROM acl WHERE id LIKE '%s/%%' OR exchange LIKE '%s/%%'",
-				sanitize(owner),
-				sanitize(owner)
+				owner,
+				owner
 	);
 
 	RUN_QUERY (query,"could not delete from acl table");
@@ -1308,20 +1371,34 @@ deregister_owner(struct http_request *req)
 	// delete all apps and devices of the owner
 	CREATE_STRING (query,
 		"DELETE FROM users WHERE id LIKE '%s/%%'",
-			sanitize(owner)
+			owner
 	);
 	RUN_QUERY (query,"could not delete apps/devices of the owner");
 
 	// finally delete the owner 
 	CREATE_STRING (query,
 			"DELETE FROM users WHERE id = '%s'",
-				sanitize(owner)
+				owner
 	);
 	RUN_QUERY (query,"could not delete the owner");
 
 	OK();
 
 done:
+	// wait for thread ...
+	if (thread_started)
+	{
+		bool *result;
+		pthread_join(thread,&result);
+
+		if (! *result) {
+			req->status = 500;
+			kore_buf_reset(response);
+		}
+
+		free(result);
+	}
+
 	http_response_header(req, "content-type", "application/json");
 	http_response(req, req->status, response->data, response->offset);
 
@@ -1785,13 +1862,19 @@ unshare (struct http_request *req)
 	return (KORE_RESULT_OK);
 }
 
-bool
-create_exchanges_and_queues (const char *id)
+void *
+create_exchanges_and_queues (void *v)
 {
-	bool is_success = false;
+	const char *id = (const char *)v;
+
+	bool *is_success;
 
 	char exchange[128];
 	char q[128];
+
+	is_success = malloc (sizeof(bool));
+
+	*is_success = false;
 
 	if (looks_like_a_valid_owner(id))
 	{
@@ -1886,19 +1969,24 @@ create_exchanges_and_queues (const char *id)
 		}
 	}
 
-	is_success = true;
+	*is_success = true;
 
 done:
 	return is_success;
 }
 
-bool
-delete_exchanges_and_queues (const char *id)
+void *
+delete_exchanges_and_queues (void *v)
 {
-	bool is_success = false;
-
+	const char *id = (const char *)v;
+	
 	char exchange[128];
 	char q[128];
+
+	bool *is_success;
+
+	is_success = malloc(sizeof(bool));
+	*is_success = false;
 
 	if (looks_like_a_valid_owner(id))
 	{
@@ -1979,7 +2067,7 @@ delete_exchanges_and_queues (const char *id)
 		}
 	}
 
-	is_success = true;
+	*is_success = true;
 
 done:
 	return is_success;
