@@ -27,21 +27,21 @@ def check(r,c):
 
 print "De registering owners"
 # delete owners
-r = get("deregister-owner", { "id":"admin", "apikey":admin_api, "entity":"owner-a" })
+r = get("deregister-owner", { "id":"admin", "apikey":admin_api, "owner":"owner-a" })
 check(r, 200)
 
-r = get("deregister-owner", { "id":"admin", "apikey":admin_api, "entity":"owner-b" })
+r = get("deregister-owner", { "id":"admin", "apikey":admin_api, "owner":"owner-b" })
 check(r, 200)
 
 
 print "\nRegistering owners"
 
 # add them
-r = get("register-owner", { "id":"admin", "apikey":admin_api, "entity":"owner-a" })
+r = get("register-owner", { "id":"admin", "apikey":admin_api, "owner":"owner-a" })
 check(r, 200)
 owner_a_apikey = r.json()['apikey']
 
-r = get("register-owner", { "id":"admin", "apikey":admin_api, "entity":"owner-b" })
+r = get("register-owner", { "id":"admin", "apikey":admin_api, "owner":"owner-b" })
 check(r, 200)
 owner_b_apikey = r.json()['apikey']
 
@@ -117,10 +117,10 @@ for i in xrange(0,num_devices):
 
 print "\nDeleting owners"
 # delete owners
-r = get("deregister-owner", { "id":"admin", "apikey":admin_api, "entity":"owner-a" })
+r = get("deregister-owner", { "id":"admin", "apikey":admin_api, "owner":"owner-a" })
 check(r, 200)
 
-r = get("deregister-owner", { "id":"admin", "apikey":admin_api, "entity":"owner-b" })
+r = get("deregister-owner", { "id":"admin", "apikey":admin_api, "owner":"owner-b" })
 check(r, 200)
 
 print "\nDone"
