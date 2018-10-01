@@ -1840,7 +1840,7 @@ sanitize (char *string)
 	{
 		/* replace single quotes with double quotes.
 
-		   underscores and % with spaces
+		   underscores and % with spaces. ok ?
 
 		  we will have problem with read only strings */
 
