@@ -51,7 +51,6 @@ int init (int);
 void gen_salt_password_and_apikey (const char *, char *, char *, char *);
 bool login_success (const char *, const char *);
 
-
 bool looks_like_a_valid_owner(const char *str);
 bool looks_like_a_valid_entity (const char *str);
 bool is_alpha_numeric (const char *str);
