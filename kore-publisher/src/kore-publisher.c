@@ -189,7 +189,7 @@ init (int state)
 	if (response == NULL)
 		response = kore_buf_alloc(65536);
 
-	kore_pgsql_register("db","host=kore-postgres user=postgres password=O58Gl6YclL4h3jZwCQMNqE130869rvDa");
+	kore_pgsql_register("db","host=kore-postgres user=postgres password=postgres_pwd");
 
 	return KORE_RESULT_OK;
 }
@@ -1765,6 +1765,22 @@ create_exchanges_and_queues (const char *id)
 		goto done;
 	}
 
+//////////////
+// lazy queues
+//////////////
+	amqp_table_t lazy_queue_table;
+	lazy_queue_table.num_entries = 1;
+	lazy_queue_table.entries = malloc(lazy_queue_table.num_entries * sizeof(amqp_table_entry_t));
+
+	if (! lazy_queue_table.entries)
+		goto done;
+
+	amqp_table_entry_t * entry = &lazy_queue_table.entries[0];
+	entry->key = amqp_cstring_bytes("x-queue-mode");
+	entry->value.kind = AMQP_FIELD_KIND_UTF8;
+	entry->value.value.bytes = amqp_cstring_bytes("lazy");
+//////////////
+
 	if (looks_like_a_valid_owner(id))
 	{
 		snprintf(exchange,128,"%s.notification",id);
@@ -1798,7 +1814,7 @@ create_exchanges_and_queues (const char *id)
 			1, /* durable */
 			0,
 			0,
-			amqp_empty_table
+			lazy_queue_table	
 		))
 		{
 			perror("amqp_queue_declare failed ");
@@ -1848,7 +1864,7 @@ create_exchanges_and_queues (const char *id)
 				1, /* durable */
 				0,
 				0,
-				amqp_empty_table
+				lazy_queue_table	
 			))
 			{
 				perror("amqp_queue_declare failed ");
@@ -1860,6 +1876,9 @@ create_exchanges_and_queues (const char *id)
 	is_success = true;
 
 done:
+	if (lazy_queue_table.entries)
+		free(lazy_queue_table.entries);
+
 	if (socket)
 	{
 		amqp_channel_close	(conn, 1, AMQP_REPLY_SUCCESS);
