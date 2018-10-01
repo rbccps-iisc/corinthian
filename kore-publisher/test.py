@@ -80,10 +80,14 @@ for i in xrange(0,num_devices):
 	device_apikey =	a_info['apikey']
 	app_apikey = 	b_info['apikey']
 
-	r = get("follow", {"id":"owner-b", "apikey":owner_b_apikey, "from": app, "to":device, "validity":"2", "permission" :"read", "topic":"hello"})
+	perm = random.choice(["read","write"])
+
+	r = get("follow", {"id":"owner-b", "apikey":owner_b_apikey,
+		"from": app, "to":device, "validity":"2", "permission":perm,
+		"topic":"hello"})
 	check(r,202)
 
-	follow_id = r.json()['follow-id-read']
+	follow_id = r.json()["follow-id-"+perm]
 	print "Follow id for following ",device, "from ", app , "is ",follow_id
 
 	r = get("share", {"id":"owner-a", "apikey":owner_a_apikey, "follow-id":follow_id})

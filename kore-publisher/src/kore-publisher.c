@@ -191,7 +191,8 @@ init (int state)
 	if (response == NULL)
 		response = kore_buf_alloc(65536);
 
-	kore_pgsql_register("db","host=kore-postgres user=postgres password=password");
+	kore_pgsql_register("db","user=postgres password=password");
+	//kore_pgsql_register("db","host=kore-postgres user=postgres password=password");
 
 	return KORE_RESULT_OK;
 }
@@ -1344,6 +1345,9 @@ follow (struct http_request *req)
 
 	char read_follow_id  [10];
 	char write_follow_id [10];
+
+	read_follow_id[0] = '\0';
+	write_follow_id[0] = '\0';
 
 	if (strcmp(permission,"read") == 0)
 	{
