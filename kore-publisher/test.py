@@ -106,6 +106,7 @@ for i in xrange(0,num_devices):
 	# subscribe
 	"""
 
+raw_input(" >>> ")
 
 print "\nDeleting entities"
 for i in xrange(0,num_devices):
@@ -114,6 +115,9 @@ for i in xrange(0,num_devices):
 
 	r = get("deregister", {"id":"owner-b", "apikey":owner_b_apikey, "entity":"app-"+str(i)})
 	check(r,200)
+
+
+raw_input(" >>> ")
 
 print "\nDeleting owners"
 # delete owners
