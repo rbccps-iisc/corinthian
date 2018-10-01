@@ -104,10 +104,20 @@ for i in xrange(0,num_devices):
 	# subscribe
 	"""
 
-r = get("deregister", {"id":"owner-a", "apikey":owner_a_apikey, "entity":"device"})
-check(r,200)
+for i in xrange(0,num_devices):
+	r = get("deregister", {"id":"owner-a", "apikey":owner_a_apikey, "entity":"device-"+str(i)})
+	check(r,200)
 
-r = get("deregister", {"id":"owner-b", "apikey":owner_b_apikey, "entity":"app"})
-check(r,200)
+	r = get("deregister", {"id":"owner-b", "apikey":owner_b_apikey, "entity":"app-"+str(i)})
+	check(r,200)
+
+# delete owners
+r = get("deregister-owner", { "id":"admin", "apikey":admin_api, "entity":"owner-a" })
+check(r, 200)
+
+r = get("deregister-owner", { "id":"admin", "apikey":admin_api, "entity":"owner-b" })
+check(r, 200)
+
+
 
 print "Done"
