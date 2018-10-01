@@ -69,7 +69,7 @@ char *sanitize (char *string);
 	kore_buf_reset(response); 			\
 	kore_buf_append(response,"{\"error\":\"",10); 	\
 	kore_buf_append(response,x,strlen(x));	 	\
-	kore_buf_append(response,"\"}\n",3);	 	\
+	kore_buf_append(response,"\"}",2);	 	\
 	goto done;					\
 }
 
@@ -78,7 +78,7 @@ char *sanitize (char *string);
 	kore_buf_reset(response); 			\
 	kore_buf_append(response,"{\"error\":\"",10); 	\
 	kore_buf_append(response,x,strlen(x));	 	\
-	kore_buf_append(response,"\"}\n",3);	 	\
+	kore_buf_append(response,"\"}",2);	 	\
 	goto done;					\
 }
 
@@ -87,7 +87,7 @@ char *sanitize (char *string);
 	kore_buf_reset(response); 			\
 	kore_buf_append(response,"{\"error\":\"",10); 	\
 	kore_buf_append(response,x,strlen(x));	 	\
-	kore_buf_append(response,"\"}\n",3);	 	\
+	kore_buf_append(response,"\"}",2);	 	\
 	goto done;					\
 }
 
@@ -96,7 +96,7 @@ char *sanitize (char *string);
 	kore_buf_reset(response); 			\
 	kore_buf_append(response,"{\"error\":\"",10); 	\
 	kore_buf_append(response,x,strlen(x));	 	\
-	kore_buf_append(response,"\"}\n",3);	 	\
+	kore_buf_append(response,"\"}",2);	 	\
 	goto done;					\
 }
 
@@ -833,7 +833,7 @@ register_entity (struct http_request *req)
 	kore_buf_append(response,entity_name,strlen(entity_name));
 	kore_buf_append(response,"\",\"apikey\":\"",12);
 	kore_buf_append(response,entity_apikey,strlen(entity_apikey));
-	kore_buf_append(response,"\"}\n",3);
+	kore_buf_append(response,"\"}",2);
 
 	OK();
 
@@ -1171,7 +1171,7 @@ register_owner(struct http_request *req)
 	kore_buf_append(response,entity,strlen(entity));
 	kore_buf_append(response,"\",\"apikey\":\"",12);
 	kore_buf_append(response,entity_apikey,strlen(entity_apikey));
-	kore_buf_append(response,"\"}\n",3);
+	kore_buf_append(response,"\"}",2);
 
 	OK();
 

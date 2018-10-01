@@ -23,14 +23,18 @@ def check(r,c):
 		print r.text
 		sys.exit(0)
 	else:
-		print "---> Ok ",r.url, r.text
+		print "---> Ok [",r.status_code,"]",r.url, r.text
 
+print "De registering owners"
 # delete owners
 r = get("deregister-owner", { "id":"admin", "apikey":admin_api, "entity":"owner-a" })
 check(r, 200)
 
 r = get("deregister-owner", { "id":"admin", "apikey":admin_api, "entity":"owner-b" })
 check(r, 200)
+
+
+print "\nRegistering owners"
 
 # add them
 r = get("register-owner", { "id":"admin", "apikey":admin_api, "entity":"owner-a" })
@@ -44,6 +48,9 @@ owner_b_apikey = r.json()['apikey']
 a = {}
 b = {} 
 
+
+print "\nRegistering devices"
+
 for i in xrange(0,num_devices):
 
 	r = post("register", {"id":"owner-a", "apikey":owner_a_apikey, "entity":"device-"+str(i)},'{"x":"y"}')
@@ -56,9 +63,6 @@ for i in xrange(0,num_devices):
 	app = r.json()['id']
 	app_apikey = r.json()['apikey']
 
-	print "Registered device",device
-	print "Registered app", app
-	
 	a[i] = {}
 	b[i] = {}
 	
@@ -69,6 +73,7 @@ for i in xrange(0,num_devices):
 	b[i]['apikey'] = app_apikey	
 	
 
+print "\nFollow-Share"
 for i in xrange(0,num_devices):
 
 	a_info = a[i]
@@ -88,12 +93,9 @@ for i in xrange(0,num_devices):
 	check(r,202)
 
 	follow_id = r.json()["follow-id-"+perm]
-	print "Follow id for following ",device, "from ", app , "is ",follow_id
 
 	r = get("share", {"id":"owner-a", "apikey":owner_a_apikey, "follow-id":follow_id})
 	check(r,200)
-
-	print "Follow id ",follow_id,"approved"
 
 	"""
 	# publish
@@ -104,6 +106,8 @@ for i in xrange(0,num_devices):
 	# subscribe
 	"""
 
+
+print "\nDeleting entities"
 for i in xrange(0,num_devices):
 	r = get("deregister", {"id":"owner-a", "apikey":owner_a_apikey, "entity":"device-"+str(i)})
 	check(r,200)
@@ -111,6 +115,7 @@ for i in xrange(0,num_devices):
 	r = get("deregister", {"id":"owner-b", "apikey":owner_b_apikey, "entity":"app-"+str(i)})
 	check(r,200)
 
+print "\nDeleting owners"
 # delete owners
 r = get("deregister-owner", { "id":"admin", "apikey":admin_api, "entity":"owner-a" })
 check(r, 200)
@@ -118,6 +123,4 @@ check(r, 200)
 r = get("deregister-owner", { "id":"admin", "apikey":admin_api, "entity":"owner-b" })
 check(r, 200)
 
-
-
-print "Done"
+print "\nDone"
