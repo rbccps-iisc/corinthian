@@ -59,20 +59,20 @@ for i in xrange(0,num_devices):
 	print "Registered device",device
 	print "Registered app", app
 	
-	a[device] = {}
-	b[app] = {}
+	a[i] = {}
+	b[i] = {}
 	
-	a[device]['name'] = device 
-	a[device]['apikey'] = device_apikey
+	a[i]['name'] = device 
+	a[i]['apikey'] = device_apikey
 
-	b[app]['name'] = app 
-	b[app]['apikey'] = app_apikey	
+	b[i]['name'] = app 
+	b[i]['apikey'] = app_apikey	
 	
 
 for i in xrange(0,num_devices):
 
-	a_info = a[ a.keys()[random.randint(0,len(a.keys()) - 1) ]]
-	b_info = b[ b.keys()[random.randint(0,len(b.keys()) - 1) ]]
+	a_info = a[i]
+	b_info = b[i]
 
 	device = a_info['name']	
 	app = b_info['name']	
