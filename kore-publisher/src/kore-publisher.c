@@ -387,6 +387,8 @@ login_success (const char *id, const char *apikey)
 				sanitize(id)
 	);
 
+	debug_printf("login query = {%s}\n",query->data);
+
 	kore_pgsql_cleanup(&sql);
 	kore_pgsql_init(&sql);
 	if (! kore_pgsql_setup(&sql,"db",KORE_PGSQL_SYNC))
@@ -394,7 +396,7 @@ login_success (const char *id, const char *apikey)
 		kore_pgsql_logerror(&sql);
 		goto done;	
 	}
-	if (! kore_pgsql_query(&sql, (char *)query->data))
+	if (! kore_pgsql_query(&sql,(const char *)query->data))
 	{
 		kore_pgsql_logerror(&sql);
 		goto done;	

@@ -12,7 +12,7 @@
 
 #include <ctype.h>
 
-#if 1
+#if 0
 	#define debug_printf(...)
 #else
 	#define debug_printf(...) printf(__VA_ARGS__)
@@ -66,7 +66,8 @@ init (int state)
 		query = kore_buf_alloc(512);
 
 	// XXX this user must only have read permissions on DB
-	kore_pgsql_register("db","host=kore-postgres user=postgres password=postgres_pwd");
+	//kore_pgsql_register("db","host=kore-postgres user=postgres password=postgres_pwd");
+	kore_pgsql_register("db","user=postgres password=password");
 
 	return KORE_RESULT_OK;
 }
@@ -158,7 +159,7 @@ login_success (const char *id, const char *apikey)
 		goto done;
 
 	CREATE_STRING (query,
-			"SELECT blocked,salt,password_hash FROM users WHERE id='%s'",
+			"SELECT salt,password_hash FROM users WHERE id='%s' and blocked='f'",
 				sanitize(id)
 	);
 
@@ -180,11 +181,8 @@ login_success (const char *id, const char *apikey)
 	if (kore_pgsql_ntuples(&sql) == 0)
 		goto done;	
 
-	if (strcmp(kore_pgsql_getvalue(&sql,0,0),"t")  == 0)
-		goto done;	
-
-	salt 	 	= kore_pgsql_getvalue(&sql,0,1);
-	password_hash	= kore_pgsql_getvalue(&sql,0,2);
+	salt 	 	= kore_pgsql_getvalue(&sql,0,0);
+	password_hash	= kore_pgsql_getvalue(&sql,0,1);
 
 	// there is no salt or password hash in db ?
 	if (salt[0] == '\0' || password_hash[0] == '\0')
@@ -224,8 +222,12 @@ login_success (const char *id, const char *apikey)
 
 	hash_string[64] = '\0';
 
-	if (strncmp((char *)hash_string,password_hash,64) == 0)
+	debug_printf("Expecting it to be {%s} got {%s}\n",password_hash, hash_string);
+
+	if (strncmp(hash_string,password_hash,64) == 0) {
 		login_result = true;
+		debug_printf("Login OK\n");
+	}
 
 done:
 	kore_buf_reset(query);
@@ -246,6 +248,7 @@ auth_user(struct http_request *req)
 	http_populate_get(req);
 
 	GET_MANDATORY_FIELD(username);
+printf("Got username = {%s}\n",username);
 	GET_MANDATORY_FIELD(password);
 
 	if (strlen(username) > 65) 
