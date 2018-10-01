@@ -386,7 +386,7 @@ login_success (const char *id, const char *apikey)
 
 	CREATE_STRING (query,
 			"SELECT salt,password_hash FROM users WHERE id='%s' and blocked='f'",
-				sanitize(id)
+				id
 	);
 
 	debug_printf("login query = {%s}\n",query->data);
@@ -860,6 +860,12 @@ register_entity (struct http_request *req)
 	if (! login_success(id,apikey))
 		FORBIDDEN("invalid id or apikey");
 
+///////////////////////////////////
+	id 	= sanitize(id);
+	entity	= sanitize(entity);
+	body	= sanitize(body);
+///////////////////////////////////
+
 	strlcpy(entity_name,id,32);
 	strcat(entity_name,"/");
 	strlcat(entity_name,entity,66);
@@ -872,7 +878,7 @@ register_entity (struct http_request *req)
 
 	CREATE_STRING(query,
 		 	"SELECT id from users WHERE id='%s'",
-				sanitize(entity_name)
+				entity_name
 	);
 
 	RUN_QUERY (query,"could not get info about entity");
@@ -884,10 +890,10 @@ register_entity (struct http_request *req)
 
 	CREATE_STRING (query,
 			"INSERT INTO users (id,password_hash,schema,salt,blocked) values('%s','%s','%s','%s','f')",
-			sanitize(entity_name),
-			sanitize(password_hash),
-			sanitize(body),		// schema
-			sanitize(salt)
+			entity_name,
+			password_hash,
+			body,		// schema
+			salt
 	);
 	RUN_QUERY (query,"failed to create the entity");
 
@@ -1006,6 +1012,11 @@ deregister_entity (struct http_request *req)
 	if (! login_success(id,apikey))
 		FORBIDDEN("invalid id or apikey");
 
+///////////////////////////////////
+	id 	= sanitize(id);
+	entity 	= sanitize(entity);
+///////////////////////////////////
+
 	strlcpy(entity_name,id,33); 
 	strlcat(entity_name,"/",34); 
 	strlcat(entity_name,entity,66); 
@@ -1020,8 +1031,8 @@ deregister_entity (struct http_request *req)
 	CREATE_STRING (
 		query,
 		"DELETE FROM acl WHERE id = '%s' or exchange LIKE '%s.%%'",
-		sanitize(entity_name),
-		sanitize(entity_name)
+		entity_name,
+		entity_name
 	);
 
 	RUN_QUERY(query,"could not delete from acl table");
@@ -1029,18 +1040,17 @@ deregister_entity (struct http_request *req)
 	CREATE_STRING (
 		query,
 		"DELETE FROM follow WHERE id_from = '%s' or id_to LIKE '%s.%%'",
-		sanitize(entity_name),
-		sanitize(entity_name)
+		entity_name,
+		entity_name
 	);
 
 	RUN_QUERY(query,"could not delete from follow table");
 
 	CREATE_STRING (query,
 			"DELETE FROM users WHERE id = '%s'",
-				sanitize(entity_name)
+				entity_name
 	);
 	RUN_QUERY (query,"could not delete the entity");
-
 
 	OK();
 
@@ -1247,10 +1257,14 @@ register_owner(struct http_request *req)
 	if (! login_success("admin",apikey))
 		FORBIDDEN("wrong apikey");
 
+////////////////////////////////////////
+	owner = sanitize(owner);
+////////////////////////////////////////
+
 	// conflict if entity_name already exist
 	CREATE_STRING (query,
 			"SELECT id FROM users WHERE id ='%s'",
-				sanitize(owner)
+				owner
 	);
 	RUN_QUERY (query,"could not query info about the owner");
 
@@ -1264,9 +1278,9 @@ register_owner(struct http_request *req)
 
 	CREATE_STRING (query,
 			"INSERT INTO users (id,password_hash,schema,salt,blocked) values('%s','%s',NULL,'%s','f')",
-				sanitize(owner),
-				sanitize(password_hash),
-				sanitize(salt)
+				owner,
+				password_hash,
+				salt
 	);
 
 	RUN_QUERY (query, "could not create a new owner");
@@ -1281,6 +1295,9 @@ register_owner(struct http_request *req)
 	OK();
 
 done:
+	http_response_header	(req, "content-type", "application/json");
+	kore_pgsql_cleanup	(&sql);
+
 	// wait for thread ...
 	if (thread_started)
 	{
@@ -1295,13 +1312,7 @@ done:
 		free(result);
 	}
 
-	http_response_header(req, "content-type", "application/json");
 	http_response(req, req->status, response->data, response->offset);
-
-	kore_pgsql_cleanup(&sql);
-
-	kore_buf_reset(query);
-	kore_buf_reset(response);
 
 	return (KORE_RESULT_OK);
 }
@@ -1337,9 +1348,6 @@ deregister_owner(struct http_request *req)
 		"inputs missing in headers"
 	);
 
-	id 	= sanitize(id);
-	owner 	= sanitize(owner);
-
 	if (strcmp(id,"admin") != 0)
 		FORBIDDEN("only admin can call this api");
 
@@ -1353,6 +1361,10 @@ deregister_owner(struct http_request *req)
 
 	if (! login_success("admin",apikey))
 		FORBIDDEN("wrong apikey");
+
+////////////////////////////////////////////////
+	owner 	= sanitize(owner);
+////////////////////////////////////////////////
 
 	// delete entries in to RabbitMQ
 	pthread_create(&thread,NULL,delete_exchanges_and_queues,(void *)owner); 
@@ -1385,6 +1397,11 @@ deregister_owner(struct http_request *req)
 	OK();
 
 done:
+	http_response_header(req, "content-type", "application/json");
+
+	kore_pgsql_cleanup(&sql);
+	kore_buf_reset(query);
+
 	// wait for thread ...
 	if (thread_started)
 	{
@@ -1399,13 +1416,7 @@ done:
 		free(result);
 	}
 
-	http_response_header(req, "content-type", "application/json");
 	http_response(req, req->status, response->data, response->offset);
-
-	kore_pgsql_cleanup(&sql);
-
-	kore_buf_reset(query);
-	kore_buf_reset(response);
 
 	return (KORE_RESULT_OK);
 }
