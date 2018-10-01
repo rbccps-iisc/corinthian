@@ -11,21 +11,21 @@ docker exec kore-postgres chmod +x postgres.sh
 docker exec -d kore-postgres ./postgres.sh
 docker cp kore-postgres:/postgres_pwd .
 
-if [ -f kore-publisher/src/kore-publisher.c.bak ]
-then
-mv kore-publisher/src/kore-publisher.c.bak kore-publisher/src/kore-publisher.c || true
-fi
-
-
-if [ -f authenticator/src/authenticator.c.bak ]
-then
-mv authenticator/src/authenticator.c.bak authenticator/src/authenticator.c || true
-fi
+#if [ -f kore-publisher/src/kore-publisher.c.bak ]
+#then
+#mv kore-publisher/src/kore-publisher.c.bak kore-publisher/src/kore-publisher.c || true
+#fi
+#
+#
+#if [ -f authenticator/src/authenticator.c.bak ]
+#then
+#mv authenticator/src/authenticator.c.bak authenticator/src/authenticator.c || true
+#fi
 
 pwd=`cat postgres_pwd | cut -d ":" -f 2`
 
-sed -i .bak 's/postgres_pwd/'$pwd'/g' authenticator/src/authenticator.c
-sed -i .bak 's/postgres_pwd/'$pwd'/g' kore-publisher/src/kore-publisher.c
+sed 's/postgres_pwd/'$pwd'/g' authenticator/src/authenticator.c > authenticator/src/authenticator_new.c
+sed 's/postgres_pwd/'$pwd'/g' kore-publisher/src/kore-publisher.c > kore-publisher/src/kore-publisher_new.c
 
 docker cp authenticator/ kore-broker:/
 docker cp setup/broker.sh kore-broker:/
