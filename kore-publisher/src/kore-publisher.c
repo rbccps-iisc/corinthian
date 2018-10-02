@@ -511,10 +511,6 @@ login_success (const char *id, const char *apikey)
 	}
 
 done:
-	kore_buf_reset(query);
-
-	kore_pgsql_cleanup(&sql);
-
 	return login_result;
 }
 
@@ -964,7 +960,6 @@ register_entity (struct http_request *req)
 
 done:
 	http_response_header(req, "content-type", "application/json");
-	kore_pgsql_cleanup(&sql);
 
 	// wait for thread ...
 	if (thread_started)
@@ -1108,7 +1103,6 @@ deregister_entity (struct http_request *req)
 
 done:
 	http_response_header	(req, "content-type", "application/json");
-	kore_pgsql_cleanup	(&sql);
 
 	// wait for thread ...
 	if (thread_started)
@@ -1201,11 +1195,6 @@ done:
 	http_response_header(req, "content-type", "application/json");
 	http_response(req, req->status, response->data, response->offset);
 
-	kore_pgsql_cleanup(&sql);
-
-	kore_buf_reset(query);
-	kore_buf_reset(response);
-
 	return (KORE_RESULT_OK);
 }
 
@@ -1248,11 +1237,6 @@ db_cleanup (struct http_request *req)
 done:
 	http_response_header(req, "content-type", "application/json");
 	http_response(req, req->status, response->data, response->offset);
-
-	kore_pgsql_cleanup(&sql);
-
-	kore_buf_reset(query);
-	kore_buf_reset(response);
 
 	return (KORE_RESULT_OK);
 }
@@ -1345,7 +1329,6 @@ register_owner(struct http_request *req)
 
 done:
 	http_response_header	(req, "content-type", "application/json");
-	kore_pgsql_cleanup	(&sql);
 
 	// wait for thread ...
 	if (thread_started)
@@ -1447,9 +1430,6 @@ deregister_owner(struct http_request *req)
 
 done:
 	http_response_header(req, "content-type", "application/json");
-
-	kore_pgsql_cleanup(&sql);
-	kore_buf_reset(query);
 
 	// wait for thread ...
 	if (thread_started)
@@ -1717,11 +1697,6 @@ done:
 	http_response_header(req, "content-type", "application/json");
 	http_response(req, req->status, response->data, response->offset);
 
-	kore_pgsql_cleanup(&sql);
-
-	kore_buf_reset(query);
-	kore_buf_reset(response);
-
 	return (KORE_RESULT_OK);
 }
 
@@ -1798,11 +1773,6 @@ share (struct http_request *req)
 done:
 	http_response_header(req, "content-type", "application/json");
 	http_response(req, req->status, response->data, response->offset);
-
-	kore_pgsql_cleanup(&sql);
-
-	kore_buf_reset(query);
-	kore_buf_reset(response);
 
 	return (KORE_RESULT_OK);
 }
@@ -1933,11 +1903,6 @@ done:
 	http_response_header(req, "content-type", "application/json");
 	http_response(req, req->status, response->data, response->offset);
 
-	kore_pgsql_cleanup(&sql);
-
-	kore_buf_reset(query);
-	kore_buf_reset(response);
-
 	return (KORE_RESULT_OK);
 }
 
@@ -2036,16 +2001,11 @@ done:
 	http_response_header(req, "content-type", "application/json");
 	http_response(req, req->status, response->data, response->offset);
 
-	kore_pgsql_cleanup(&sql);
-
-	kore_buf_reset(query);
-	kore_buf_reset(response);
-
 	return (KORE_RESULT_OK);
 }
 
 int
-queue_unbind   (struct http_request *req)
+queue_unbind (struct http_request *req)
 {
 	const char *id;
 	const char *apikey;
@@ -2136,11 +2096,6 @@ unbind:
 done:
 	http_response_header(req, "content-type", "application/json");
 	http_response(req, req->status, response->data, response->offset);
-
-	kore_pgsql_cleanup(&sql);
-
-	kore_buf_reset(query);
-	kore_buf_reset(response);
 
 	return (KORE_RESULT_OK);
 }
