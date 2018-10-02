@@ -259,7 +259,7 @@ done:
 	if (req->status == 200)
 	{
 		if (strcmp(username,"admin") == 0)
-			http_response(req, req->status, "allow administrator", 19);
+			http_response(req, req->status, "allow administrator management", 30);
 		else
 			http_response(req, req->status, "allow", 5);
 	}
