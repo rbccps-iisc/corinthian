@@ -74,7 +74,7 @@ for i in xrange(0,num_devices):
 	b[i]['apikey'] = app_apikey	
 	
 tt = time.time()
-print tt - t, "Seconds to register 20 entities", " >> avg = ", (tt-t)/(2*num_devices),"seconds"
+print tt - t, "Seconds to register",2*num_devices,",entities", " >> avg = ", (tt-t)/(2*num_devices),"seconds"
 
 print "\nFollow-Share"
 for i in xrange(0,num_devices):
@@ -119,7 +119,7 @@ for i in xrange(0,num_devices):
 	check(r,200)
 
 tt = time.time()
-print tt - t, "Seconds to de-register 20 entities", " >> avg = ", (tt-t)/(2*num_devices),"seconds "
+print tt - t, "Seconds to de-register",2*num_devices,"entities", " >> avg = ", (tt-t)/(2*num_devices),"seconds "
 
 print "\nDeleting owners"
 # delete owners
