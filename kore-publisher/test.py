@@ -73,7 +73,8 @@ for i in xrange(0,num_devices):
 	b[i]['name'] = app 
 	b[i]['apikey'] = app_apikey	
 	
-print time.time() - t, "Seconds to register 20 entities"
+tt = time.time()
+print tt - t, "Seconds to register 20 entities", " >> avg = ", (tt-t)/(2*num_devices),"seconds"
 
 print "\nFollow-Share"
 for i in xrange(0,num_devices):
@@ -108,6 +109,7 @@ for i in xrange(0,num_devices):
 	# subscribe
 	"""
 
+t = time.time()
 print "\nDeleting entities"
 for i in xrange(0,num_devices):
 	r = get("deregister", {"id":"owner-a", "apikey":owner_a_apikey, "entity":"device-"+str(i)})
@@ -116,7 +118,8 @@ for i in xrange(0,num_devices):
 	r = get("deregister", {"id":"owner-b", "apikey":owner_b_apikey, "entity":"app-"+str(i)})
 	check(r,200)
 
-
+tt = time.time()
+print tt - t, "Seconds to de-register 20 entities", " >> avg = ", (tt-t)/(2*num_devices),"seconds "
 
 print "\nDeleting owners"
 # delete owners

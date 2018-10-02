@@ -21,6 +21,8 @@
 
 #include "ht.h"
 
+#define ADMIN_USER ("admin")
+
 #if 1
 	#define debug_printf(...)
 #else
@@ -221,7 +223,7 @@ init (int state)
 	}
 
 	login_reply = amqp_login(cached_admin_conn, 
-		"/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN, "admin", admin_apikey);
+		"/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN, ADMIN_USER, admin_apikey);
 
 	if (login_reply.reply_type != AMQP_RESPONSE_NORMAL)
 	{
@@ -961,6 +963,10 @@ register_entity (struct http_request *req)
 	OK();
 
 done:
+	http_response_header(req, "content-type", "application/json");
+	kore_pgsql_cleanup(&sql);
+	kore_buf_reset(query);
+
 	// wait for thread ...
 	if (thread_started)
 	{
@@ -975,13 +981,7 @@ done:
 		free(result);
 	}
 
-	http_response_header(req, "content-type", "application/json");
 	http_response(req, req->status, response->data, response->offset);
-
-	kore_pgsql_cleanup(&sql);
-
-	kore_buf_reset(query);
-	kore_buf_reset(response);
 
 	return (KORE_RESULT_OK);
 }
@@ -1108,6 +1108,9 @@ deregister_entity (struct http_request *req)
 	OK();
 
 done:
+	http_response_header	(req, "content-type", "application/json");
+	kore_pgsql_cleanup	(&sql);
+
 	// wait for thread ...
 	if (thread_started)
 	{
@@ -1122,13 +1125,7 @@ done:
 		free(result);
 	}
 
-	http_response_header(req, "content-type", "application/json");
 	http_response(req, req->status, response->data, response->offset);
-
-	kore_pgsql_cleanup(&sql);
-
-	kore_buf_reset(query);
-	kore_buf_reset(response);
 
 	return (KORE_RESULT_OK);
 }
