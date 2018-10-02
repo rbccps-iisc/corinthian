@@ -46,6 +46,8 @@ int get_follow_requests (struct http_request *);
 
 int share		(struct http_request *);
 int unshare		(struct http_request *);
+int queue_bind          (struct http_request *);
+int queue_unbind        (struct http_request *);
 
 int init (int);
 void gen_salt_password_and_apikey (const char *, char *, char *, char *);
@@ -1781,6 +1783,45 @@ int
 unshare (struct http_request *req)
 {
 	return (KORE_RESULT_OK);
+}
+
+int
+queue_bind   (struct http_request *req)
+{
+	const char *id;
+	const char *apikey;
+
+	const char *queue;
+	const char *exchange;
+        const char *topic;
+
+ 	char *status = 403;
+	
+	BAD_REQUEST_if
+	(
+		KORE_RESULT_OK != http_request_header(req, "id", &id)
+				||
+		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+				||
+		KORE_RESULT_OK != http_request_header(req, "queue", &queue)
+				||
+		KORE_RESULT_OK != http_request_header(req, "exchange", &exchange)
+				||
+		KORE_RESULT_OK != http_request_header(req, "topic", &topic)
+			,
+		"inputs missing in headers"
+	);
+
+done:
+
+ return KORE_RESULT_OK;
+
+}
+
+int
+queue_unbind   (struct http_request *req)
+{
+ 	return KORE_RESULT_OK;
 }
 
 bool
