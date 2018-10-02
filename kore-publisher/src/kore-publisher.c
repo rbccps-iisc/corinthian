@@ -17,10 +17,11 @@
 #include <openssl/sha.h>
 
 #include <ctype.h>
+#include <pthread.h>
 
 #include "ht.h"
 
-#if 0
+#if 1
 	#define debug_printf(...)
 #else
 	#define debug_printf(...) printf(__VA_ARGS__)
@@ -57,8 +58,8 @@ bool looks_like_a_valid_owner(const char *str);
 bool looks_like_a_valid_entity (const char *str);
 bool is_alpha_numeric (const char *str);
 
-bool create_exchanges_and_queues (const char *id);
-bool delete_exchanges_and_queues (const char *id);
+void *create_exchanges_and_queues (void *);
+void *delete_exchanges_and_queues (void *);
 
 char *sanitize (char *string);
 
@@ -207,13 +208,13 @@ init (int state)
 
 	if (socket == NULL)
 	{
-		perror("Could not open a socket ");
+		printf("Could not open a socket ");
 		return KORE_RESULT_ERROR;
 	}
 
 	if (amqp_socket_open(socket, "kore-broker", 5672))
 	{
-		perror("Could not connect to kore-broker ");
+		printf("Could not connect to kore-broker ");
 		return KORE_RESULT_ERROR;	
 	}
 
@@ -228,16 +229,17 @@ init (int state)
 
 	if(! amqp_channel_open(cached_admin_conn, 1))
 	{
-		perror ("could not open an AMQP connection");
+		printf("could not open an AMQP connection");
 		return KORE_RESULT_ERROR;	
 	}
 
 	rpc_reply = amqp_get_rpc_reply(cached_admin_conn);
 	if (rpc_reply.reply_type != AMQP_RESPONSE_NORMAL)
 	{
-		perror ("did not receive expected response from the broker");
+		printf("did not receive expected response from the broker");
 		return KORE_RESULT_ERROR;	
 	}
+
 
 	// TODO drop privilages to read admin.apikey file
 
@@ -386,7 +388,7 @@ login_success (const char *id, const char *apikey)
 
 	CREATE_STRING (query,
 			"SELECT salt,password_hash FROM users WHERE id='%s' and blocked='f'",
-				sanitize(id)
+				id
 	);
 
 	debug_printf("login query = {%s}\n",query->data);
@@ -825,6 +827,9 @@ register_entity (struct http_request *req)
 	char entity_apikey	[33];
 	char password_hash	[65];
 
+	pthread_t thread;
+	bool thread_started = false; 
+
 	req->status = 403;
 
 	BAD_REQUEST_if
@@ -857,15 +862,25 @@ register_entity (struct http_request *req)
 	if (! login_success(id,apikey))
 		FORBIDDEN("invalid id or apikey");
 
+///////////////////////////////////
+	id 	= sanitize(id);
+	entity	= sanitize(entity);
+	body	= sanitize(body);
+///////////////////////////////////
+
 	strlcpy(entity_name,id,32);
 	strcat(entity_name,"/");
 	strlcat(entity_name,entity,66);
+
+	// create entries in to RabbitMQ
+	pthread_create(&thread,NULL,create_exchanges_and_queues,(void *)&entity_name); 
+	thread_started = true;
 
 	// conflict if entity_name already exist
 
 	CREATE_STRING(query,
 		 	"SELECT id from users WHERE id='%s'",
-				sanitize(entity_name)
+				entity_name
 	);
 
 	RUN_QUERY (query,"could not get info about entity");
@@ -877,16 +892,13 @@ register_entity (struct http_request *req)
 
 	CREATE_STRING (query,
 			"INSERT INTO users (id,password_hash,schema,salt,blocked) values('%s','%s','%s','%s','f')",
-			sanitize(entity_name),
-			sanitize(password_hash),
-			sanitize(body),		// schema
-			sanitize(salt)
+			entity_name,
+			password_hash,
+			body,		// schema
+			salt
 	);
 	RUN_QUERY (query,"failed to create the entity");
 
-	// create entries in to RabbitMQ
-	create_exchanges_and_queues (entity_name);
-	
 	// generate response
 	kore_buf_reset(response);
 	kore_buf_append(response,"{\"id\":\"",7);
@@ -898,6 +910,20 @@ register_entity (struct http_request *req)
 	OK();
 
 done:
+	// wait for thread ...
+	if (thread_started)
+	{
+		bool *result;
+		pthread_join(thread,&result);
+
+		if (! *result) {
+			req->status = 500;
+			kore_buf_reset(response);
+		}
+
+		free(result);
+	}
+
 	http_response_header(req, "content-type", "application/json");
 	http_response(req, req->status, response->data, response->offset);
 
@@ -914,6 +940,7 @@ delete_entity_from_rabbitmq (char *entity)
 {
 	if (! looks_like_a_valid_entity(entity))
 		return -1;
+
 
 /* XXX
 	amqp_exchange_delete (entity.public);
@@ -961,6 +988,9 @@ deregister_entity (struct http_request *req)
 
 	char entity_name [66];
 
+	pthread_t thread;
+	bool thread_started = false; 
+
 	req->status = 403;
 
 	BAD_REQUEST_if
@@ -984,20 +1014,27 @@ deregister_entity (struct http_request *req)
 	if (! login_success(id,apikey))
 		FORBIDDEN("invalid id or apikey");
 
+///////////////////////////////////
+	id 	= sanitize(id);
+	entity 	= sanitize(entity);
+///////////////////////////////////
+
 	strlcpy(entity_name,id,33); 
 	strlcat(entity_name,"/",34); 
 	strlcat(entity_name,entity,66); 
 
 	// TODO delete from follow where from_entity = entity_name or to_entity = entity_name
-	delete_exchanges_and_queues (entity_name);
+	// delete entries in to RabbitMQ
+	pthread_create(&thread,NULL,delete_exchanges_and_queues,(void *)&entity_name); 
+	thread_started = true;
 
 	// TODO run select query and delete all exchanges and queues of entity_name 
 
 	CREATE_STRING (
 		query,
 		"DELETE FROM acl WHERE id = '%s' or exchange LIKE '%s.%%'",
-		sanitize(entity_name),
-		sanitize(entity_name)
+		entity_name,
+		entity_name
 	);
 
 	RUN_QUERY(query,"could not delete from acl table");
@@ -1005,22 +1042,35 @@ deregister_entity (struct http_request *req)
 	CREATE_STRING (
 		query,
 		"DELETE FROM follow WHERE id_from = '%s' or id_to LIKE '%s.%%'",
-		sanitize(entity_name),
-		sanitize(entity_name)
+		entity_name,
+		entity_name
 	);
 
 	RUN_QUERY(query,"could not delete from follow table");
 
 	CREATE_STRING (query,
 			"DELETE FROM users WHERE id = '%s'",
-				sanitize(entity_name)
+				entity_name
 	);
 	RUN_QUERY (query,"could not delete the entity");
-
 
 	OK();
 
 done:
+	// wait for thread ...
+	if (thread_started)
+	{
+		bool *result;
+		pthread_join(thread,&result);
+
+		if (! *result) {
+			req->status = 500;
+			kore_buf_reset(response);
+		}
+
+		free(result);
+	}
+
 	http_response_header(req, "content-type", "application/json");
 	http_response(req, req->status, response->data, response->offset);
 
@@ -1171,6 +1221,9 @@ register_owner(struct http_request *req)
 	char owner_apikey	[33];
 	char password_hash	[65];
 
+	pthread_t thread;
+	bool thread_started = false;
+
 	req->status = 403;
 
 	if (req->owner->addrtype == AF_INET)
@@ -1206,29 +1259,33 @@ register_owner(struct http_request *req)
 	if (! login_success("admin",apikey))
 		FORBIDDEN("wrong apikey");
 
+////////////////////////////////////////
+	owner = sanitize(owner);
+////////////////////////////////////////
+
 	// conflict if entity_name already exist
 	CREATE_STRING (query,
 			"SELECT id FROM users WHERE id ='%s'",
-				sanitize(owner)
+				owner
 	);
 	RUN_QUERY (query,"could not query info about the owner");
 
 	if(kore_pgsql_ntuples(&sql) > 0)
 		CONFLICT("id already used");
 
+	pthread_create(&thread,NULL,create_exchanges_and_queues,(void *)owner); 
+	thread_started = true;
+
 	gen_salt_password_and_apikey (owner, salt, password_hash, owner_apikey);
 
 	CREATE_STRING (query,
 			"INSERT INTO users (id,password_hash,schema,salt,blocked) values('%s','%s',NULL,'%s','f')",
-				sanitize(owner),
-				sanitize(password_hash),
-				sanitize(salt)
+				owner,
+				password_hash,
+				salt
 	);
 
 	RUN_QUERY (query, "could not create a new owner");
-
-	// create entries in to RabbitMQ
-	create_exchanges_and_queues (owner);
 
 	kore_buf_reset(response);
 	kore_buf_append(response,"{\"id\":\"",7);
@@ -1240,13 +1297,24 @@ register_owner(struct http_request *req)
 	OK();
 
 done:
-	http_response_header(req, "content-type", "application/json");
+	http_response_header	(req, "content-type", "application/json");
+	kore_pgsql_cleanup	(&sql);
+
+	// wait for thread ...
+	if (thread_started)
+	{
+		bool *result;
+		pthread_join(thread,&result);
+
+		if (! *result) {
+			req->status = 500;
+			kore_buf_reset(response);
+		}
+
+		free(result);
+	}
+
 	http_response(req, req->status, response->data, response->offset);
-
-	kore_pgsql_cleanup(&sql);
-
-	kore_buf_reset(query);
-	kore_buf_reset(response);
 
 	return (KORE_RESULT_OK);
 }
@@ -1257,6 +1325,9 @@ deregister_owner(struct http_request *req)
 	const char *id;
 	const char *apikey;
 	const char *owner;
+
+	pthread_t thread;
+	bool thread_started = false; 
 
 	req->status = 403;
 
@@ -1293,14 +1364,20 @@ deregister_owner(struct http_request *req)
 	if (! login_success("admin",apikey))
 		FORBIDDEN("wrong apikey");
 
-	delete_exchanges_and_queues (owner);
+////////////////////////////////////////////////
+	owner 	= sanitize(owner);
+////////////////////////////////////////////////
+
+	// delete entries in to RabbitMQ
+	pthread_create(&thread,NULL,delete_exchanges_and_queues,(void *)owner); 
+	thread_started = true;
 	// XXX TODO delete all entities of the owner
 
 	// delete all acls
 	CREATE_STRING (query,
 			"DELETE FROM acl WHERE id LIKE '%s/%%' OR exchange LIKE '%s/%%'",
-				sanitize(owner),
-				sanitize(owner)
+				owner,
+				owner
 	);
 
 	RUN_QUERY (query,"could not delete from acl table");
@@ -1308,14 +1385,14 @@ deregister_owner(struct http_request *req)
 	// delete all apps and devices of the owner
 	CREATE_STRING (query,
 		"DELETE FROM users WHERE id LIKE '%s/%%'",
-			sanitize(owner)
+			owner
 	);
 	RUN_QUERY (query,"could not delete apps/devices of the owner");
 
 	// finally delete the owner 
 	CREATE_STRING (query,
 			"DELETE FROM users WHERE id = '%s'",
-				sanitize(owner)
+				owner
 	);
 	RUN_QUERY (query,"could not delete the owner");
 
@@ -1323,12 +1400,25 @@ deregister_owner(struct http_request *req)
 
 done:
 	http_response_header(req, "content-type", "application/json");
-	http_response(req, req->status, response->data, response->offset);
 
 	kore_pgsql_cleanup(&sql);
-
 	kore_buf_reset(query);
-	kore_buf_reset(response);
+
+	// wait for thread ...
+	if (thread_started)
+	{
+		bool *result;
+		pthread_join(thread,&result);
+
+		if (! *result) {
+			req->status = 500;
+			kore_buf_reset(response);
+		}
+
+		free(result);
+	}
+
+	http_response(req, req->status, response->data, response->offset);
 
 	return (KORE_RESULT_OK);
 }
@@ -1785,6 +1875,7 @@ unshare (struct http_request *req)
 	return (KORE_RESULT_OK);
 }
 
+
 int
 queue_bind   (struct http_request *req)
 {
@@ -1824,13 +1915,19 @@ queue_unbind   (struct http_request *req)
  	return KORE_RESULT_OK;
 }
 
-bool
-create_exchanges_and_queues (const char *id)
+void *
+create_exchanges_and_queues (void *v)
 {
-	bool is_success = false;
+	const char *id = (const char *)v;
+
+	bool *is_success;
 
 	char exchange[128];
 	char q[128];
+
+	is_success = malloc (sizeof(bool));
+
+	*is_success = false;
 
 	if (looks_like_a_valid_owner(id))
 	{
@@ -1921,22 +2018,28 @@ create_exchanges_and_queues (const char *id)
 				perror("amqp_queue_declare failed ");
 				goto done;
 			}
+		debug_printf("[entity] DONE creating queue {%s}\n",q);
 		}
 	}
 
-	is_success = true;
+	*is_success = true;
 
 done:
 	return is_success;
 }
 
-bool
-delete_exchanges_and_queues (const char *id)
+void *
+delete_exchanges_and_queues (void *v)
 {
-	bool is_success = false;
-
+	const char *id = (const char *)v;
+	
 	char exchange[128];
 	char q[128];
+
+	bool *is_success;
+
+	is_success = malloc(sizeof(bool));
+	*is_success = false;
 
 	if (looks_like_a_valid_owner(id))
 	{
@@ -1969,6 +2072,7 @@ delete_exchanges_and_queues (const char *id)
 			perror("amqp_queue_delete failed ");
 			goto done;
 		}
+		debug_printf("[owner] DONE deleting queue {%s}\n",q);
 	}
 	else
 	{
@@ -2012,10 +2116,11 @@ delete_exchanges_and_queues (const char *id)
 				perror("amqp_queue_delete failed ");
 				goto done;
 			}
+			debug_printf("[entity] DONE deleting queue {%s}\n",q);
 		}
 	}
 
-	is_success = true;
+	*is_success = true;
 
 done:
 	return is_success;

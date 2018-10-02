@@ -1,3 +1,4 @@
+import time
 import random
 import sys
 import requests
@@ -48,7 +49,7 @@ owner_b_apikey = r.json()['apikey']
 a = {}
 b = {} 
 
-
+t = time.time()
 print "\nRegistering devices"
 
 for i in xrange(0,num_devices):
@@ -72,6 +73,7 @@ for i in xrange(0,num_devices):
 	b[i]['name'] = app 
 	b[i]['apikey'] = app_apikey	
 	
+print time.time() - t, "Seconds to register 20 entities"
 
 print "\nFollow-Share"
 for i in xrange(0,num_devices):
@@ -113,6 +115,7 @@ for i in xrange(0,num_devices):
 
 	r = get("deregister", {"id":"owner-b", "apikey":owner_b_apikey, "entity":"app-"+str(i)})
 	check(r,200)
+
 
 
 print "\nDeleting owners"
