@@ -53,9 +53,11 @@ int queue_unbind        (struct http_request *);
 int init (int);
 void gen_salt_password_and_apikey (const char *, char *, char *, char *);
 bool login_success (const char *, const char *);
+bool check_acl(const char *id, const char *exchange, const char *permission);
 
 bool looks_like_a_valid_owner(const char *str);
 bool looks_like_a_valid_entity (const char *str);
+bool looks_like_a_valid_resource(const char *str);
 bool is_alpha_numeric (const char *str);
 
 void *create_exchanges_and_queues (void *);
@@ -325,6 +327,55 @@ looks_like_a_valid_entity (const char *str)
 	if (front_slash_count != 1)
 		return false;
 
+	return true;
+}
+
+bool
+looks_like_a_valid_resource (const char *str)
+{
+	uint8_t strlen_str = strlen(str);
+
+	uint8_t front_slash_count = 0;
+ 
+        uint8_t dot_count = 0;
+
+	if (strlen_str < 3 || strlen_str > 65)
+		return false;
+
+	for (i = 0; i < strlen_str; ++i)
+	{
+		if (! isalnum(str[i]))
+		{
+			// support some extra chars
+			switch (str[i])
+			{
+				case '/':
+						++front_slash_count;
+						break;
+				case '-':
+						break;
+
+				case '.':
+						++dot_count;
+				default:
+						return false;	
+			}
+		}
+
+		if (
+			(front_slash_count > 1)
+				  ||
+		            (dot_count > 1)
+		   )
+		   {	
+			return false;
+	           }
+	}
+
+	// there should be only one front slash. Dot may or may not exist
+	if ( (front_slash_count != 1) || (dot_count > 1) )
+		return false;
+  	   
 	return true;
 }
 
@@ -1679,6 +1730,222 @@ done:
 }
 
 int
+share (struct http_request *req)
+{
+	const char *id;
+	const char *apikey;
+	const char *follow_id;
+
+	req->status = 403;
+
+	BAD_REQUEST_if
+	(
+		KORE_RESULT_OK != http_request_header(req, "id", &id)
+				||
+		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+				||
+		KORE_RESULT_OK != http_request_header(req, "follow-id", &follow_id)
+		,
+		
+		"inputs missing in headers"
+	);
+
+	if (! looks_like_a_valid_owner(id))
+		BAD_REQUEST("id is not valid owner");	
+
+	if (! login_success(id,apikey))
+		FORBIDDEN("invalid id or apikey");
+
+	CREATE_STRING (query, 
+		"SELECT id_from,id_to,permission,validity,topic FROM follow "
+		"WHERE follow_id = '%s' AND id_to LIKE '%s/%%.%%' and status='pending'",
+			sanitize(follow_id),
+			sanitize(id)
+	);
+
+	RUN_QUERY (query,"could not run select query on follow");
+
+	uint32_t num_rows = kore_pgsql_ntuples(&sql);
+
+	if (num_rows != 1)
+		BAD_REQUEST("follow-id is not valid");
+
+	char *id_from 	 	= kore_pgsql_getvalue(&sql,0,0);
+	char *exchange 	 	= kore_pgsql_getvalue(&sql,0,1);
+	char *permission 	= kore_pgsql_getvalue(&sql,0,2); 
+	char *validity_hours 	= kore_pgsql_getvalue(&sql,0,3); 
+	char *topic 	 	= kore_pgsql_getvalue(&sql,0,4); 
+
+	// NOTE: follow_id is primary key 
+	CREATE_STRING (query,
+			"UPDATE follow SET status='approved' WHERE follow_id = '%s'",
+				sanitize(follow_id)
+	);
+	RUN_QUERY (query,"could not run update query on follow");
+
+	// add entry in acl
+	CREATE_STRING 	(query,
+				"INSERT into acl (acl_id,id,exchange,follow_id,permission,topic,valid_till) "
+				"values(DEFAULT,'%s','%s','%s','%s', '%s', now() + interval '%s  hours')",
+			        	sanitize(id_from),
+					sanitize(exchange),
+					sanitize(follow_id),
+					sanitize(permission),
+					sanitize(topic),
+					sanitize(validity_hours)
+	);
+
+	RUN_QUERY (query,"could not run insert query on acl");
+
+	OK();
+
+done:
+	http_response_header(req, "content-type", "application/json");
+	http_response(req, req->status, response->data, response->offset);
+
+	kore_pgsql_cleanup(&sql);
+
+	kore_buf_reset(query);
+	kore_buf_reset(response);
+
+	return (KORE_RESULT_OK);
+}
+
+bool
+check_acl(const char *id, const char *exchange, const char *permission)
+{
+	CREATE_STRING(query,
+			"SELECT id,exchange,permission FROM acl WHERE id = '%s' AND exchange = '%s' AND permission = '%s'"
+			, id, exchange, permission);	
+
+	kore_pgsql_cleanup(&sql);
+	kore_pgsql_init(&sql);
+	if (! kore_pgsql_setup(&sql,"db",KORE_PGSQL_SYNC))
+	{
+		kore_pgsql_logerror(&sql);
+		return false;	
+	}
+	if (! kore_pgsql_query(&sql,(const char *)query->data))
+	{
+		kore_pgsql_logerror(&sql);
+		return false;	
+	}
+
+	if (kore_pgsql_ntuples(&sql) == 0)
+		return false;	
+
+	return true;
+
+}
+
+int
+unfollow (struct http_request *req)
+{
+	return (KORE_RESULT_OK);
+}
+
+int
+queue_bind (struct http_request *req)
+{
+	const char *id;
+	const char *apikey;
+
+	const char *queue;
+	const char *exchange;
+        const char *topic;
+
+ 	char *status = 403;
+	
+	BAD_REQUEST_if
+	(
+		KORE_RESULT_OK != http_request_header(req, "id", &id)
+				||
+		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+				||
+		KORE_RESULT_OK != http_request_header(req, "queue", &queue)
+				||
+		KORE_RESULT_OK != http_request_header(req, "exchange", &exchange)
+				||
+		KORE_RESULT_OK != http_request_header(req, "topic", &topic)
+			,
+		"inputs missing in headers"
+	);
+
+      	if (! looks_like_a_valid_owner(id))
+		BAD_REQUEST("id is not valid owner");	
+
+	uint8_t strlen_id = strlen(id);
+
+	if (! looks_like_a_valid_resource(queue))
+		FORBIDDEN("queue is not a valid resource name");
+	
+	if (! looks_like_a_valid_resource(exchange))
+		FORBIDDEN("exchange is not a valid resource name");
+
+	// check if the he is the owner of queue 
+	if (strncmp(id,queue,strlen_id) != 0)
+		FORBIDDEN("you are not the owner of the queue");
+
+	if (! login_success(id,apikey))
+		FORBIDDEN("invalid id or apikey");
+
+	// if both from and to are owned by id
+	if (
+		(queue[strlen_id] == '/')
+				&&
+		(strncmp(id,exchange,strlen_id) == 0)
+				&&
+		(exchange[strlen_id] == '/')
+	)
+	{
+		status = "approved";	
+                goto bind;
+	}
+	
+	if ( check_acl(id, exchange, "read") )
+	{
+		goto bind;
+	}
+	else
+	{
+		kore_buf_reset(response);
+		kore_buf_appendf(response, "{\"Status\":\"You do not have permission to bind to this exchange\"}");
+		goto done;
+	}
+
+bind:
+	if (! amqp_queue_bind (
+		cached_admin_conn,
+		1,
+		amqp_cstring_bytes(queue),
+		amqp_cstring_bytes(exchange),
+		amqp_cstring_bytes(topic),
+		amqp_empty_table
+	))
+	{
+		perror("amqp_queue_bind failed ");
+		goto done;
+	}
+	else
+	{
+		kore_buf_reset(response);
+		kore_buf_appendf(response, "{\"Status\":\"%s has been bound to %s \"}", queue, exchange);
+		goto done;
+	}
+	
+done:
+	http_response_header(req, "content-type", "application/json");
+	http_response(req, req->status, response->data, response->offset);
+
+	kore_pgsql_cleanup(&sql);
+
+	kore_buf_reset(query);
+	kore_buf_reset(response);
+
+	return (KORE_RESULT_OK);
+}
+
+int
 get_follow_requests (struct http_request *req)
 {
 	const char *id;
@@ -1782,102 +2049,7 @@ done:
 }
 
 int
-share (struct http_request *req)
-{
-	const char *id;
-	const char *apikey;
-	const char *follow_id;
-
-	req->status = 403;
-
-	BAD_REQUEST_if
-	(
-		KORE_RESULT_OK != http_request_header(req, "id", &id)
-				||
-		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
-				||
-		KORE_RESULT_OK != http_request_header(req, "follow-id", &follow_id)
-		,
-		
-		"inputs missing in headers"
-	);
-
-	if (! looks_like_a_valid_owner(id))
-		BAD_REQUEST("id is not valid owner");	
-
-	if (! login_success(id,apikey))
-		FORBIDDEN("invalid id or apikey");
-
-	CREATE_STRING (query, 
-		"SELECT id_from,id_to,permission,validity,topic FROM follow "
-		"WHERE follow_id = '%s' AND id_to LIKE '%s/%%.%%' and status='pending'",
-			sanitize(follow_id),
-			sanitize(id)
-	);
-
-	RUN_QUERY (query,"could not run select query on follow");
-
-	uint32_t num_rows = kore_pgsql_ntuples(&sql);
-
-	if (num_rows != 1)
-		BAD_REQUEST("follow-id is not valid");
-
-	char *id_from 	 	= kore_pgsql_getvalue(&sql,0,0);
-	char *exchange 	 	= kore_pgsql_getvalue(&sql,0,1);
-	char *permission 	= kore_pgsql_getvalue(&sql,0,2); 
-	char *validity_hours 	= kore_pgsql_getvalue(&sql,0,3); 
-	char *topic 	 	= kore_pgsql_getvalue(&sql,0,4); 
-
-	// NOTE: follow_id is primary key 
-	CREATE_STRING (query,
-			"UPDATE follow SET status='approved' WHERE follow_id = '%s'",
-				sanitize(follow_id)
-	);
-	RUN_QUERY (query,"could not run update query on follow");
-
-	// add entry in acl
-	CREATE_STRING 	(query,
-				"INSERT into acl (acl_id,id,exchange,follow_id,permission,topic,valid_till) "
-				"values(DEFAULT,'%s','%s','%s','%s', '%s', now() + interval '%s  hours')",
-			        	sanitize(id_from),
-					sanitize(exchange),
-					sanitize(follow_id),
-					sanitize(permission),
-					sanitize(topic),
-					sanitize(validity_hours)
-	);
-
-	RUN_QUERY (query,"could not run insert query on acl");
-
-	OK();
-
-done:
-	http_response_header(req, "content-type", "application/json");
-	http_response(req, req->status, response->data, response->offset);
-
-	kore_pgsql_cleanup(&sql);
-
-	kore_buf_reset(query);
-	kore_buf_reset(response);
-
-	return (KORE_RESULT_OK);
-}
-
-int
-unfollow (struct http_request *req)
-{
-	return (KORE_RESULT_OK);
-}
-
-int
-unshare (struct http_request *req)
-{
-	return (KORE_RESULT_OK);
-}
-
-
-int
-queue_bind   (struct http_request *req)
+queue_unbind   (struct http_request *req)
 {
 	const char *id;
 	const char *apikey;
@@ -1903,16 +2075,78 @@ queue_bind   (struct http_request *req)
 		"inputs missing in headers"
 	);
 
+      	if (! looks_like_a_valid_owner(id))
+		BAD_REQUEST("id is not valid owner");	
+
+	uint8_t strlen_id = strlen(id);
+
+	if (! looks_like_a_valid_resource(queue))
+		FORBIDDEN("queue is not a valid resource name");
+	
+	if (! looks_like_a_valid_resource(exchange))
+		FORBIDDEN("exchange is not a valid resource name");
+
+	// check if the he is the owner of queue 
+	if (strncmp(id,queue,strlen_id) != 0)
+		FORBIDDEN("you are not the owner of the queue");
+
+	if (! login_success(id,apikey))
+		FORBIDDEN("invalid id or apikey");
+
+	// if both from and to are owned by id
+	if (
+		(queue[strlen_id] == '/')
+				&&
+		(strncmp(id,exchange,strlen_id) == 0)
+				&&
+		(exchange[strlen_id] == '/')
+	)
+	{
+		status = "approved";	
+                goto unbind;
+	}
+	
+	if ( check_acl(id, exchange, "read") )
+	{
+		goto unbind;
+	}
+	else
+	{
+		kore_buf_reset(response);
+		kore_buf_appendf(response, "{\"Status\":\"You do not have permission to unbind from this exchange\"}");
+		goto done;
+	}
+
+unbind:
+	if (! amqp_queue_unbind (
+		cached_admin_conn,
+		1,
+		amqp_cstring_bytes(queue),
+		amqp_cstring_bytes(exchange),
+		amqp_cstring_bytes(topic),
+		amqp_empty_table
+	))
+	{
+		perror("amqp_queue_bind failed ");
+		goto done;
+	}
+	else
+	{
+		kore_buf_reset(response);
+		kore_buf_appendf(response, "{\"Status\":\"%s has been unbound from %s \"}", queue, exchange);
+		goto done;
+	}
+	
 done:
+	http_response_header(req, "content-type", "application/json");
+	http_response(req, req->status, response->data, response->offset);
 
- return KORE_RESULT_OK;
+	kore_pgsql_cleanup(&sql);
 
-}
+	kore_buf_reset(query);
+	kore_buf_reset(response);
 
-int
-queue_unbind   (struct http_request *req)
-{
- 	return KORE_RESULT_OK;
+	return (KORE_RESULT_OK);
 }
 
 void *
