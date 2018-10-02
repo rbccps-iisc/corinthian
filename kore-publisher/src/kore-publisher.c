@@ -965,7 +965,6 @@ register_entity (struct http_request *req)
 done:
 	http_response_header(req, "content-type", "application/json");
 	kore_pgsql_cleanup(&sql);
-	kore_buf_reset(query);
 
 	// wait for thread ...
 	if (thread_started)
