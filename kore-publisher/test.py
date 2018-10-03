@@ -4,11 +4,7 @@ import sys
 import requests
 
 admin_api = "x"
-
 num_devices = 10
-
-r ={}
-x = 0
 
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)

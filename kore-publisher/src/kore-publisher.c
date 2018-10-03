@@ -169,7 +169,10 @@ struct kore_pgsql sql;
 
 ht connection_ht;
 
+
+amqp_table_entry_t *entry;
 amqp_table_t lazy_queue_table;
+amqp_table_t durable_binding_table;
 
 char admin_apikey[33];
 amqp_connection_state_t	cached_admin_conn;
@@ -195,10 +198,25 @@ init (int state)
 	if (! lazy_queue_table.entries)
 		exit(-1);
 
-	amqp_table_entry_t * entry = &lazy_queue_table.entries[0];
+	entry = &lazy_queue_table.entries[0];
 	entry->key = amqp_cstring_bytes("x-queue-mode");
 	entry->value.kind = AMQP_FIELD_KIND_UTF8;
 	entry->value.value.bytes = amqp_cstring_bytes("lazy");
+
+//////////////
+// durable bindings 
+//////////////
+	durable_binding_table.num_entries = 1;
+	durable_binding_table.entries = malloc(durable_binding_table.num_entries * sizeof(amqp_table_entry_t));
+
+	if (! durable_binding_table.entries)
+		exit(-1);
+
+	entry = &durable_binding_table.entries[0];
+	entry->key = amqp_cstring_bytes("x-queue-mode");	//XXX 
+	entry->value.kind = AMQP_FIELD_KIND_UTF8;
+	entry->value.value.bytes = amqp_cstring_bytes("lazy");	//XXX
+
 //////////////
 
 	int fd = open("admin.apikey",O_RDONLY);
@@ -1813,10 +1831,14 @@ queue_bind (struct http_request *req)
 	const char *from;
 	const char *to;
 
+	char *message_type;
+
 	char queue	[128];
 	char exchange	[128];
 
         const char *topic;
+
+	bool is_priority = false;
 
  	req->status = 403;
 	
@@ -1835,6 +1857,14 @@ queue_bind (struct http_request *req)
 		"inputs missing in headers"
 	);
 
+	if (KORE_RESULT_OK == http_request_header(req, "message-type", &topic))
+	{
+		if (strcmp(message_type,"priority") == 0);
+		{
+			is_priority = true;
+		}
+	}
+
       	if (! looks_like_a_valid_owner(id))
 		BAD_REQUEST("id is not valid owner");	
 
@@ -1851,6 +1881,12 @@ queue_bind (struct http_request *req)
 	if (! login_success(id,apikey))
 		FORBIDDEN("invalid id or apikey");
 
+/////////////////////////////////////
+	sanitize(id);
+	sanitize(exchange);
+	sanitize(topic);
+/////////////////////////////////////
+
 	// if he is not the owner of exchange, he should have an entry in acl
 	if (! is_owner(id,exchange))
 	{
@@ -1859,23 +1895,127 @@ queue_bind (struct http_request *req)
 				"SELECT topic FROM acl WHERE id = '%s' "
 				"AND exchange = '%s' AND permission = 'read' "
 				"AND valid_till > now() AND topic = '%s'",
-				sanitize(id),
-				sanitize(exchange),
-				sanitize(topic)
+				id,
+				exchange,
+				topic
 		);
 
 		RUN_QUERY(query,"failed to query for permission");
 		
 		if (kore_pgsql_ntuples(&sql) != 1)
 			FORBIDDEN("unauthorized");
-		
-		topic = kore_pgsql_getvalue(&sql,0,0);
 	}
 
 	snprintf (queue,"%s%s", id, is_priority ? ".priority" : "");
 	snprintf (exchange,"%s.protected",from); 
 	
 	if (! amqp_queue_bind (
+		cached_admin_conn,
+		1,
+		amqp_cstring_bytes(queue),
+		amqp_cstring_bytes(exchange),
+		amqp_cstring_bytes(topic),
+		durable_binding_table
+	))
+	{
+		ERROR("bind failed");
+	}
+
+	OK();
+	
+done:
+	END();
+}
+
+int
+queue_unbind (struct http_request *req)
+{
+	const char *id;
+	const char *apikey;
+
+	// source and destination instead ?
+	const char *from;
+	const char *to;
+
+	char *message_type;
+
+	char queue	[128];
+	char exchange	[128];
+
+        const char *topic;
+
+	bool is_priority = false;
+
+ 	req->status = 403;
+	
+	BAD_REQUEST_if
+	(
+		KORE_RESULT_OK != http_request_header(req, "id", &id)
+				||
+		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+				||
+		KORE_RESULT_OK != http_request_header(req, "from", &from)
+				||
+		KORE_RESULT_OK != http_request_header(req, "to", &to)
+				||
+		KORE_RESULT_OK != http_request_header(req, "topic", &topic)
+			,
+		"inputs missing in headers"
+	);
+
+	if (KORE_RESULT_OK == http_request_header(req, "message-type", &topic))
+	{
+		if (strcmp(message_type,"priority") == 0);
+		{
+			is_priority = true;
+		}
+	}
+
+      	if (! looks_like_a_valid_owner(id))
+		BAD_REQUEST("id is not valid owner");	
+
+	if (! looks_like_a_valid_resource(queue))
+		FORBIDDEN("queue is not a valid resource name");
+	
+	if (! looks_like_a_valid_resource(exchange))
+		FORBIDDEN("exchange is not a valid resource name");
+
+	// check if the he is the owner of queue 
+	if (! is_owner(id,queue))
+		FORBIDDEN("you are not the owner of the queue");
+
+	if (! login_success(id,apikey))
+		FORBIDDEN("invalid id or apikey");
+
+/////////////////////////////////////
+	sanitize(id);
+	sanitize(exchange);
+	sanitize(topic);
+/////////////////////////////////////
+
+	// if he is not the owner of exchange, he should have an entry in acl
+	if (! is_owner(id,exchange))
+	{
+		CREATE_STRING (
+			query,
+				"SELECT topic FROM acl WHERE id = '%s' "
+				"AND exchange = '%s' AND permission = 'read' "
+				"AND valid_till > now() AND topic = '%s'",
+				id,
+				exchange,
+				topic
+		);
+
+		RUN_QUERY(query,"failed to query for permission");
+		
+		if (kore_pgsql_ntuples(&sql) != 1)
+			FORBIDDEN("unauthorized");
+	}
+
+	snprintf (queue,127,"%s%s", id, is_priority ? ".priority" : "");
+	snprintf (exchange,127,"%s.protected",from); 
+	
+	if (! amqp_queue_unbind (
 		cached_admin_conn,
 		1,
 		amqp_cstring_bytes(queue),
@@ -1986,74 +2126,6 @@ get_follow_requests (struct http_request *req)
 
 	OK();
 
-done:
-	END();
-}
-
-int
-queue_unbind (struct http_request *req)
-{
-	const char *id;
-	const char *apikey;
-
-	const char *queue;
-	const char *exchange;
-        const char *topic;
-
- 	req->status = 403;
-	
-	BAD_REQUEST_if
-	(
-		KORE_RESULT_OK != http_request_header(req, "id", &id)
-				||
-		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
-				||
-		KORE_RESULT_OK != http_request_header(req, "queue", &queue)
-				||
-		KORE_RESULT_OK != http_request_header(req, "exchange", &exchange)
-				||
-		KORE_RESULT_OK != http_request_header(req, "topic", &topic)
-			,
-		"inputs missing in headers"
-	);
-
-      	if (! looks_like_a_valid_owner(id))
-		BAD_REQUEST("id is not valid owner");	
-
-	if (! looks_like_a_valid_resource(queue))
-		FORBIDDEN("queue is not a valid resource name");
-	
-	if (! looks_like_a_valid_resource(exchange))
-		FORBIDDEN("exchange is not a valid resource name");
-
-	// check if the he is the owner of queue 
-	if (! is_owner(id,queue))
-		FORBIDDEN("you are not the owner of the queue");
-
-	if (! login_success(id,apikey))
-		FORBIDDEN("invalid id or apikey");
-
-	// if he is not the owner of exchange, he should have an entry in acl
-	if (! is_owner(id,exchange))
-	{
-		if (! check_acl(id, exchange, "read"))
-			FORBIDDEN("unauthorized");
-	}
-
-	if (! amqp_queue_unbind (
-		cached_admin_conn,
-		1,
-		amqp_cstring_bytes(queue),
-		amqp_cstring_bytes(exchange),
-		amqp_cstring_bytes(topic),
-		amqp_empty_table
-	))
-	{
-		ERROR("unbind failed");
-	}
-
-	OK();
-	
 done:
 	END();
 }
