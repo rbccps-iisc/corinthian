@@ -29,7 +29,7 @@
 	#define ADMIN_USER ("admin")
 #endif
 
-#if 1
+#if 0
 	#define debug_printf(...)
 #else
 	#define debug_printf(...) printf(__VA_ARGS__)
@@ -133,6 +133,24 @@ char *sanitize (char *string);
 	}							\
 }
 
+#define END() 	{			\
+	http_response_header(		\
+		req,			\
+		"content-type",		\
+		"application/json"	\
+	);				\
+	http_response (			\
+		req,			\
+		req->status, 		\
+		response->data,		\
+		response->offset	\
+	);				\
+	kore_pgsql_cleanup(&sql);	\
+	kore_buf_reset(response);	\
+	kore_buf_reset(Q);		\
+	return (KORE_RESULT_OK);	\
+} 
+
 struct kore_buf *Q = NULL;
 struct kore_buf *query = NULL;
 struct kore_buf *response = NULL;
@@ -142,15 +160,6 @@ uint8_t	binary_hash 		[SHA256_DIGEST_LENGTH];
 char 	hash_string		[SHA256_DIGEST_LENGTH*2 + 1];
 
 struct kore_pgsql sql;
-
-size_t i;
-
-void inline cleanup ()
-{
-	kore_pgsql_cleanup(&sql);
-	kore_buf_reset(response);
-	kore_buf_reset(Q);
-}
 
 #define CREATE_STRING(buf,...)	{			\
 	kore_buf_reset(buf);				\
@@ -169,6 +178,8 @@ amqp_connection_state_t	*cached_admin_conn = NULL;
 int
 init (int state)
 {
+	int i;
+
 	// https
 	if (worker->id == 0)
 		return KORE_RESULT_OK;
@@ -288,6 +299,7 @@ init (int state)
 bool
 is_alpha_numeric (const char *str)
 {
+	int i;
 	uint8_t strlen_str = strlen(str);
 
 	if (strlen_str < 3 || strlen_str > 32)
@@ -319,6 +331,8 @@ looks_like_a_valid_owner (const char *str)
 bool
 looks_like_a_valid_entity (const char *str)
 {
+	int i;
+
 	uint8_t strlen_str = strlen(str);
 
 	uint8_t front_slash_count = 0;
@@ -357,6 +371,8 @@ looks_like_a_valid_entity (const char *str)
 bool
 looks_like_a_valid_resource (const char *str)
 {
+	int i;
+
 	uint8_t strlen_str = strlen(str);
 
 	uint8_t front_slash_count = 0;
@@ -407,6 +423,8 @@ looks_like_a_valid_resource (const char *str)
 void
 gen_salt_password_and_apikey (const char *entity, char *salt, char *password_hash, char *apikey)
 {
+	int i;
+
 	// TODO security level
 	for (i = 0; i < 32; ++i)
 	{
@@ -675,17 +693,14 @@ done:
 		}
 	}
 
-	http_response_header(req, "content-type", "application/json");
-	http_response(req, req->status, response->data, response->offset);
-
-	cleanup();
-
-	return (KORE_RESULT_OK);
+	END();
 }
 
 int
 subscribe(struct http_request *req)
 {
+	int i;
+
 	const char *id;
 	const char *apikey;
 	const char *message_type;
@@ -786,8 +801,8 @@ subscribe(struct http_request *req)
 
 	for (i = 0; i < int_num_messages; ++i)
 	{
-		amqp_rpc_reply_t 	res;
-		amqp_message_t message;
+		amqp_rpc_reply_t res;
+		amqp_message_t 	 message;
 		
 		time_t t;
 		t = time(NULL);
@@ -872,12 +887,7 @@ done:
 		amqp_destroy_connection	(connection);
 	}
 
-	http_response_header(req, "content-type", "application/json");
-	http_response(req, req->status, response->data, response->offset);
-
-	cleanup();
-
-	return (KORE_RESULT_OK);
+	END();
 }
 
 // one with register-bulk
@@ -980,8 +990,6 @@ register_entity (struct http_request *req)
 	OK();
 
 done:
-	http_response_header(req, "content-type", "application/json");
-
 	// wait for thread ...
 	if (thread_started)
 	{
@@ -996,11 +1004,7 @@ done:
 		free(result);
 	}
 
-	http_response(req, req->status, response->data, response->offset);
-
-	cleanup();
-
-	return (KORE_RESULT_OK);
+	END();
 }
 
 int
@@ -1107,8 +1111,6 @@ deregister_entity (struct http_request *req)
 	OK();
 
 done:
-	http_response_header (req, "content-type", "application/json");
-
 	// wait for thread ...
 	if (thread_started)
 	{
@@ -1123,16 +1125,14 @@ done:
 		free(result);
 	}
 
-	http_response(req, req->status, response->data, response->offset);
-
-	cleanup();
-
-	return (KORE_RESULT_OK);
+	END();
 }
 
 int
 cat(struct http_request *req)
 {
+	int i;
+
 	const char *entity;
 	uint32_t num_rows = 0;
 
@@ -1199,12 +1199,7 @@ cat(struct http_request *req)
 	OK();
 
 done:
-	http_response_header(req, "content-type", "application/json");
-	http_response(req, req->status, response->data, response->offset);
-
-	cleanup();
-
-	return (KORE_RESULT_OK);
+	END();
 }
 
 int
@@ -1244,13 +1239,7 @@ db_cleanup (struct http_request *req)
 	OK();
 
 done:
-
-	http_response_header(req, "content-type", "application/json");
-	http_response(req, req->status, response->data, response->offset);
-
-	cleanup();
-
-	return (KORE_RESULT_OK);
+	END();
 }
 
 int
@@ -1340,8 +1329,6 @@ register_owner(struct http_request *req)
 	OK();
 
 done:
-	http_response_header (req, "content-type", "application/json");
-
 	// wait for thread ...
 	if (thread_started)
 	{
@@ -1356,11 +1343,7 @@ done:
 		free(result);
 	}
 
-	http_response(req, req->status, response->data, response->offset);
-
-	cleanup();
-
-	return (KORE_RESULT_OK);
+	END();
 }
 
 int
@@ -1443,8 +1426,6 @@ deregister_owner(struct http_request *req)
 	OK();
 
 done:
-	http_response_header (req, "content-type", "application/json");
-
 	// wait for thread ...
 	if (thread_started)
 	{
@@ -1459,11 +1440,7 @@ done:
 		free(result);
 	}
 
-	http_response(req, req->status, response->data, response->offset);
-
-	cleanup();
-
-	return (KORE_RESULT_OK);
+	END();
 }
 
 int
@@ -1710,12 +1687,7 @@ follow (struct http_request *req)
 	kore_buf_append(response,"}\n",2);
 
 done:
-	http_response_header(req, "content-type", "application/json");
-	http_response(req, req->status, response->data, response->offset);
-
-	cleanup();
-
-	return (KORE_RESULT_OK);
+	END();
 }
 
 int
@@ -1790,12 +1762,7 @@ share (struct http_request *req)
 	OK();
 
 done:
-	http_response_header(req, "content-type", "application/json");
-	http_response(req, req->status, response->data, response->offset);
-
-	cleanup();
-
-	return (KORE_RESULT_OK);
+	END();
 }
 
 bool
@@ -1923,17 +1890,14 @@ bind:
 	}
 	
 done:
-	http_response_header(req, "content-type", "application/json");
-	http_response(req, req->status, response->data, response->offset);
-
-	cleanup();
-
-	return (KORE_RESULT_OK);
+	END();
 }
 
 int
 get_follow_requests (struct http_request *req)
 {
+	int i;
+
 	const char *id;
 	const char *apikey;
 	const char *status;
@@ -2023,12 +1987,7 @@ get_follow_requests (struct http_request *req)
 	OK();
 
 done:
-	http_response_header(req, "content-type", "application/json");
-	http_response(req, req->status, response->data, response->offset);
-
-	cleanup();
-
-	return (KORE_RESULT_OK);
+	END();
 }
 
 int
@@ -2121,13 +2080,24 @@ unbind:
 	}
 	
 done:
-	http_response_header(req, "content-type", "application/json");
-	http_response(req, req->status, response->data, response->offset);
-
-	cleanup();
-
-	return (KORE_RESULT_OK);
+	END();
 }
+
+int
+block (struct http_request *req)
+{
+	const char *id;
+	const char *apikey;
+
+	const char *queue;
+	const char *exchange;
+        const char *topic;
+
+done:
+	END();
+}
+
+
 
 void *
 create_exchanges_and_queues (void *v)
