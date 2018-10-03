@@ -71,7 +71,6 @@ void *delete_exchanges_and_queues (void *);
 
 char *sanitize (char *string);
 
-
 #define OK()    {req->status=200; goto done;}
 #define OK202() {req->status=202; goto done;}
 
@@ -2205,7 +2204,7 @@ unblock (struct http_request *req)
 			"UPDATE users set blocked='f' WHERE id='%s'",
 				sanitize(entity)
 	);
-
+	
 	RUN_QUERY(query, "could not block the entity");
 
 	OK();
@@ -2213,9 +2212,6 @@ unblock (struct http_request *req)
 done:
 	END();
 }
-
-
-
 
 void *
 create_exchanges_and_queues (void *v)
