@@ -23,13 +23,7 @@
 
 //#define TEST (1)
 
-#ifdef TEST
-	#define ADMIN_USER ("guest")
-#else
-	#define ADMIN_USER ("admin")
-#endif
-
-#if 0
+#if 1
 	#define debug_printf(...)
 #else
 	#define debug_printf(...) printf(__VA_ARGS__)
@@ -72,6 +66,8 @@ void *create_exchanges_and_queues (void *);
 void *delete_exchanges_and_queues (void *);
 
 char *sanitize (char *string);
+
+bool is_owner(const char *, const char *);
 
 #define OK()    {req->status=200; goto done;}
 #define OK202() {req->status=202; goto done;}
@@ -173,14 +169,14 @@ ht connection_ht;
 amqp_table_t lazy_queue_table;
 
 char admin_apikey[33];
-amqp_connection_state_t	*cached_admin_conn = NULL;
+amqp_connection_state_t	cached_admin_conn;
 
 int
 init (int state)
 {
 	int i;
 
-	// https
+	// ignore the https worker
 	if (worker->id == 0)
 		return KORE_RESULT_OK;
 
@@ -236,22 +232,21 @@ init (int state)
 
 	if (socket == NULL)
 	{
-		printf("Could not open a socket ");
+		fprintf(stderr,"Could not open a socket ");
 		return KORE_RESULT_ERROR;
 	}
 
 	if (amqp_socket_open(socket, "kore-broker", 5672))
 	{
-		printf("Could not connect to kore-broker ");
+		fprintf(stderr,"Could not connect to kore-broker ");
 		return KORE_RESULT_ERROR;	
 	}
 
-	login_reply = amqp_login(cached_admin_conn, 
-
+	login_reply = amqp_login
 #ifdef TEST
-		"/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN, "guest", "guest");
-#else
-		"/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN, ADMIN_USER, admin_apikey);
+		(cached_admin_conn, "/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN, "guest", "guest");
+#else	
+		(cached_admin_conn, "/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN, "admin", admin_apikey);
 #endif
 
 	if (login_reply.reply_type != AMQP_RESPONSE_NORMAL)
@@ -329,7 +324,7 @@ looks_like_a_valid_owner (const char *str)
 }
 
 bool
-is_owner(char *id, char *entity)
+is_owner(const char *id, const char *entity)
 {
 	int strlen_id = strlen(id);
 
@@ -1008,7 +1003,7 @@ done:
 	if (thread_started)
 	{
 		bool *result;
-		pthread_join(thread,&result);
+		pthread_join(thread,(void *)&result);
 
 		if (! *result) {
 			req->status = 500;
@@ -1129,7 +1124,7 @@ done:
 	if (thread_started)
 	{
 		bool *result;
-		pthread_join(thread,&result);
+		pthread_join(thread,(void *)&result);
 
 		if (! *result) {
 			req->status = 500;
@@ -1816,7 +1811,7 @@ queue_bind (struct http_request *req)
 	const char *exchange;
         const char *topic;
 
- 	char *status = 403;
+ 	req->status = 403;
 	
 	BAD_REQUEST_if
 	(
@@ -1849,25 +1844,13 @@ queue_bind (struct http_request *req)
 	if (! login_success(id,apikey))
 		FORBIDDEN("invalid id or apikey");
 
-	// if both queue and exchange are owned by id
-	if (is_owner(id,exchange))
+	// if he is not the owner of exchange, he should have an entry in acl
+	if (! is_owner(id,exchange))
 	{
-		status = "approved";	
-                goto bind;
+		if (! check_acl(id, exchange, "read"))
+			FORBIDDEN("unauthorized");
 	}
 	
-	if (check_acl(id, exchange,"read"))
-	{
-		goto bind;
-	}
-	else
-	{
-		kore_buf_reset(response);
-		kore_buf_appendf(response, "{\"Status\":\"You do not have permission to bind to this exchange\"}");
-		goto done;
-	}
-
-bind:
 	if (! amqp_queue_bind (
 		cached_admin_conn,
 		1,
@@ -1877,15 +1860,10 @@ bind:
 		amqp_empty_table
 	))
 	{
-		fprintf(stderr,"amqp_queue_bind failed\n");
-		goto done;
+		ERROR("bind failed");
 	}
-	else
-	{
-		kore_buf_reset(response);
-		kore_buf_appendf(response, "{\"Status\":\"%s has been bound to %s \"}", queue, exchange);
-		goto done;
-	}
+
+	OK();
 	
 done:
 	END();
@@ -1998,7 +1976,7 @@ queue_unbind (struct http_request *req)
 	const char *exchange;
         const char *topic;
 
- 	char *status = 403;
+ 	req->status = 403;
 	
 	BAD_REQUEST_if
 	(
@@ -2031,25 +2009,13 @@ queue_unbind (struct http_request *req)
 	if (! login_success(id,apikey))
 		FORBIDDEN("invalid id or apikey");
 
-	// if both queue aand exchange are owned by id
-	if (is_owner(id,exchange))
+	// if he is not the owner of exchange, he should have an entry in acl
+	if (! is_owner(id,exchange))
 	{
-		status = "approved";	
-                goto unbind;
-	}
-	
-	if ( check_acl(id, exchange, "read") )
-	{
-		goto unbind;
-	}
-	else
-	{
-		kore_buf_reset(response);
-		kore_buf_appendf(response, "{\"Status\":\"You do not have permission to unbind from this exchange\"}");
-		goto done;
+		if (! check_acl(id, exchange, "read"))
+			FORBIDDEN("unauthorized");
 	}
 
-unbind:
 	if (! amqp_queue_unbind (
 		cached_admin_conn,
 		1,
@@ -2059,15 +2025,10 @@ unbind:
 		amqp_empty_table
 	))
 	{
-		fprintf(stderr,"amqp_queue_bind failed\n");
-		goto done;
+		ERROR("unbind failed");
 	}
-	else
-	{
-		kore_buf_reset(response);
-		kore_buf_appendf(response, "{\"Status\":\"%s has been unbound from %s \"}", queue, exchange);
-		goto done;
-	}
+
+	OK();
 	
 done:
 	END();
@@ -2375,6 +2336,7 @@ char*
 sanitize (char *string)
 {
 	char *p = string;
+
 	while (*p)
 	{
 		/* replace single quotes with double quotes.
