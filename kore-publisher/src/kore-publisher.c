@@ -2020,7 +2020,7 @@ queue_unbind (struct http_request *req)
 		amqp_cstring_bytes(queue),
 		amqp_cstring_bytes(exchange),
 		amqp_cstring_bytes(topic),
-		amqp_empty_table
+		durable_binding_table	
 	))
 	{
 		ERROR("bind failed");
