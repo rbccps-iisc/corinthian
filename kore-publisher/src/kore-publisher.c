@@ -1532,6 +1532,16 @@ follow (struct http_request *req)
 	if (! login_success(id,apikey))
 		FORBIDDEN("invalid id or apikey");
 
+///////////////////////////////////
+
+	sanitize (from);
+	sanitize (to);
+	sanitize (permission);
+	sanitize (validity);
+	sanitize (topic);
+
+///////////////////////////////////
+
 	// if both from and to are owned by id
 	if (is_owner(id,to))
 	{
@@ -1550,11 +1560,11 @@ follow (struct http_request *req)
 			"INSERT INTO follow "
 			"(follow_id,id_from,id_to,time,permission,topic,validity,status) "
 			"values(DEFAULT,'%s','%s.protected',now(),'read','%s','%s','%s')",
-				sanitize(from),
-				sanitize(to),
-				sanitize(topic),
-				sanitize(validity),
-				sanitize(status)
+				from,
+				to,
+				topic,
+				validity,
+				status
 		);
 		RUN_QUERY (query, "failed to insert follow - read");
 
@@ -1568,11 +1578,11 @@ follow (struct http_request *req)
 		CREATE_STRING (query,
 			"INSERT INTO follow (follow_id,id_from,id_to,time,permission,topic,validity,status) "
 			"values(DEFAULT,'%s','%s.command',now(),'write','%s','%s','%s')",
-				sanitize(from),
-				sanitize(to),
+				from,
+				to,
 				"#",
-				sanitize(validity),
-				sanitize(status)
+				validity,
+				status
 		);
 		RUN_QUERY (query, "failed to insert follow - write");
 
@@ -1585,11 +1595,11 @@ follow (struct http_request *req)
 		CREATE_STRING (query,
 			"INSERT INTO follow (follow_id,id_from,id_to,time,permission,topic,validity,status) "
 			"values(DEFAULT,'%s','%s.protected',now(),'read','%s','%s','%s')",
-				sanitize(from),
-				sanitize(to),
-				sanitize(topic),
-				sanitize(validity),
-				sanitize(status)
+				from,
+				to,
+				topic,
+				validity,
+				status
 		);
 		RUN_QUERY (query, "failed to insert follow - read");
 
@@ -1601,11 +1611,11 @@ follow (struct http_request *req)
 		CREATE_STRING (query,
 			"INSERT INTO follow (follow_id,id_from,id_to,time,permission,topic,validity,status) "
 			"values(DEFAULT,'%s','%s.command',now(),'write','%s','%s','%s')",
-				sanitize(from),
-				sanitize(to),
+				from,
+				to,
 				"#",
-				sanitize(validity),
-				sanitize(status)
+				validity,
+				status
 		);
 		RUN_QUERY (query, "failed to insert follow - write");
 
@@ -1627,12 +1637,12 @@ follow (struct http_request *req)
 			CREATE_STRING (query,
 				"INSERT into acl (acl_id,id,exchange,follow_id,permission,topic,valid_till) "
 				"values(DEFAULT,'%s','%s.protected','%s','%s', '%s', now() + interval '%s  hours')",
-			        	sanitize(from),
-					sanitize(to),
-					sanitize(read_follow_id),
+			        	from,
+					to,
+					read_follow_id,
 					"read",
-					sanitize(topic),
-					sanitize(validity)
+					topic,
+					validity
 			);
 
 			RUN_QUERY (query,"could not run insert query on acl - read ");
@@ -1642,12 +1652,12 @@ follow (struct http_request *req)
 			CREATE_STRING (query,
 				"INSERT into acl (acl_id,id,exchange,follow_id,permission,topic,valid_till) "
 				"values(DEFAULT,'%s','%s.command','%s','%s', '%s', now() + interval '%s  hours')",
-			        	sanitize(from),
-					sanitize(to),
-					sanitize(write_follow_id),
+			        	from,
+					to,
+					write_follow_id,
 					"write",
-					sanitize(topic),
-					sanitize(validity)
+					topic,
+					validity
 			);
 
 			RUN_QUERY (query,"could not run insert query on acl - write");
@@ -1657,12 +1667,12 @@ follow (struct http_request *req)
 			CREATE_STRING (query,
 				"INSERT into acl (acl_id,id,exchange,follow_id,permission,topic,valid_till) "
 				"values(DEFAULT,'%s','%s.protected','%s','%s', '%s', now() + interval '%s  hours')",
-			        	sanitize(from),
-					sanitize(to),
-					sanitize(read_follow_id),
+			        	from,
+					to,
+					read_follow_id,
 					"read",
-					sanitize(topic),
-					sanitize(validity)
+					topic,
+					validity
 			);
 
 			RUN_QUERY(query,"could not run insert query on acl - read/write -1 ");
@@ -1670,12 +1680,12 @@ follow (struct http_request *req)
 			CREATE_STRING (query,
 				"INSERT into acl (acl_id,id,exchange,follow_id,permission,topic,valid_till) "
 				"values(DEFAULT,'%s','%s.command','%s','%s', '%s', now() + interval '%s  hours')",
-			        	sanitize(from),
-					sanitize(to),
-					sanitize(write_follow_id),
+			        	from,
+					to,
+					write_follow_id,
 					"write",
-					sanitize(topic),
-					sanitize(validity)
+					topic,
+					validity
 			);
 
 			RUN_QUERY (query,"could not run insert query on acl - read/write - 2");
@@ -1739,11 +1749,18 @@ share (struct http_request *req)
 	if (! login_success(id,apikey))
 		FORBIDDEN("invalid id or apikey");
 
+///////////////////////////////////
+
+	sanitize(id);
+	sanitize(follow_id);
+
+///////////////////////////////////
+
 	CREATE_STRING (query, 
 		"SELECT id_from,id_to,permission,validity,topic FROM follow "
 		"WHERE follow_id = '%s' AND id_to LIKE '%s/%%.%%' and status='pending'",
-			sanitize(follow_id),
-			sanitize(id)
+			follow_id,
+			id
 	);
 
 	RUN_QUERY (query,"could not run select query on follow");
@@ -1770,12 +1787,12 @@ share (struct http_request *req)
 	CREATE_STRING 	(query,
 				"INSERT into acl (acl_id,id,exchange,follow_id,permission,topic,valid_till) "
 				"values(DEFAULT,'%s','%s','%s','%s', '%s', now() + interval '%s  hours')",
-			        	sanitize(id_from),
-					sanitize(exchange),
-					sanitize(follow_id),
-					sanitize(permission),
-					sanitize(topic),
-					sanitize(validity_hours)
+			        	id_from,
+					exchange,
+					follow_id,
+					permission,
+					topic,
+					validity_hours
 	);
 
 	RUN_QUERY (query,"could not run insert query on acl");
@@ -1784,35 +1801,6 @@ share (struct http_request *req)
 
 done:
 	END();
-}
-
-bool
-check_acl(const char *id, const char *exchange, const char *permission)
-{
-	CREATE_STRING(query,
-			"SELECT id,exchange,permission FROM acl WHERE id = '%s' AND exchange = '%s' AND permission = '%s'"
-			, id, exchange, permission);	
-
-	kore_pgsql_cleanup(&sql);
-	kore_pgsql_init(&sql);
-	if (! kore_pgsql_setup(&sql,"db",KORE_PGSQL_SYNC))
-	{
-		kore_pgsql_logerror(&sql);
-		return false;	
-	}
-	if (! kore_pgsql_query(&sql,(const char *)query->data))
-	{
-		kore_pgsql_logerror(&sql);
-		return false;	
-	}
-
-	if (kore_pgsql_ntuples(&sql) == 0)
-		return false;	
-
-	// XXX Should kore_pgsql_cleanup(&sql); before returning
-
-	return true;
-
 }
 
 int
@@ -1824,6 +1812,8 @@ unfollow (struct http_request *req)
 int
 queue_bind (struct http_request *req)
 {
+	/*XXX XXX XXX not tested XXX XXX XXX */
+
 	const char *id;
 	const char *apikey;
 
@@ -1868,27 +1858,30 @@ queue_bind (struct http_request *req)
       	if (! looks_like_a_valid_owner(id))
 		BAD_REQUEST("id is not valid owner");	
 
-	if (! looks_like_a_valid_resource(queue))
+	if (! looks_like_a_valid_resource(from))
 		FORBIDDEN("queue is not a valid resource name");
 	
-	if (! looks_like_a_valid_resource(exchange))
+	if (! looks_like_a_valid_resource(to))
 		FORBIDDEN("exchange is not a valid resource name");
 
 	// check if the he is the owner of queue 
-	if (! is_owner(id,queue))
+	if (! is_owner(id,from))
 		FORBIDDEN("you are not the owner of the queue");
 
 	if (! login_success(id,apikey))
 		FORBIDDEN("invalid id or apikey");
 
 /////////////////////////////////////
+
 	sanitize(id);
-	sanitize(exchange);
+	sanitize(from);
+	sanitize(to);
 	sanitize(topic);
+
 /////////////////////////////////////
 
 	// if he is not the owner of exchange, he should have an entry in acl
-	if (! is_owner(id,exchange))
+	if (! is_owner(id,from))
 	{
 		CREATE_STRING (
 			query,
@@ -1896,7 +1889,7 @@ queue_bind (struct http_request *req)
 				"AND exchange = '%s' AND permission = 'read' "
 				"AND valid_till > now() AND topic = '%s'",
 				id,
-				exchange,
+				from,
 				topic
 		);
 
@@ -1930,6 +1923,9 @@ done:
 int
 queue_unbind (struct http_request *req)
 {
+
+	/*XXX XXX XXX not tested XXX XXX XXX */
+
 	const char *id;
 	const char *apikey;
 
@@ -1974,27 +1970,30 @@ queue_unbind (struct http_request *req)
       	if (! looks_like_a_valid_owner(id))
 		BAD_REQUEST("id is not valid owner");	
 
-	if (! looks_like_a_valid_resource(queue))
+	if (! looks_like_a_valid_resource(from))
 		FORBIDDEN("queue is not a valid resource name");
 	
-	if (! looks_like_a_valid_resource(exchange))
+	if (! looks_like_a_valid_resource(to))
 		FORBIDDEN("exchange is not a valid resource name");
 
 	// check if the he is the owner of queue 
-	if (! is_owner(id,queue))
+	if (! is_owner(id,from))
 		FORBIDDEN("you are not the owner of the queue");
 
 	if (! login_success(id,apikey))
 		FORBIDDEN("invalid id or apikey");
 
 /////////////////////////////////////
+
 	sanitize(id);
-	sanitize(exchange);
+	sanitize(from);
+	sanitize(to);
 	sanitize(topic);
+
 /////////////////////////////////////
 
 	// if he is not the owner of exchange, he should have an entry in acl
-	if (! is_owner(id,exchange))
+	if (! is_owner(id,to))
 	{
 		CREATE_STRING (
 			query,
@@ -2002,7 +2001,7 @@ queue_unbind (struct http_request *req)
 				"AND exchange = '%s' AND permission = 'read' "
 				"AND valid_till > now() AND topic = '%s'",
 				id,
-				exchange,
+				to,
 				topic
 		);
 
@@ -2012,8 +2011,8 @@ queue_unbind (struct http_request *req)
 			FORBIDDEN("unauthorized");
 	}
 
-	snprintf (queue,127,"%s%s", id, is_priority ? ".priority" : "");
-	snprintf (exchange,127,"%s.protected",from); 
+	snprintf (queue,127,"%s%s", from, is_priority ? ".priority" : "");
+	snprintf (exchange,127,"%s.protected",to); 
 	
 	if (! amqp_queue_unbind (
 		cached_admin_conn,
