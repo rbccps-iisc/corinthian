@@ -205,13 +205,13 @@ init (int state)
 	int fd = open("admin.apikey",O_RDONLY);
 	if (fd < 0)
 	{
-		perror("could not open admin.apikey");
+		fprintf(stderr,"could not open admin.apikey\n");
 		exit(-1);
 	}
 
 	if (! read(fd,admin_apikey,32))
 	{
-		perror("could not read from admin.apikey");
+		fprintf(stderr,"could not read from admin.apikey\n");
 		exit(-1);
 	}
 
@@ -256,20 +256,20 @@ init (int state)
 
 	if (login_reply.reply_type != AMQP_RESPONSE_NORMAL)
 	{
-		perror("invalid id or apikey ");
+		fprintf(stderr,"invalid id or apikey\n");
 		return KORE_RESULT_ERROR;	
 	}
 
 	if(! amqp_channel_open(cached_admin_conn, 1))
 	{
-		printf("could not open an AMQP connection");
+		fprintf(stderr,"could not open an AMQP connection\n");
 		return KORE_RESULT_ERROR;	
 	}
 
 	rpc_reply = amqp_get_rpc_reply(cached_admin_conn);
 	if (rpc_reply.reply_type != AMQP_RESPONSE_NORMAL)
 	{
-		printf("did not receive expected response from the broker");
+		fprintf(stderr,"did not receive expected response from the broker\n");
 		return KORE_RESULT_ERROR;	
 	}
 
@@ -1879,7 +1879,7 @@ bind:
 		amqp_empty_table
 	))
 	{
-		perror("amqp_queue_bind failed ");
+		fprintf(stderr,"amqp_queue_bind failed\n");
 		goto done;
 	}
 	else
@@ -2069,7 +2069,7 @@ unbind:
 		amqp_empty_table
 	))
 	{
-		perror("amqp_queue_bind failed ");
+		fprintf(stderr,"amqp_queue_bind failed\n");
 		goto done;
 	}
 	else
@@ -2131,7 +2131,7 @@ create_exchanges_and_queues (void *v)
 			amqp_empty_table
 		))
 		{
-			perror("amqp_exchange_declare failed ");
+			fprintf(stderr,"amqp_exchange_declare failed\n");
 			goto done;
 		}
 		debug_printf("[owner] done creating exchange {%s}\n",exchange);
@@ -2149,7 +2149,7 @@ create_exchanges_and_queues (void *v)
 			lazy_queue_table	
 		))
 		{
-			perror("amqp_queue_declare failed ");
+			fprintf(stderr,"amqp_queue_declare failed\n");
 			goto done;
 		}
 	}
@@ -2176,7 +2176,7 @@ create_exchanges_and_queues (void *v)
 				)
 			)
 			{
-				perror("something went wrong with exchange creation ");
+				fprintf(stderr,"something went wrong with exchange creation\n");
 				goto done;
 			}
 			debug_printf("[entity] DONE creating exchange {%s}\n",exchange);
@@ -2199,7 +2199,7 @@ create_exchanges_and_queues (void *v)
 				lazy_queue_table	
 			))
 			{
-				perror("amqp_queue_declare failed ");
+				fprintf(stderr,"amqp_queue_declare failed\n");
 				goto done;
 			}
 		debug_printf("[entity] DONE creating queue {%s}\n",q);
@@ -2238,7 +2238,7 @@ delete_exchanges_and_queues (void *v)
 			0
 		))
 		{
-			perror("amqp_exchange_delete failed ");
+			fprintf(stderr,"amqp_exchange_delete failed\n");
 			goto done;
 		}
 		debug_printf("[owner] done creating exchange {%s}\n",exchange);
@@ -2253,7 +2253,7 @@ delete_exchanges_and_queues (void *v)
 			0
 		))
 		{
-			perror("amqp_queue_delete failed ");
+			fprintf(stderr,"amqp_queue_delete failed\n");
 			goto done;
 		}
 		debug_printf("[owner] DONE deleting queue {%s}\n",q);
@@ -2276,7 +2276,7 @@ delete_exchanges_and_queues (void *v)
 				)
 			)
 			{
-				perror("something went wrong with exchange deletion");
+				fprintf(stderr,"something went wrong with exchange deletion\n");
 				goto done;
 			}
 			debug_printf("[entity] DONE deleting exchange {%s}\n",exchange);
@@ -2297,7 +2297,7 @@ delete_exchanges_and_queues (void *v)
 				0
 			))
 			{
-				perror("amqp_queue_delete failed ");
+				fprintf(stderr,"amqp_queue_delete failed\n");
 				goto done;
 			}
 			debug_printf("[entity] DONE deleting queue {%s}\n",q);
