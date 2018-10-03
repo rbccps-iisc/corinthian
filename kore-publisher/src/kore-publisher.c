@@ -21,7 +21,7 @@
 
 #include "ht.h"
 
-#define TEST (1)
+//#define TEST (1)
 
 #ifdef TEST
 	#define ADMIN_USER ("guest")
