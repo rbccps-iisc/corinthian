@@ -21,7 +21,7 @@
 
 #include "ht.h"
 
-//#define TEST (1)
+#define TEST (1)
 
 #if 1
 	#define debug_printf(...)
@@ -53,21 +53,24 @@ int queue_bind          (struct http_request *);
 int queue_unbind        (struct http_request *);
 
 int init (int);
+
 void gen_salt_password_and_apikey (const char *, char *, char *, char *);
+
 bool login_success (const char *, const char *);
 bool check_acl(const char *id, const char *exchange, const char *permission);
 
-bool looks_like_a_valid_owner(const char *str);
-bool looks_like_a_valid_entity (const char *str);
+bool looks_like_a_valid_owner	(const char *str);
+bool looks_like_a_valid_entity 	(const char *str);
 bool looks_like_a_valid_resource(const char *str);
-bool is_alpha_numeric (const char *str);
+
+bool is_alpha_numeric 	(const char *str);
+bool is_owner		(const char *, const char *);
 
 void *create_exchanges_and_queues (void *);
 void *delete_exchanges_and_queues (void *);
 
 char *sanitize (char *string);
 
-bool is_owner(const char *, const char *);
 
 #define OK()    {req->status=200; goto done;}
 #define OK202() {req->status=202; goto done;}
@@ -670,8 +673,7 @@ reconnect:
 
 	debug_printf("Got content-type {%s}\n",content_type);
 
-	//FORBIDDEN_if
-	ERROR_if
+	FORBIDDEN_if
 	(
 		AMQP_STATUS_OK != amqp_basic_publish (	
 			*cached_conn,
@@ -684,7 +686,7 @@ reconnect:
 			amqp_cstring_bytes(message)
 		),
 
-		"broker refused publish message"
+		"broker refused to publish message"
 	);
 
 	OK202();
@@ -1807,8 +1809,13 @@ queue_bind (struct http_request *req)
 	const char *id;
 	const char *apikey;
 
-	const char *queue;
-	const char *exchange;
+	// source and destination instead ?
+	const char *from;
+	const char *to;
+
+	char queue	[128];
+	char exchange	[128];
+
         const char *topic;
 
  	req->status = 403;
@@ -1819,9 +1826,9 @@ queue_bind (struct http_request *req)
 				||
 		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
 				||
-		KORE_RESULT_OK != http_request_header(req, "queue", &queue)
+		KORE_RESULT_OK != http_request_header(req, "from", &from)
 				||
-		KORE_RESULT_OK != http_request_header(req, "exchange", &exchange)
+		KORE_RESULT_OK != http_request_header(req, "to", &to)
 				||
 		KORE_RESULT_OK != http_request_header(req, "topic", &topic)
 			,
@@ -1847,9 +1854,26 @@ queue_bind (struct http_request *req)
 	// if he is not the owner of exchange, he should have an entry in acl
 	if (! is_owner(id,exchange))
 	{
-		if (! check_acl(id, exchange, "read"))
+		CREATE_STRING (
+			query,
+				"SELECT topic FROM acl WHERE id = '%s' "
+				"AND exchange = '%s' AND permission = 'read' "
+				"AND valid_till > now() AND topic = '%s'",
+				sanitize(id),
+				sanitize(exchange),
+				sanitize(topic)
+		);
+
+		RUN_QUERY(query,"failed to query for permission");
+		
+		if (kore_pgsql_ntuples(&sql) != 1)
 			FORBIDDEN("unauthorized");
+		
+		topic = kore_pgsql_getvalue(&sql,0,0);
 	}
+
+	snprintf (queue,"%s%s", id, is_priority ? ".priority" : "");
+	snprintf (exchange,"%s.protected",from); 
 	
 	if (! amqp_queue_bind (
 		cached_admin_conn,
@@ -2237,6 +2261,8 @@ done:
 void *
 delete_exchanges_and_queues (void *v)
 {
+	int i;
+
 	const char *id = (const char *)v;
 	
 	char exchange[128];
@@ -2284,7 +2310,7 @@ delete_exchanges_and_queues (void *v)
 	{
 		char *_e[] = {".public", ".private", ".protected", ".command"};
 
-		for (int i = 0; i < 4; ++i)
+		for (i = 0; i < 4; ++i)
 		{
 			snprintf(exchange,128,"%s%s",id,_e[i]);
 
@@ -2305,7 +2331,7 @@ delete_exchanges_and_queues (void *v)
 		}
 
 		char *_q[] = {"\0", ".priority", ".command"};
-		for (int i = 0; i < 3; ++i)
+		for (i = 0; i < 3; ++i)
 		{
 			snprintf(q,128,"%s%s",id,_q[i]);
 
