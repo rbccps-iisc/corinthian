@@ -21,7 +21,7 @@
 
 #include "ht.h"
 
-//#define TEST (1)
+#define TEST (1)
 
 #ifdef TEST
 	#define ADMIN_USER ("guest")
@@ -145,6 +145,13 @@ struct kore_pgsql sql;
 
 size_t i;
 
+void inline cleanup ()
+{
+	kore_pgsql_cleanup(&sql);
+	kore_buf_reset(response);
+	kore_buf_reset(Q);
+}
+
 #define CREATE_STRING(buf,...)	{			\
 	kore_buf_reset(buf);				\
 	kore_buf_appendf(buf,__VA_ARGS__);		\
@@ -169,9 +176,9 @@ init (int state)
 	amqp_rpc_reply_t 	login_reply;
 	amqp_rpc_reply_t 	rpc_reply;
 
-	//////////////
-	// lazy queues
-	//////////////
+//////////////
+// lazy queues
+//////////////
 	lazy_queue_table.num_entries = 1;
 	lazy_queue_table.entries = malloc(lazy_queue_table.num_entries * sizeof(amqp_table_entry_t));
 
@@ -182,7 +189,7 @@ init (int state)
 	entry->key = amqp_cstring_bytes("x-queue-mode");
 	entry->value.kind = AMQP_FIELD_KIND_UTF8;
 	entry->value.value.bytes = amqp_cstring_bytes("lazy");
-	//////////////
+//////////////
 
 	int fd = open("admin.apikey",O_RDONLY);
 	if (fd < 0)
@@ -671,8 +678,7 @@ done:
 	http_response_header(req, "content-type", "application/json");
 	http_response(req, req->status, response->data, response->offset);
 
-	kore_buf_reset(Q);
-	kore_buf_reset(response);
+	cleanup();
 
 	return (KORE_RESULT_OK);
 }
@@ -869,8 +875,7 @@ done:
 	http_response_header(req, "content-type", "application/json");
 	http_response(req, req->status, response->data, response->offset);
 
-	kore_buf_reset(Q);
-	kore_buf_reset(response);
+	cleanup();
 
 	return (KORE_RESULT_OK);
 }
@@ -975,7 +980,6 @@ register_entity (struct http_request *req)
 	OK();
 
 done:
-	kore_pgsql_cleanup(&sql);				\
 	http_response_header(req, "content-type", "application/json");
 
 	// wait for thread ...
@@ -993,6 +997,8 @@ done:
 	}
 
 	http_response(req, req->status, response->data, response->offset);
+
+	cleanup();
 
 	return (KORE_RESULT_OK);
 }
@@ -1036,7 +1042,6 @@ deregister_entity (struct http_request *req)
 	bool thread_started = false; 
 
 	req->status = 403;
-	kore_buf_reset(response);
 
 	BAD_REQUEST_if
 	(
@@ -1102,7 +1107,6 @@ deregister_entity (struct http_request *req)
 	OK();
 
 done:
-	kore_pgsql_cleanup(&sql);				\
 	http_response_header (req, "content-type", "application/json");
 
 	// wait for thread ...
@@ -1120,6 +1124,8 @@ done:
 	}
 
 	http_response(req, req->status, response->data, response->offset);
+
+	cleanup();
 
 	return (KORE_RESULT_OK);
 }
@@ -1193,10 +1199,10 @@ cat(struct http_request *req)
 	OK();
 
 done:
-	kore_pgsql_cleanup(&sql);				\
-
 	http_response_header(req, "content-type", "application/json");
 	http_response(req, req->status, response->data, response->offset);
+
+	cleanup();
 
 	return (KORE_RESULT_OK);
 }
@@ -1238,10 +1244,11 @@ db_cleanup (struct http_request *req)
 	OK();
 
 done:
-	kore_pgsql_cleanup(&sql);				\
 
 	http_response_header(req, "content-type", "application/json");
 	http_response(req, req->status, response->data, response->offset);
+
+	cleanup();
 
 	return (KORE_RESULT_OK);
 }
@@ -1333,7 +1340,6 @@ register_owner(struct http_request *req)
 	OK();
 
 done:
-	kore_pgsql_cleanup(&sql);				\
 	http_response_header (req, "content-type", "application/json");
 
 	// wait for thread ...
@@ -1351,6 +1357,8 @@ done:
 	}
 
 	http_response(req, req->status, response->data, response->offset);
+
+	cleanup();
 
 	return (KORE_RESULT_OK);
 }
@@ -1435,7 +1443,6 @@ deregister_owner(struct http_request *req)
 	OK();
 
 done:
-	kore_pgsql_cleanup(&sql);				\
 	http_response_header (req, "content-type", "application/json");
 
 	// wait for thread ...
@@ -1453,6 +1460,8 @@ done:
 	}
 
 	http_response(req, req->status, response->data, response->offset);
+
+	cleanup();
 
 	return (KORE_RESULT_OK);
 }
@@ -1701,10 +1710,10 @@ follow (struct http_request *req)
 	kore_buf_append(response,"}\n",2);
 
 done:
-	kore_pgsql_cleanup(&sql);				\
-
 	http_response_header(req, "content-type", "application/json");
 	http_response(req, req->status, response->data, response->offset);
+
+	cleanup();
 
 	return (KORE_RESULT_OK);
 }
@@ -1781,10 +1790,10 @@ share (struct http_request *req)
 	OK();
 
 done:
-	kore_pgsql_cleanup(&sql);				\
-
 	http_response_header(req, "content-type", "application/json");
 	http_response(req, req->status, response->data, response->offset);
+
+	cleanup();
 
 	return (KORE_RESULT_OK);
 }
@@ -1917,6 +1926,8 @@ done:
 	http_response_header(req, "content-type", "application/json");
 	http_response(req, req->status, response->data, response->offset);
 
+	cleanup();
+
 	return (KORE_RESULT_OK);
 }
 
@@ -2012,10 +2023,10 @@ get_follow_requests (struct http_request *req)
 	OK();
 
 done:
-	kore_pgsql_cleanup(&sql);				\
-
 	http_response_header(req, "content-type", "application/json");
 	http_response(req, req->status, response->data, response->offset);
+
+	cleanup();
 
 	return (KORE_RESULT_OK);
 }
@@ -2113,6 +2124,8 @@ done:
 	http_response_header(req, "content-type", "application/json");
 	http_response(req, req->status, response->data, response->offset);
 
+	cleanup();
+
 	return (KORE_RESULT_OK);
 }
 
@@ -2174,7 +2187,7 @@ create_exchanges_and_queues (void *v)
 	{
 		char *_e[] = {".public", ".private", ".protected", ".command"};
 
-		for (i = 0; i < 4; ++i)
+		for (int i = 0; i < 4; ++i)
 		{
 			snprintf(exchange,128,"%s%s",id,_e[i]);
 
@@ -2200,7 +2213,7 @@ create_exchanges_and_queues (void *v)
 		}
 
 		char *_q[] = {"\0", ".priority", ".command"};
-		for (i = 0; i < 3; ++i)
+		for (int i = 0; i < 3; ++i)
 		{
 			snprintf(q,128,"%s%s",id,_q[i]);
 
@@ -2279,7 +2292,7 @@ delete_exchanges_and_queues (void *v)
 	{
 		char *_e[] = {".public", ".private", ".protected", ".command"};
 
-		for (i = 0; i < 4; ++i)
+		for (int i = 0; i < 4; ++i)
 		{
 			snprintf(exchange,128,"%s%s",id,_e[i]);
 
@@ -2300,7 +2313,7 @@ delete_exchanges_and_queues (void *v)
 		}
 
 		char *_q[] = {"\0", ".priority", ".command"};
-		for (i = 0; i < 3; ++i)
+		for (int i = 0; i < 3; ++i)
 		{
 			snprintf(q,128,"%s%s",id,_q[i]);
 
