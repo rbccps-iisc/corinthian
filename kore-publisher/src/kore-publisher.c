@@ -1108,12 +1108,7 @@ deregister_entity (struct http_request *req)
 	// TODO delete from follow where from_entity = entity_name or to_entity = entity_name
 	// delete entries in to RabbitMQ
 
-	pthread_attr_t attr;
-	pthread_attr_init(&attr);
-
-	pthread_attr_setdetachstate(&attr,PTHREAD_CREATE_DETACHED);
-
-	pthread_create(&thread,&attr,delete_exchanges_and_queues,(void *)&entity_name); 
+	pthread_create(&thread,NULL,delete_exchanges_and_queues,(void *)&entity_name); 
 	thread_started = true;
 
 	// TODO run select query and delete all exchanges and queues of entity_name 
@@ -1145,7 +1140,6 @@ deregister_entity (struct http_request *req)
 	OK();
 
 done:
-/*
 	// wait for thread ...
 	if (thread_started)
 	{
@@ -1159,7 +1153,6 @@ done:
 
 		free(result);
 	}
-*/
 
 	END();
 }
