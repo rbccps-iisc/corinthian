@@ -329,6 +329,20 @@ looks_like_a_valid_owner (const char *str)
 }
 
 bool
+is_owner(char *id, char *entity)
+{
+	int strlen_id = strlen(id);
+
+	if (strncmp(id,entity,strlen_id) != 0)
+		return false;	
+
+	if (entity[strlen_id] != '/')
+		return false;	
+
+	return true;
+}
+
+bool
 looks_like_a_valid_entity (const char *str)
 {
 	int i;
@@ -1490,8 +1504,6 @@ follow (struct http_request *req)
 	if (! looks_like_a_valid_owner(id))
 		BAD_REQUEST("id is not valid owner");	
 
-	uint8_t strlen_id = strlen(id);
-
 	if (! looks_like_a_valid_entity(from))
 		FORBIDDEN("from is not a valid entity");
 	
@@ -1499,20 +1511,14 @@ follow (struct http_request *req)
 		FORBIDDEN("to is not a valid entity");
 
 	// check if the he is the owner of from 
-	if (strncmp(id,from,strlen_id) != 0)
+	if (! is_owner(id,from))
 		FORBIDDEN("you are not the owner of from entity");
 
 	if (! login_success(id,apikey))
 		FORBIDDEN("invalid id or apikey");
 
 	// if both from and to are owned by id
-	if (
-		(from[strlen_id] == '/')
-				&&
-		(strncmp(id,to,strlen_id) == 0)
-				&&
-		(to[strlen_id] == '/')
-	)
+	if (is_owner(id,to))
 	{
 		status = "approved";	
 	}
@@ -1830,8 +1836,6 @@ queue_bind (struct http_request *req)
       	if (! looks_like_a_valid_owner(id))
 		BAD_REQUEST("id is not valid owner");	
 
-	uint8_t strlen_id = strlen(id);
-
 	if (! looks_like_a_valid_resource(queue))
 		FORBIDDEN("queue is not a valid resource name");
 	
@@ -1839,26 +1843,20 @@ queue_bind (struct http_request *req)
 		FORBIDDEN("exchange is not a valid resource name");
 
 	// check if the he is the owner of queue 
-	if (strncmp(id,queue,strlen_id) != 0)
+	if (! is_owner(id,queue))
 		FORBIDDEN("you are not the owner of the queue");
 
 	if (! login_success(id,apikey))
 		FORBIDDEN("invalid id or apikey");
 
-	// if both from and to are owned by id
-	if (
-		(queue[strlen_id] == '/')
-				&&
-		(strncmp(id,exchange,strlen_id) == 0)
-				&&
-		(exchange[strlen_id] == '/')
-	)
+	// if both queue and exchange are owned by id
+	if (is_owner(id,exchange))
 	{
 		status = "approved";	
                 goto bind;
 	}
 	
-	if ( check_acl(id, exchange, "read") )
+	if (check_acl(id, exchange,"read"))
 	{
 		goto bind;
 	}
@@ -2020,8 +2018,6 @@ queue_unbind (struct http_request *req)
       	if (! looks_like_a_valid_owner(id))
 		BAD_REQUEST("id is not valid owner");	
 
-	uint8_t strlen_id = strlen(id);
-
 	if (! looks_like_a_valid_resource(queue))
 		FORBIDDEN("queue is not a valid resource name");
 	
@@ -2029,20 +2025,14 @@ queue_unbind (struct http_request *req)
 		FORBIDDEN("exchange is not a valid resource name");
 
 	// check if the he is the owner of queue 
-	if (strncmp(id,queue,strlen_id) != 0)
+	if (! is_owner(id,queue))
 		FORBIDDEN("you are not the owner of the queue");
 
 	if (! login_success(id,apikey))
 		FORBIDDEN("invalid id or apikey");
 
-	// if both from and to are owned by id
-	if (
-		(queue[strlen_id] == '/')
-				&&
-		(strncmp(id,exchange,strlen_id) == 0)
-				&&
-		(exchange[strlen_id] == '/')
-	)
+	// if both queue aand exchange are owned by id
+	if (is_owner(id,exchange))
 	{
 		status = "approved";	
                 goto unbind;
@@ -2088,14 +2078,85 @@ block (struct http_request *req)
 {
 	const char *id;
 	const char *apikey;
+	const char *entity;
 
-	const char *queue;
-	const char *exchange;
-        const char *topic;
+	BAD_REQUEST_if
+	(
+		KORE_RESULT_OK != http_request_header(req, "id", &id)
+				||
+		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+				||
+		KORE_RESULT_OK != http_request_header(req, "entity", &entity)
+			,
+		"inputs missing in headers"
+	);
+
+	if (! looks_like_a_valid_owner(id))
+		BAD_REQUEST("id is not valid owner");	
+
+	if (! is_owner(id,entity))
+		FORBIDDEN("you are not the owner of the entity");
+
+	if (! login_success(id,apikey))
+		FORBIDDEN("invalid id or apikey");
+
+	// TODO if admin ... can  block both entities and owners !
+
+	CREATE_STRING(query,
+			"UPDATE users set blocked='t' WHERE id='%s'",
+				sanitize(entity)
+	);
+
+	RUN_QUERY(query, "could not block the entity");
+
+	OK();
 
 done:
 	END();
 }
+
+int
+unblock (struct http_request *req)
+{
+	const char *id;
+	const char *apikey;
+	const char *entity;
+
+	BAD_REQUEST_if
+	(
+		KORE_RESULT_OK != http_request_header(req, "id", &id)
+				||
+		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+				||
+		KORE_RESULT_OK != http_request_header(req, "entity", &entity)
+			,
+		"inputs missing in headers"
+	);
+
+	if (! looks_like_a_valid_owner(id))
+		BAD_REQUEST("id is not valid owner");	
+
+	if (! is_owner(id,entity))
+		FORBIDDEN("you are not the owner of the entity");
+
+	if (! login_success(id,apikey))
+		FORBIDDEN("invalid id or apikey");
+
+	// TODO if admin ... can un-block both entities and owners !
+
+	CREATE_STRING(query,
+			"UPDATE users set blocked='f' WHERE id='%s'",
+				sanitize(entity)
+	);
+
+	RUN_QUERY(query, "could not block the entity");
+
+	OK();
+
+done:
+	END();
+}
+
 
 
 
