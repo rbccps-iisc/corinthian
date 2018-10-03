@@ -212,9 +212,9 @@ init (int state)
 		exit(-1);
 
 	entry = &durable_binding_table.entries[0];
-	entry->key = amqp_cstring_bytes("x-queue-mode");	//XXX 
+	entry->key = amqp_cstring_bytes("durable");
 	entry->value.kind = AMQP_FIELD_KIND_UTF8;
-	entry->value.value.bytes = amqp_cstring_bytes("lazy");	//XXX
+	entry->value.value.bytes = amqp_cstring_bytes("true");
 
 //////////////
 
