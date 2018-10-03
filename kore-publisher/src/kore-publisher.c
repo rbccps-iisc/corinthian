@@ -21,7 +21,13 @@
 
 #include "ht.h"
 
-#define ADMIN_USER ("admin")
+//#define TEST (1)
+
+#ifdef TEST
+	#define ADMIN_USER ("guest")
+#else
+	#define ADMIN_USER ("admin")
+#endif
 
 #if 1
 	#define debug_printf(...)
@@ -223,7 +229,12 @@ init (int state)
 	}
 
 	login_reply = amqp_login(cached_admin_conn, 
+
+#ifdef TEST
+		"/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN, "guest", "guest");
+#else
 		"/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN, ADMIN_USER, admin_apikey);
+#endif
 
 	if (login_reply.reply_type != AMQP_RESPONSE_NORMAL)
 	{
@@ -258,7 +269,11 @@ init (int state)
 	if (response == NULL)
 		response = kore_buf_alloc(65536);
 
+#ifdef TEST
+	kore_pgsql_register("db","user=postgres password=password");
+#else
 	kore_pgsql_register("db","host=kore-postgres user=postgres password=postgres_pwd");
+#endif
 
 	return KORE_RESULT_OK;
 }
@@ -1021,6 +1036,7 @@ deregister_entity (struct http_request *req)
 	bool thread_started = false; 
 
 	req->status = 403;
+	kore_buf_reset(response);
 
 	BAD_REQUEST_if
 	(
@@ -1701,6 +1717,7 @@ share (struct http_request *req)
 	const char *follow_id;
 
 	req->status = 403;
+	kore_buf_reset(response);
 
 	BAD_REQUEST_if
 	(
