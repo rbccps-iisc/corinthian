@@ -2150,13 +2150,14 @@ block (struct http_request *req)
 	if (! looks_like_a_valid_owner(id))
 		BAD_REQUEST("id is not valid owner");	
 
-	if (! is_owner(id,entity))
-		FORBIDDEN("you are not the owner of the entity");
+	if (strcmp(id,"admin") == 0)
+	{
+		if (! is_owner(id,entity))
+			FORBIDDEN("you are not the owner of the entity");
+	}
 
 	if (! login_success(id,apikey))
 		FORBIDDEN("invalid id or apikey");
-
-	// TODO if admin ... can  block both entities and owners !
 
 	CREATE_STRING(query,
 			"UPDATE users set blocked='t' WHERE id='%s'",
@@ -2192,13 +2193,14 @@ unblock (struct http_request *req)
 	if (! looks_like_a_valid_owner(id))
 		BAD_REQUEST("id is not valid owner");	
 
-	if (! is_owner(id,entity))
-		FORBIDDEN("you are not the owner of the entity");
+	if (strcmp(id,"admin") == 0)
+	{
+		if (! is_owner(id,entity))
+			FORBIDDEN("you are not the owner of the entity");
 
-	if (! login_success(id,apikey))
-		FORBIDDEN("invalid id or apikey");
-
-	// TODO if admin ... can un-block both entities and owners !
+		if (! login_success(id,apikey))
+			FORBIDDEN("invalid id or apikey");
+	}
 
 	CREATE_STRING(query,
 			"UPDATE users set blocked='f' WHERE id='%s'",
