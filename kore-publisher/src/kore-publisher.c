@@ -21,7 +21,7 @@
 
 #include "ht.h"
 
-//#define TEST (1)
+#define TEST (1)
 
 #if 1
 	#define debug_printf(...)
@@ -258,7 +258,7 @@ init (int state)
 
 	if (amqp_socket_open(socket, "kore-broker", 5672))
 	{
-		fprintf(stderr,"Could not connect to kore-broker ");
+		fprintf(stderr,"Could not connect to kore-broker");
 		return KORE_RESULT_ERROR;	
 	}
 
@@ -1107,7 +1107,13 @@ deregister_entity (struct http_request *req)
 
 	// TODO delete from follow where from_entity = entity_name or to_entity = entity_name
 	// delete entries in to RabbitMQ
-	pthread_create(&thread,NULL,delete_exchanges_and_queues,(void *)&entity_name); 
+
+	pthread_attr_t attr;
+	pthread_attr_init(&attr);
+
+	pthread_attr_setdetachstate(&attr,PTHREAD_CREATE_DETACHED);
+
+	pthread_create(&thread,&attr,delete_exchanges_and_queues,(void *)&entity_name); 
 	thread_started = true;
 
 	// TODO run select query and delete all exchanges and queues of entity_name 
@@ -1139,6 +1145,7 @@ deregister_entity (struct http_request *req)
 	OK();
 
 done:
+/*
 	// wait for thread ...
 	if (thread_started)
 	{
@@ -1152,6 +1159,7 @@ done:
 
 		free(result);
 	}
+*/
 
 	END();
 }
@@ -2247,7 +2255,7 @@ create_exchanges_and_queues (void *v)
 			amqp_empty_table
 		))
 		{
-			fprintf(stderr,"amqp_exchange_declare failed\n");
+			fprintf(stderr,"amqp_exchange_declare failed {%s}\n",exchange);
 			goto done;
 		}
 		debug_printf("[owner] done creating exchange {%s}\n",exchange);
@@ -2265,7 +2273,7 @@ create_exchanges_and_queues (void *v)
 			lazy_queue_table	
 		))
 		{
-			fprintf(stderr,"amqp_queue_declare failed\n");
+			fprintf(stderr,"amqp_queue_declare failed {%s}\n",q);
 			goto done;
 		}
 	}
@@ -2292,7 +2300,7 @@ create_exchanges_and_queues (void *v)
 				)
 			)
 			{
-				fprintf(stderr,"something went wrong with exchange creation\n");
+				fprintf(stderr,"something went wrong with exchange creation {%s}\n",exchange);
 				goto done;
 			}
 			debug_printf("[entity] DONE creating exchange {%s}\n",exchange);
@@ -2315,7 +2323,7 @@ create_exchanges_and_queues (void *v)
 				lazy_queue_table	
 			))
 			{
-				fprintf(stderr,"amqp_queue_declare failed\n");
+				fprintf(stderr,"amqp_queue_declare failed {%s}\n",q);
 				goto done;
 			}
 		debug_printf("[entity] DONE creating queue {%s}\n",q);
@@ -2356,7 +2364,7 @@ delete_exchanges_and_queues (void *v)
 			0
 		))
 		{
-			fprintf(stderr,"amqp_exchange_delete failed\n");
+			fprintf(stderr,"amqp_exchange_delete failed {%s}\n",exchange);
 			goto done;
 		}
 		debug_printf("[owner] done creating exchange {%s}\n",exchange);
@@ -2371,7 +2379,7 @@ delete_exchanges_and_queues (void *v)
 			0
 		))
 		{
-			fprintf(stderr,"amqp_queue_delete failed\n");
+			fprintf(stderr,"amqp_queue_delete failed {%s}\n",q);
 			goto done;
 		}
 		debug_printf("[owner] DONE deleting queue {%s}\n",q);
@@ -2394,7 +2402,7 @@ delete_exchanges_and_queues (void *v)
 				)
 			)
 			{
-				fprintf(stderr,"something went wrong with exchange deletion\n");
+				fprintf(stderr,"something went wrong with exchange deletion {%s}\n",exchange);
 				goto done;
 			}
 			debug_printf("[entity] DONE deleting exchange {%s}\n",exchange);
@@ -2415,7 +2423,7 @@ delete_exchanges_and_queues (void *v)
 				0
 			))
 			{
-				fprintf(stderr,"amqp_queue_delete failed\n");
+				fprintf(stderr,"amqp_queue_delete failed {%s}\n",q);
 				goto done;
 			}
 			debug_printf("[entity] DONE deleting queue {%s}\n",q);
