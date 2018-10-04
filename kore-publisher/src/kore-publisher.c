@@ -310,7 +310,7 @@ init (int state)
 #ifdef TEST
 	kore_pgsql_register("db","user=postgres password=password");
 #else
-	kore_pgsql_register("db","host=kore-postgres user=postgres password=postgres_pwd");
+	kore_pgsql_register("db","host=kore-postgres user=postgres password=nTIB4nchJlrc2V2sL5v4OCGVemWRc0f5");
 #endif
 
 	return KORE_RESULT_OK;
@@ -1575,7 +1575,7 @@ queue_bind (struct http_request *req)
 				"SELECT * FROM acl WHERE id = '%s' "
 				"AND exchange = '%s' AND permission = 'read' "
 				"AND valid_till > now() AND topic = '%s'",
-				queue,
+				to,
 				exchange,
 				topic
 		);
@@ -1771,6 +1771,9 @@ follow (struct http_request *req)
 
 	char *status = "pending";
 
+	bool owner  = false;
+	bool entity = false;
+
 	req->status = 403;
 
 	BAD_REQUEST_if
@@ -1802,8 +1805,15 @@ follow (struct http_request *req)
 		topic = "#";
 	}
 
-	if (! looks_like_a_valid_owner(id))
-		BAD_REQUEST("id is not valid owner");	
+      	if ( looks_like_a_valid_entity(id))
+		entity = true;
+
+	if ( looks_like_a_valid_owner(id))
+		owner = true;	
+	
+	//requestor has to be either entity or owner
+	if( !( owner ^ entity ))
+		BAD_REQUEST("Neither entity nor owner");
 
 	if (! looks_like_a_valid_entity(from))
 		FORBIDDEN("from is not a valid entity");
@@ -1812,8 +1822,18 @@ follow (struct http_request *req)
 		FORBIDDEN("to is not a valid entity");
 
 	// check if the he is the owner of from 
-	if (! is_owner(id,from))
-		FORBIDDEN("you are not the owner of from entity");
+	if(owner)
+	{
+		if (! is_owner(id,from))
+			FORBIDDEN("you are not the owner of from entity");
+	}
+	else if( entity )
+	{
+		if( strncmp(id, from, strlen(id)) != 0)
+		{
+			FORBIDDEN("Unauthorised");
+		}
+	}
 
 	if (! login_success(id,apikey))
 		FORBIDDEN("invalid id or apikey");
@@ -2014,6 +2034,9 @@ share (struct http_request *req)
 	const char *apikey;
 	const char *follow_id;
 
+	bool owner  = false;
+	bool entity = false;
+
 	req->status = 403;
 	kore_buf_reset(response);
 
@@ -2029,8 +2052,15 @@ share (struct http_request *req)
 		"inputs missing in headers"
 	);
 
-	if (! looks_like_a_valid_owner(id))
-		BAD_REQUEST("id is not valid owner");	
+      	if ( looks_like_a_valid_entity(id))
+		entity = true;
+
+	if ( looks_like_a_valid_owner(id))
+		owner = true;	
+	
+	//requestor has to be either entity or owner
+	if( !(owner ^ entity ))
+		BAD_REQUEST("Neither entity nor owner");
 
 	if (! login_success(id,apikey))
 		FORBIDDEN("invalid id or apikey");
@@ -2042,12 +2072,26 @@ share (struct http_request *req)
 
 ///////////////////////////////////
 
-	CREATE_STRING (query, 
-		"SELECT id_from,id_to,permission,validity,topic FROM follow "
-		"WHERE follow_id = '%s' AND id_to LIKE '%s/%%.%%' and status='pending'",
-			follow_id,
-			id
-	);
+	if( owner )
+	{
+		CREATE_STRING (query, 
+			"SELECT id_from,id_to,permission,validity,topic FROM follow "
+			"WHERE follow_id = '%s' AND id_to LIKE '%s/%%.%%' and status='pending'",
+				follow_id,
+				id
+		);
+	}
+	else if( entity)
+	{
+	
+		CREATE_STRING (query, 
+			"SELECT id_from,id_to,permission,validity,topic FROM follow "
+			"WHERE follow_id = '%s' AND id_to LIKE '%s.%%' and status='pending'",
+				follow_id,
+				id
+		);
+	}
+		
 
 	RUN_QUERY (query,"could not run select query on follow");
 
@@ -2158,8 +2202,12 @@ unfollow (struct http_request *req)
 	const char *apikey;
 	const char *follow_id;
 
+	char *queue;
 	char *exchange;
 	char *topic;
+
+	bool is_owner = false;
+	bool is_entity = false;
 
 	BAD_REQUEST_if
 	(
@@ -2173,9 +2221,15 @@ unfollow (struct http_request *req)
 	);
 
 	
-      	if (! looks_like_a_valid_entity(id))
-		BAD_REQUEST("id is not valid entity");	
+      	if ( looks_like_a_valid_entity(id))
+		is_entity = true;
 
+	if ( looks_like_a_valid_owner(id))
+		is_owner = true;	
+	
+	//requestor has to be either entity or owner
+	if( !(is_owner ^ is_entity ))
+		BAD_REQUEST("Neither entity nor owner");
 	
 	CREATE_STRING ( query, "SELECT id, exchange, topic FROM acl WHERE follow_id = '%s'", follow_id );
 
@@ -2184,23 +2238,28 @@ unfollow (struct http_request *req)
 	if (kore_pgsql_ntuples(&sql) != 1)
 		FORBIDDEN("unauthorized");
 	
+	queue	 = kore_pgsql_getvalue(&sql, 0, 0);
 	exchange = kore_pgsql_getvalue(&sql, 0, 1);
 	topic	 = kore_pgsql_getvalue(&sql, 0, 2);
+
+	debug_printf("queue = %s\n", queue);
+	debug_printf("exchange = %s\n", exchange);
+	debug_printf("topic = %s\n", topic); 
 
 	kore_buf_reset(query);
 
 	CREATE_STRING ( query, "DELETE FROM acl WHERE follow_id = '%s'", follow_id );
 
 	RUN_QUERY(query,"failed to query for permission");
+
+	CREATE_STRING ( query, "DELETE FROM follow WHERE follow_id = '%s'", follow_id );
+
+	RUN_QUERY(query,"failed to query for permission");
 	
-	debug_printf("exchange = %s\n", exchange);
-	debug_printf("topic = %s\n", topic); 
-
-
 	if (! amqp_queue_unbind (
 		cached_admin_conn,
 		1,
-		amqp_cstring_bytes(id),
+		amqp_cstring_bytes(queue),
 		amqp_cstring_bytes(exchange),
 		amqp_cstring_bytes(topic),
 		durable_binding_table	
@@ -2211,8 +2270,10 @@ unfollow (struct http_request *req)
 	
 	char priority_queue[256];
 
-	strlcpy(priority_queue, id , strlen(id));
+	strlcpy(priority_queue, queue, strlen(queue) + 1);
 	strncat(priority_queue, ".priority", 9);
+
+	debug_printf("priority queue = %s\n",priority_queue);
 
 	if (! amqp_queue_unbind (
 		cached_admin_conn,
