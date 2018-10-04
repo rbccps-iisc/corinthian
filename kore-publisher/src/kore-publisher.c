@@ -49,8 +49,14 @@ int get_follow_requests (struct http_request *);
 
 int share		(struct http_request *);
 int unshare		(struct http_request *);
+int reject_follow	(struct http_request *);
+
 int queue_bind          (struct http_request *);
 int queue_unbind        (struct http_request *);
+
+
+int block		(struct http_request *);
+int unblock		(struct http_request *);
 
 int init (int);
 
@@ -1779,7 +1785,7 @@ share (struct http_request *req)
 	// NOTE: follow_id is primary key 
 	CREATE_STRING (query,
 			"UPDATE follow SET status='approved' WHERE follow_id = '%s'",
-				sanitize(follow_id)
+				follow_id
 	);
 	RUN_QUERY (query,"could not run update query on follow");
 
@@ -1796,6 +1802,68 @@ share (struct http_request *req)
 	);
 
 	RUN_QUERY (query,"could not run insert query on acl");
+
+	OK();
+
+done:
+	END();
+}
+
+int
+reject_follow (struct http_request *req)
+{
+	const char *id;
+	const char *apikey;
+	const char *follow_id;
+
+	req->status = 403;
+	kore_buf_reset(response);
+
+	BAD_REQUEST_if
+	(
+		KORE_RESULT_OK != http_request_header(req, "id", &id)
+				||
+		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+				||
+		KORE_RESULT_OK != http_request_header(req, "follow-id", &follow_id)
+		,
+		
+		"inputs missing in headers"
+	);
+
+	if (! looks_like_a_valid_owner(id))
+		BAD_REQUEST("id is not valid owner");	
+
+	if (! login_success(id,apikey))
+		FORBIDDEN("invalid id or apikey");
+
+///////////////////////////////////
+
+	sanitize(id);
+	sanitize(follow_id);
+
+///////////////////////////////////
+
+	CREATE_STRING (query, 
+		"SELECT follow_id FROM follow "
+		"WHERE follow_id = '%s' AND id_to LIKE '%s/%%.%%' and status='pending'",
+			follow_id,
+			id
+	);
+
+	RUN_QUERY (query,"could not run select query on follow");
+
+	uint32_t num_rows = kore_pgsql_ntuples(&sql);
+
+	if (num_rows != 1)
+		BAD_REQUEST("follow-id is not valid");
+
+	// NOTE: follow_id is primary key 
+	CREATE_STRING (query,
+			"UPDATE follow SET status='rejected' WHERE follow_id = '%s'",
+				follow_id
+	);
+	RUN_QUERY (query,"could not run update query on follow");
 
 	OK();
 
@@ -2073,14 +2141,16 @@ get_follow_requests (struct http_request *req)
 	if (strcmp(status,"all") == 0)
 	{
 		CREATE_STRING(query,
-				"SELECT * FROM follow WHERE id_to LIKE '%s/%%.%%'",
+				"SELECT * FROM follow WHERE id_to LIKE '%s/%%.%%' "
+				"ORDER BY time",
 					sanitize(id)
 		);
 	}
 	else
 	{
 		CREATE_STRING (query,
-				"SELECT * FROM follow WHERE id_to LIKE '%s/%%.%%' and status='%s'",
+				"SELECT * FROM follow WHERE id_to LIKE '%s/%%.%%' and status='%s' "
+				"ORDER BY time",
 					sanitize(id),
 					sanitize(status)
 		);
