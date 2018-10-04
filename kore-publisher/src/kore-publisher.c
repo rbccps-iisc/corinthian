@@ -54,7 +54,6 @@ int reject_follow	(struct http_request *);
 int queue_bind          (struct http_request *);
 int queue_unbind        (struct http_request *);
 
-
 int block		(struct http_request *);
 int unblock		(struct http_request *);
 
@@ -76,6 +75,8 @@ void *create_exchanges_and_queues (void *);
 void *delete_exchanges_and_queues (void *);
 
 char *sanitize (char *string);
+
+bool is_request_from_localhost (struct http_request *);
 
 #define OK()    {req->status=200; goto done;}
 #define OK202() {req->status=202; goto done;}
@@ -1075,8 +1076,6 @@ deregister_entity (struct http_request *req)
 	const char *apikey;
 	const char *entity;
 
-	char entity_name [66];
-
 	pthread_t thread;
 	bool thread_started = false; 
 
@@ -1097,7 +1096,7 @@ deregister_entity (struct http_request *req)
 	if (! looks_like_a_valid_owner(id))
 		FORBIDDEN("id is not an owner");
 
-	if (! is_alpha_numeric(entity))
+	if (! looks_like_a_valid_entity(entity))
 		FORBIDDEN("entity is not valid");
 
 	if (! login_success(id,apikey))
@@ -1108,23 +1107,22 @@ deregister_entity (struct http_request *req)
 	entity 	= sanitize(entity);
 ///////////////////////////////////
 
-	strlcpy(entity_name,id,33); 
-	strlcat(entity_name,"/",34); 
-	strlcat(entity_name,entity,66); 
+	if (! is_owner(id,entity))
+		FORBIDDEN("you are not the owner of the entity");
 
-	// TODO delete from follow where from_entity = entity_name or to_entity = entity_name
+	// TODO delete from follow where from_entity = entity or to_entity = entity
 	// delete entries in to RabbitMQ
 
-	pthread_create(&thread,NULL,delete_exchanges_and_queues,(void *)&entity_name); 
+	pthread_create(&thread,NULL,delete_exchanges_and_queues,(void *)entity); 
 	thread_started = true;
 
-	// TODO run select query and delete all exchanges and queues of entity_name 
+	// TODO run select query and delete all exchanges and queues of entity
 
 	CREATE_STRING (
 		query,
 		"DELETE FROM acl WHERE id = '%s' or exchange LIKE '%s.%%'",
-		entity_name,
-		entity_name
+		entity,
+		entity
 	);
 
 	RUN_QUERY(query,"could not delete from acl table");
@@ -1132,15 +1130,15 @@ deregister_entity (struct http_request *req)
 	CREATE_STRING (
 		query,
 		"DELETE FROM follow WHERE id_from = '%s' or id_to LIKE '%s.%%'",
-		entity_name,
-		entity_name
+		entity,
+		entity
 	);
 
 	RUN_QUERY(query,"could not delete from follow table");
 
 	CREATE_STRING (query,
 			"DELETE FROM users WHERE id = '%s'",
-				entity_name
+				entity
 	);
 	RUN_QUERY (query,"could not delete the entity");
 
@@ -1246,13 +1244,8 @@ db_cleanup (struct http_request *req)
 
 	req->status = 403;
 
-	if (req->owner->addrtype == AF_INET)
-	{
-		if (req->owner->addr.ipv4.sin_addr.s_addr != htonl(INADDR_LOOPBACK))	
-		{
-			FORBIDDEN("this api can only be called from localhost");
-		}
-	}
+	if (! is_request_from_localhost(req))
+		FORBIDDEN("this api can only be called from localhost");	
 
 	BAD_REQUEST_if
 	(
@@ -1294,13 +1287,8 @@ register_owner(struct http_request *req)
 
 	req->status = 403;
 
-	if (req->owner->addrtype == AF_INET)
-	{
-		if (req->owner->addr.ipv4.sin_addr.s_addr != htonl(INADDR_LOOPBACK))	
-		{
-			FORBIDDEN("this api can only be called from localhost");
-		}
-	}
+	if (! is_request_from_localhost(req))
+		FORBIDDEN("this api can only be called from localhost");	
 
 	BAD_REQUEST_if
 	(
@@ -1331,7 +1319,7 @@ register_owner(struct http_request *req)
 	owner = sanitize(owner);
 ////////////////////////////////////////
 
-	// conflict if entity_name already exist
+	// conflict if owner already exist
 	CREATE_STRING (query,
 			"SELECT id FROM users WHERE id ='%s'",
 				owner
@@ -1394,13 +1382,8 @@ deregister_owner(struct http_request *req)
 
 	req->status = 403;
 
-	if (req->owner->addrtype == AF_INET)
-	{
-		if (req->owner->addr.ipv4.sin_addr.s_addr != htonl(INADDR_LOOPBACK))	
-		{
-			FORBIDDEN("this api can only be called from localhost");
-		}
-	}
+	if (! is_request_from_localhost(req))
+		FORBIDDEN("this api can only be called from localhost");	
 
 	BAD_REQUEST_if
 	(
@@ -2296,6 +2279,8 @@ done:
 void *
 create_exchanges_and_queues (void *v)
 {
+	int i;
+
 	const char *id = (const char *)v;
 
 	bool *is_success;
@@ -2349,9 +2334,9 @@ create_exchanges_and_queues (void *v)
 	}
 	else
 	{
-		char *_e[] = {".public", ".private", ".protected", ".command"};
+		char *_e[] = {".public", ".private", ".protected", ".command", ".notification", NULL};
 
-		for (int i = 0; i < 4; ++i)
+		for (i = 0; _e[i]; ++i)
 		{
 			snprintf(exchange,129,"%s%s",id,_e[i]);
 
@@ -2376,8 +2361,8 @@ create_exchanges_and_queues (void *v)
 			debug_printf("[entity] DONE creating exchange {%s}\n",exchange);
 		}
 
-		char *_q[] = {"\0", ".priority", ".command"};
-		for (int i = 0; i < 3; ++i)
+		char *_q[] = {"\0", ".priority", ".command", ".notification", NULL};
+		for (i = 0; _q[i]; ++i)
 		{
 			snprintf(q,129,"%s%s",id,_q[i]);
 
@@ -2456,9 +2441,9 @@ delete_exchanges_and_queues (void *v)
 	}
 	else
 	{
-		char *_e[] = {".public", ".private", ".protected", ".command"};
+		char *_e[] = {".public", ".private", ".protected", ".command", ".notification", NULL};
 
-		for (i = 0; i < 4; ++i)
+		for (i = 0; _e[i]; ++i)
 		{
 			snprintf(exchange,129,"%s%s",id,_e[i]);
 
@@ -2478,8 +2463,8 @@ delete_exchanges_and_queues (void *v)
 			debug_printf("[entity] DONE deleting exchange {%s}\n",exchange);
 		}
 
-		char *_q[] = {"\0", ".priority", ".command"};
-		for (i = 0; i < 3; ++i)
+		char *_q[] = {"\0", ".priority", ".command", ".notification", NULL};
+		for (i = 0; _q[i]; ++i)
 		{
 			snprintf(q,129,"%s%s",id,_q[i]);
 
@@ -2527,4 +2512,20 @@ sanitize (char *string)
 	}
 	
 	return string;
+}
+
+bool
+is_request_from_localhost (struct http_request *req)
+{
+	if (req->owner->addrtype == AF_INET)
+	{
+		if (req->owner->addr.ipv4.sin_addr.s_addr != htonl(INADDR_LOOPBACK))	
+			return false;	
+	}
+	else
+	{
+		return false; // ipv6 ?
+	}
+
+	return true;
 }

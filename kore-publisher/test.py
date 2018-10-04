@@ -114,13 +114,20 @@ for i in xrange(0,num_devices):
 t_dregister = time.time()
 print "\nDeleting entities"
 for i in xrange(0,num_devices):
-	r =get("deregister", {"id":"owner-a", "apikey":owner_a_apikey, "entity":"device-"+str(i)})
+	a_info = a[i]
+	b_info = b[i]
+
+	device = a_info['name']	
+	app = b_info['name']	
+
+	r =get("deregister", {"id":"owner-a", "apikey":owner_a_apikey, "entity":device})
 	check(r,200)
 
-	r =get("deregister", {"id":"owner-b", "apikey":owner_b_apikey, "entity":"app-"+str(i)})
+	r =get("deregister", {"id":"owner-b", "apikey":owner_b_apikey, "entity":app})
 	check(r,200)
 
 t_dregister =time.time() - t_dregister
+
 
 print "\nDeleting owners"
 # delete owners
