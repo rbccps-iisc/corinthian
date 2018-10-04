@@ -29,7 +29,7 @@
 	#define debug_printf(...) printf(__VA_ARGS__)
 #endif
 
-char password_chars[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789~!@#$^&*-+=.?/";
+char password_chars[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789~!@#$^*-+=./";
 
 int cat			(struct http_request *);
 
@@ -679,7 +679,7 @@ reconnect:
 			"/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN, id, apikey);
 
 		if (login_reply.reply_type != AMQP_RESPONSE_NORMAL)
-			FORBIDDEN("invalid id or apiey ...");
+			FORBIDDEN("invalid id or apikey ...");
 
 		if(! amqp_channel_open(*cached_conn, 1))
 			ERROR("could not open an AMQP connection");
