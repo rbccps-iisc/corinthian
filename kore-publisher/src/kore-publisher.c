@@ -251,10 +251,8 @@ init (int state)
 
 	close (fd);
 
-	amqp_socket_t *socket = NULL;
-
 	cached_admin_conn = amqp_new_connection();
-	socket = amqp_tcp_socket_new(cached_admin_conn);
+	amqp_socket_t *socket = amqp_tcp_socket_new(cached_admin_conn);
 
 	if (socket == NULL)
 	{
@@ -1061,10 +1059,10 @@ delete_owner_from_rabbitmq (char *owner)
 		entity = kore_pgsql_getvalue(&sql,i,0);
 		// delete_entity_from_rabbitmq (entity);
 	}
-*/
 
 done:
 	return 0;
+*/
 }
 
 int
@@ -1521,6 +1519,10 @@ follow (struct http_request *req)
 			BAD_REQUEST ("topic is missing in headers");
 		}
 	}
+	else
+	{
+		topic = "#";
+	}
 
 	if (! looks_like_a_valid_owner(id))
 		BAD_REQUEST("id is not valid owner");	
@@ -1915,7 +1917,7 @@ queue_bind (struct http_request *req)
 		"inputs missing in headers"
 	);
 
-	if (KORE_RESULT_OK == http_request_header(req, "message-type", &topic))
+	if (KORE_RESULT_OK == http_request_header(req, "message-type", &message_type))
 	{
 		if (strcmp(message_type,"priority") == 0);
 		{
@@ -2027,7 +2029,7 @@ queue_unbind (struct http_request *req)
 		"inputs missing in headers"
 	);
 
-	if (KORE_RESULT_OK == http_request_header(req, "message-type", &topic))
+	if (KORE_RESULT_OK == http_request_header(req, "message-type", &message_type))
 	{
 		if (strcmp(message_type,"priority") == 0);
 		{
