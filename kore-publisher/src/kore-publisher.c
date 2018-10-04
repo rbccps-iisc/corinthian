@@ -738,7 +738,7 @@ subscribe(struct http_request *req)
 	const char *message_type;
 	const char *num_messages;
 
-	uint8_t int_num_messages = 1;
+	uint8_t int_num_messages;
 
 	amqp_socket_t 			*socket = NULL;
 	amqp_connection_state_t		connection;
@@ -782,6 +782,7 @@ subscribe(struct http_request *req)
 	}
 	kore_buf_append(Q,"\0",1);
 
+	int_num_messages = 1;
 	if (KORE_RESULT_OK == http_request_header(req, "num-messages", &num_messages))
 	{
 		int_num_messages = atoi(num_messages);
@@ -1898,7 +1899,7 @@ queue_bind (struct http_request *req)
 
         const char *topic;
 
-	bool is_priority = false;
+	bool is_priority;
 
  	req->status = 403;
 	
@@ -1917,6 +1918,7 @@ queue_bind (struct http_request *req)
 		"inputs missing in headers"
 	);
 
+	is_priority = false;
 	if (KORE_RESULT_OK == http_request_header(req, "message-type", &message_type))
 	{
 		if (strcmp(message_type,"priority") == 0);
@@ -2010,7 +2012,7 @@ queue_unbind (struct http_request *req)
 
         const char *topic;
 
-	bool is_priority = false;
+	bool is_priority;
 
  	req->status = 403;
 	
@@ -2029,6 +2031,7 @@ queue_unbind (struct http_request *req)
 		"inputs missing in headers"
 	);
 
+	is_priority = false;
 	if (KORE_RESULT_OK == http_request_header(req, "message-type", &message_type))
 	{
 		if (strcmp(message_type,"priority") == 0);
@@ -2123,16 +2126,17 @@ get_follow_requests (struct http_request *req)
 		"inputs missing in headers"
 	);
 
-	if (KORE_RESULT_OK != http_request_header(req, "status", &status))
-		status = "all";
-
-	if (	
-		strcmp(status,"pending")  != 0 && 
-		strcmp(status,"approved") != 0 &&
-		strcmp(status,"rejected") != 0 &&
-		strcmp(status,"all") 	  != 0
-	)
-		BAD_REQUEST("status can be pending, approved, rejected, or all");
+	status = "all";
+	if (KORE_RESULT_OK == http_request_header(req, "status", &status))
+	{
+		if (	
+			strcmp(status,"pending")  != 0 && 
+			strcmp(status,"approved") != 0 &&
+			strcmp(status,"rejected") != 0 &&
+			strcmp(status,"all") 	  != 0
+		)
+			BAD_REQUEST("status can be pending, approved, rejected, or all");
+	}
 
 	if (! looks_like_a_valid_owner(id))
 		BAD_REQUEST("id is not valid owner");	
