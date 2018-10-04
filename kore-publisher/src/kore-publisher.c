@@ -23,7 +23,7 @@
 
 //#define TEST (1)
 
-#if 1
+#if 0
 	#define debug_printf(...)
 #else
 	#define debug_printf(...) printf(__VA_ARGS__)
@@ -1461,6 +1461,298 @@ done:
 
 	END();
 }
+int
+queue_bind (struct http_request *req)
+{
+	const char *id;
+	const char *apikey;
+
+	char *message_type;
+
+	const char *to;
+	const char *from;
+
+	char queue 	[129];
+	char exchange	[129];
+
+        const char *topic;
+
+	bool is_priority = false;
+
+	bool is_owner = false;
+	bool is_entity = false;
+
+	bool needs_acl = true;
+
+ 	req->status = 403;
+	
+	BAD_REQUEST_if
+	(
+		KORE_RESULT_OK != http_request_header(req, "id", &id)
+				||
+		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+				||
+		KORE_RESULT_OK != http_request_header(req, "from", &from)
+				||
+		KORE_RESULT_OK != http_request_header(req, "to", &to)
+				||
+		KORE_RESULT_OK != http_request_header(req, "topic", &topic)
+			,
+		"inputs missing in headers"
+	);
+
+	if (KORE_RESULT_OK == http_request_header(req, "message-type", &message_type))
+	{
+		if (strcmp(message_type,"priority") == 0)
+			is_priority = true;
+		
+	}
+
+      	if ( looks_like_a_valid_entity(id))
+		is_entity = true;
+
+	if ( looks_like_a_valid_owner(id))
+		is_owner = true;	
+	
+	//requestor has to be either entity or owner
+	if( !(is_owner ^ is_entity ))
+		BAD_REQUEST("Neither entity nor owner");
+
+	if (! looks_like_a_valid_resource(from))
+		FORBIDDEN("queue is not a valid resource name");
+	
+	if (! looks_like_a_valid_resource(to))
+		FORBIDDEN("exchange is not a valid resource name");
+
+	// check if the he is the owner of queue 
+	if ( strncmp(id, to, strlen(id)) != 0)
+		FORBIDDEN("you are not the owner of the queue");
+
+	if (! login_success(id,apikey))
+		FORBIDDEN("invalid id or apikey");
+
+/////////////////////////////////////
+
+	sanitize(id);
+	sanitize(from);
+	sanitize(to);
+	sanitize(topic);
+
+/////////////////////////////////////
+
+	// if he is not the owner of exchange, he should have an entry in acl
+	
+	if(is_owner)
+	{
+		if(strncmp(id, from, strlen(id)) != 0)
+			needs_acl = true;
+	}
+	
+	else if(is_entity)
+	{	
+		uint8_t offset = strchr(id, '/') - id;
+		
+		if( strncmp(id,from, offset) != 0)
+			needs_acl = true;
+	}
+
+	if(! needs_acl)
+	{
+		FORBIDDEN("Not allowed");
+	}
+			
+	else if ( needs_acl )
+	{
+
+		snprintf (queue,128,"%s%s", to, is_priority ? ".priority" : "\0");
+		snprintf (exchange,128,"%s.protected", from); 
+		
+		debug_printf("queue = %s",queue);
+		debug_printf("exchange = %s", exchange);
+		
+		CREATE_STRING (
+			query,
+				"SELECT * FROM acl WHERE id = '%s' "
+				"AND exchange = '%s' AND permission = 'read' "
+				"AND valid_till > now() AND topic = '%s'",
+				queue,
+				exchange,
+				topic
+		);
+
+		RUN_QUERY(query,"failed to query for permission");
+		
+		if (kore_pgsql_ntuples(&sql) != 1)
+			FORBIDDEN("unauthorized");
+		
+	}
+
+	
+	if (! amqp_queue_bind (
+		cached_admin_conn,
+		1,
+		amqp_cstring_bytes(queue),
+		amqp_cstring_bytes(exchange),
+		amqp_cstring_bytes(topic),
+		durable_binding_table
+	))
+	{
+		ERROR("bind failed");
+	}
+
+	OK();
+	
+done:
+	END();
+}
+
+
+
+int
+queue_unbind (struct http_request *req)
+{
+	
+	const char *id;
+	const char *apikey;
+
+	char *message_type;
+
+	const char *to;
+	const char *from;
+
+	char queue 	[129];
+	char exchange	[129];
+
+        const char *topic;
+
+	bool is_priority = false;
+
+	bool is_owner = false;
+	bool is_entity = false;
+
+	bool needs_acl = true;
+
+ 	req->status = 403;
+	
+	BAD_REQUEST_if
+	(
+		KORE_RESULT_OK != http_request_header(req, "id", &id)
+				||
+		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+				||
+		KORE_RESULT_OK != http_request_header(req, "from", &from)
+				||
+		KORE_RESULT_OK != http_request_header(req, "to", &to)
+				||
+		KORE_RESULT_OK != http_request_header(req, "topic", &topic)
+			,
+		"inputs missing in headers"
+	);
+
+	if (KORE_RESULT_OK == http_request_header(req, "message-type", &message_type))
+	{
+		if (strcmp(message_type,"priority") == 0)
+			is_priority = true;
+		
+	}
+
+      	if ( looks_like_a_valid_entity(id))
+		is_entity = true;
+
+	if ( looks_like_a_valid_owner(id))
+		is_owner = true;	
+	
+	//requestor has to be either entity or owner
+	if( !(is_owner ^ is_entity ))
+		BAD_REQUEST("Neither entity nor owner");
+
+	if (! looks_like_a_valid_resource(from))
+		FORBIDDEN("queue is not a valid resource name");
+	
+	if (! looks_like_a_valid_resource(to))
+		FORBIDDEN("exchange is not a valid resource name");
+
+	// check if the he is the owner of queue 
+	if ( strncmp(id, to, strlen(id)) != 0)
+		FORBIDDEN("you are not the owner of the queue");
+
+	if (! login_success(id,apikey))
+		FORBIDDEN("invalid id or apikey");
+
+/////////////////////////////////////
+
+	sanitize(id);
+	sanitize(from);
+	sanitize(to);
+	sanitize(topic);
+
+/////////////////////////////////////
+
+	// if he is not the owner of exchange, he should have an entry in acl
+	
+	if(is_owner)
+	{
+		if(strncmp(id, from, strlen(id)) != 0)
+			needs_acl = true;
+	}
+	
+	else if(is_entity)
+	{	
+		uint8_t offset = strchr(id, '/') - id;
+		
+		if( strncmp(id,from, offset) != 0)
+			needs_acl = true;
+	}
+
+	if(! needs_acl)
+	{
+		FORBIDDEN("Not allowed");
+	}
+			
+	else if ( needs_acl )
+	{
+
+		snprintf (queue,128,"%s%s", to, is_priority ? ".priority" : "\0");
+		snprintf (exchange,128,"%s.protected", from); 
+		
+		debug_printf("queue = %s",queue);
+		debug_printf("exchange = %s", exchange);
+		
+		CREATE_STRING (
+			query,
+				"SELECT * FROM acl WHERE id = '%s' "
+				"AND exchange = '%s' AND permission = 'read' "
+				"AND valid_till > now() AND topic = '%s'",
+				queue,
+				exchange,
+				topic
+		);
+
+		RUN_QUERY(query,"failed to query for permission");
+		
+		if (kore_pgsql_ntuples(&sql) != 1)
+			FORBIDDEN("unauthorized");
+		
+	}
+
+	
+	if (! amqp_queue_unbind (
+		cached_admin_conn,
+		1,
+		amqp_cstring_bytes(queue),
+		amqp_cstring_bytes(exchange),
+		amqp_cstring_bytes(topic),
+		durable_binding_table
+	))
+	{
+		ERROR("unbind failed");
+	}
+
+	OK();
+	
+done:
+	END();
+}
 
 int
 follow (struct http_request *req)
@@ -1790,7 +2082,7 @@ share (struct http_request *req)
 	);
 
 	RUN_QUERY (query,"could not run insert query on acl");
-
+	
 	OK();
 
 done:
@@ -1862,226 +2154,76 @@ done:
 int
 unfollow (struct http_request *req)
 {
-	return (KORE_RESULT_OK);
-}
-
-int
-queue_bind (struct http_request *req)
-{
-	/*XXX XXX XXX not tested XXX XXX XXX */
-
 	const char *id;
 	const char *apikey;
+	const char *follow_id;
 
-	// source and destination instead ?
-	const char *from;
-	const char *to;
+	char *exchange;
+	char *topic;
 
-	char *message_type;
-
-	char queue	[129];
-	char exchange	[129];
-
-        const char *topic;
-
-	bool is_priority;
-
- 	req->status = 403;
-	
 	BAD_REQUEST_if
 	(
 		KORE_RESULT_OK != http_request_header(req, "id", &id)
 				||
 		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
 				||
-		KORE_RESULT_OK != http_request_header(req, "from", &from)
-				||
-		KORE_RESULT_OK != http_request_header(req, "to", &to)
-				||
-		KORE_RESULT_OK != http_request_header(req, "topic", &topic)
+		KORE_RESULT_OK != http_request_header(req, "follow-id", &follow_id)
 			,
 		"inputs missing in headers"
 	);
 
-	is_priority = false;
-	if (KORE_RESULT_OK == http_request_header(req, "message-type", &message_type))
-	{
-		if (strcmp(message_type,"priority") == 0);
-		{
-			is_priority = true;
-		}
-	}
-
-      	if (! looks_like_a_valid_owner(id))
-		BAD_REQUEST("id is not valid owner");	
-
-	if (! looks_like_a_valid_resource(from))
-		FORBIDDEN("queue is not a valid resource name");
 	
-	if (! looks_like_a_valid_resource(to))
-		FORBIDDEN("exchange is not a valid resource name");
+      	if (! looks_like_a_valid_entity(id))
+		BAD_REQUEST("id is not valid entity");	
 
-	// check if the he is the owner of queue 
-	if (! is_owner(id,from))
-		FORBIDDEN("you are not the owner of the queue");
+	
+	CREATE_STRING ( query, "SELECT id, exchange, topic FROM acl WHERE follow_id = '%s'", follow_id );
 
-	if (! login_success(id,apikey))
-		FORBIDDEN("invalid id or apikey");
-
-/////////////////////////////////////
-
-	sanitize(id);
-	sanitize(from);
-	sanitize(to);
-	sanitize(topic);
-
-/////////////////////////////////////
-
-	// if he is not the owner of exchange, he should have an entry in acl
-	if (! is_owner(id,from))
-	{
-		CREATE_STRING (
-			query,
-				"SELECT topic FROM acl WHERE id = '%s' "
-				"AND exchange = '%s' AND permission = 'read' "
-				"AND valid_till > now() AND topic = '%s'",
-				id,
-				from,
-				topic
-		);
-
-		RUN_QUERY(query,"failed to query for permission");
+	RUN_QUERY(query,"failed to query for permission");
 		
-		if (kore_pgsql_ntuples(&sql) != 1)
-			FORBIDDEN("unauthorized");
-	}
-
-	snprintf (queue,129,"%s%s", id, is_priority ? ".priority" : "");
-	snprintf (exchange,129,"%s.protected",from); 
+	if (kore_pgsql_ntuples(&sql) != 1)
+		FORBIDDEN("unauthorized");
 	
-	if (! amqp_queue_bind (
-		cached_admin_conn,
-		1,
-		amqp_cstring_bytes(queue),
-		amqp_cstring_bytes(exchange),
-		amqp_cstring_bytes(topic),
-		durable_binding_table
-	))
-	{
-		ERROR("bind failed");
-	}
+	exchange = kore_pgsql_getvalue(&sql, 0, 1);
+	topic	 = kore_pgsql_getvalue(&sql, 0, 2);
 
-	OK();
+	kore_buf_reset(query);
+
+	CREATE_STRING ( query, "DELETE FROM acl WHERE follow_id = '%s'", follow_id );
+
+	RUN_QUERY(query,"failed to query for permission");
 	
-done:
-	END();
-}
+	debug_printf("exchange = %s\n", exchange);
+	debug_printf("topic = %s\n", topic); 
 
-int
-queue_unbind (struct http_request *req)
-{
 
-	/*XXX XXX XXX not tested XXX XXX XXX */
-
-	const char *id;
-	const char *apikey;
-
-	// source and destination instead ?
-	const char *from;
-	const char *to;
-
-	char *message_type;
-
-	char queue	[129];
-	char exchange	[129];
-
-        const char *topic;
-
-	bool is_priority;
-
- 	req->status = 403;
-	
-	BAD_REQUEST_if
-	(
-		KORE_RESULT_OK != http_request_header(req, "id", &id)
-				||
-		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
-				||
-		KORE_RESULT_OK != http_request_header(req, "from", &from)
-				||
-		KORE_RESULT_OK != http_request_header(req, "to", &to)
-				||
-		KORE_RESULT_OK != http_request_header(req, "topic", &topic)
-			,
-		"inputs missing in headers"
-	);
-
-	is_priority = false;
-	if (KORE_RESULT_OK == http_request_header(req, "message-type", &message_type))
-	{
-		if (strcmp(message_type,"priority") == 0);
-		{
-			is_priority = true;
-		}
-	}
-
-      	if (! looks_like_a_valid_owner(id))
-		BAD_REQUEST("id is not valid owner");	
-
-	if (! looks_like_a_valid_resource(from))
-		FORBIDDEN("queue is not a valid resource name");
-	
-	if (! looks_like_a_valid_resource(to))
-		FORBIDDEN("exchange is not a valid resource name");
-
-	// check if the he is the owner of queue 
-	if (! is_owner(id,from))
-		FORBIDDEN("you are not the owner of the queue");
-
-	if (! login_success(id,apikey))
-		FORBIDDEN("invalid id or apikey");
-
-/////////////////////////////////////
-
-	sanitize(id);
-	sanitize(from);
-	sanitize(to);
-	sanitize(topic);
-
-/////////////////////////////////////
-
-	// if he is not the owner of exchange, he should have an entry in acl
-	if (! is_owner(id,to))
-	{
-		CREATE_STRING (
-			query,
-				"SELECT topic FROM acl WHERE id = '%s' "
-				"AND exchange = '%s' AND permission = 'read' "
-				"AND valid_till > now() AND topic = '%s'",
-				id,
-				to,
-				topic
-		);
-
-		RUN_QUERY(query,"failed to query for permission");
-		
-		if (kore_pgsql_ntuples(&sql) != 1)
-			FORBIDDEN("unauthorized");
-	}
-
-	snprintf (queue,129,"%s%s", from, is_priority ? ".priority" : "");
-	snprintf (exchange,129,"%s.protected",to); 
-	
 	if (! amqp_queue_unbind (
 		cached_admin_conn,
 		1,
-		amqp_cstring_bytes(queue),
+		amqp_cstring_bytes(id),
 		amqp_cstring_bytes(exchange),
 		amqp_cstring_bytes(topic),
 		durable_binding_table	
 	))
 	{
-		ERROR("bind failed");
+		ERROR("unbind failed");
+	}
+	
+	char priority_queue[256];
+
+	strlcpy(priority_queue, id , strlen(id));
+	strncat(priority_queue, ".priority", 9);
+
+	if (! amqp_queue_unbind (
+		cached_admin_conn,
+		1,
+		amqp_cstring_bytes(priority_queue),
+		amqp_cstring_bytes(exchange),
+		amqp_cstring_bytes(topic),
+		durable_binding_table	
+	))
+	{
+		ERROR("unbind failed");
 	}
 
 	OK();
