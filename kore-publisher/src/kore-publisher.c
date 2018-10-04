@@ -475,9 +475,10 @@ gen_salt_password_and_apikey (const char *entity, char *salt, char *password_has
 
 	debug_printf("gen STRING TO BE HASHED = {%s}\n",string_to_be_hashed);
 
-	sprintf	
+	snprintf	
 	(
 		password_hash,
+		65,
 		"%02x%02x%02x%02x"
 		"%02x%02x%02x%02x"
 		"%02x%02x%02x%02x"
@@ -554,9 +555,10 @@ login_success (const char *id, const char *apikey)
 
 	debug_printf("login_success STRING TO BE HASHED = {%s}\n",string_to_be_hashed);
 
-	sprintf	
+	snprintf
 	(
 		hash_string,
+		65,
 		"%02x%02x%02x%02x"
 		"%02x%02x%02x%02x"
 		"%02x%02x%02x%02x"
@@ -1894,8 +1896,8 @@ queue_bind (struct http_request *req)
 
 	char *message_type;
 
-	char queue	[128];
-	char exchange	[128];
+	char queue	[129];
+	char exchange	[129];
 
         const char *topic;
 
@@ -1971,8 +1973,8 @@ queue_bind (struct http_request *req)
 			FORBIDDEN("unauthorized");
 	}
 
-	snprintf (queue,"%s%s", id, is_priority ? ".priority" : "");
-	snprintf (exchange,"%s.protected",from); 
+	snprintf (queue,129,"%s%s", id, is_priority ? ".priority" : "");
+	snprintf (exchange,129,"%s.protected",from); 
 	
 	if (! amqp_queue_bind (
 		cached_admin_conn,
@@ -2007,8 +2009,8 @@ queue_unbind (struct http_request *req)
 
 	char *message_type;
 
-	char queue	[128];
-	char exchange	[128];
+	char queue	[129];
+	char exchange	[129];
 
         const char *topic;
 
@@ -2084,8 +2086,8 @@ queue_unbind (struct http_request *req)
 			FORBIDDEN("unauthorized");
 	}
 
-	snprintf (queue,127,"%s%s", from, is_priority ? ".priority" : "");
-	snprintf (exchange,127,"%s.protected",to); 
+	snprintf (queue,129,"%s%s", from, is_priority ? ".priority" : "");
+	snprintf (exchange,129,"%s.protected",to); 
 	
 	if (! amqp_queue_unbind (
 		cached_admin_conn,
@@ -2298,8 +2300,8 @@ create_exchanges_and_queues (void *v)
 
 	bool *is_success;
 
-	char exchange[128];
-	char q[128];
+	char exchange[129];
+	char q[129];
 
 	is_success = malloc (sizeof(bool));
 
@@ -2307,7 +2309,7 @@ create_exchanges_and_queues (void *v)
 
 	if (looks_like_a_valid_owner(id))
 	{
-		snprintf(exchange,128,"%s.notification",id);
+		snprintf(exchange,129,"%s.notification",id);
 
 		debug_printf("[owner] creating exchange {%s}\n",exchange);
 
@@ -2328,7 +2330,7 @@ create_exchanges_and_queues (void *v)
 		}
 		debug_printf("[owner] done creating exchange {%s}\n",exchange);
 
-		snprintf(q,128,"%s.notification",id);
+		snprintf(q,129,"%s.notification",id);
 		debug_printf("[owner] creating queue {%s}\n",q);
 		if (! amqp_queue_declare (
 			cached_admin_conn,
@@ -2351,7 +2353,7 @@ create_exchanges_and_queues (void *v)
 
 		for (int i = 0; i < 4; ++i)
 		{
-			snprintf(exchange,128,"%s%s",id,_e[i]);
+			snprintf(exchange,129,"%s%s",id,_e[i]);
 
 			debug_printf("[entity] creating exchange {%s}\n",exchange);
 
@@ -2377,7 +2379,7 @@ create_exchanges_and_queues (void *v)
 		char *_q[] = {"\0", ".priority", ".command"};
 		for (int i = 0; i < 3; ++i)
 		{
-			snprintf(q,128,"%s%s",id,_q[i]);
+			snprintf(q,129,"%s%s",id,_q[i]);
 
 		debug_printf("[entity] creating queue {%s}\n",q);
 			if (! amqp_queue_declare (
@@ -2411,8 +2413,8 @@ delete_exchanges_and_queues (void *v)
 
 	const char *id = (const char *)v;
 	
-	char exchange[128];
-	char q[128];
+	char exchange[129];
+	char q[129];
 
 	bool *is_success;
 
@@ -2421,7 +2423,7 @@ delete_exchanges_and_queues (void *v)
 
 	if (looks_like_a_valid_owner(id))
 	{
-		snprintf(exchange,128,"%s.notification",id);
+		snprintf(exchange,129,"%s.notification",id);
 
 		debug_printf("[owner] deleting exchange {%s}\n",exchange);
 
@@ -2437,7 +2439,7 @@ delete_exchanges_and_queues (void *v)
 		}
 		debug_printf("[owner] done creating exchange {%s}\n",exchange);
 
-		snprintf(q,128,"%s.notification",id);
+		snprintf(q,129,"%s.notification",id);
 		debug_printf("[owner] deleting queue {%s}\n",q);
 		if (! amqp_queue_delete (
 			cached_admin_conn,
@@ -2458,7 +2460,7 @@ delete_exchanges_and_queues (void *v)
 
 		for (i = 0; i < 4; ++i)
 		{
-			snprintf(exchange,128,"%s%s",id,_e[i]);
+			snprintf(exchange,129,"%s%s",id,_e[i]);
 
 			debug_printf("[entity] deleting exchange {%s}\n",exchange);
 
@@ -2479,7 +2481,7 @@ delete_exchanges_and_queues (void *v)
 		char *_q[] = {"\0", ".priority", ".command"};
 		for (i = 0; i < 3; ++i)
 		{
-			snprintf(q,128,"%s%s",id,_q[i]);
+			snprintf(q,129,"%s%s",id,_q[i]);
 
 			debug_printf("[entity] deleting queue {%s}\n",q);
 
