@@ -429,7 +429,7 @@ auth_resource(struct http_request *req)
 
 			CREATE_STRING (query,
 				"SELECT permission FROM acl "
-					"WHERE id='%s' AND exchange='%s' and permission='write'"
+					"WHERE from_id='%s' AND exchange='%s' and permission='write'"
 						" AND now() < valid_till",
 				sanitize(username),
 				sanitize(name)

@@ -4,7 +4,7 @@ import sys
 import requests
 
 admin_api = "x"
-num_devices = 10
+num_devices = 10 
 
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
@@ -25,7 +25,10 @@ def check(r,c):
 		print r._content
 		sys.exit(0)
 	else:
-		print "---> Ok [",r.status_code,"]",r.url, r._content.strip()
+		if len(r._content) > 65:
+			print "---> Ok [",r.status_code,"]",r.url, r._content[:65].strip(),"..."
+		else:
+			print "---> Ok [",r.status_code,"]",r.url, r._content.strip()
 
 
 print "De registering owners"
@@ -77,7 +80,7 @@ for i in xrange(0,num_devices):
 	
 t_register =time.time() - t_register
 
-print "\nFollow-Share"
+print "\nFollow-Share-BIND-Publish-Subscribe-UNBIND-Unfollow"
 for i in xrange(0,num_devices):
 
 	a_info = a[i]
@@ -97,19 +100,28 @@ for i in xrange(0,num_devices):
 	follow_id = r.json()["follow-id-"+perm]
 	check(r,202)
 
+	r = get("follow-status", {"id":"owner-b", "apikey":owner_b_apikey})
+	check(r,200)
+	assert (r.json()[0]['follow-id'] == follow_id)
 
-	r._content = ""
-	r =get("share", {"id":"owner-a", "apikey":owner_a_apikey, "follow-id":follow_id})
+	r = get("follow-status", {"id":app, "apikey":app_apikey})
+	check(r,200)
+	assert (r.json()[0]['follow-id'] == follow_id)
+
+	r = get("share", {"id":"owner-a", "apikey":owner_a_apikey, "follow-id":follow_id})
 	check(r,200)
 
-	"""
-	# publish
-	print "publishing {"+device+"} with {"+device_apikey+"}"
-	r =post("publish",{"id":device,"apikey":device_apikey,"message":"hello", "to":device+".protected", "topic":"hello"})
-	check(r,202)
-	
-	# subscribe
-	"""
+	if perm == "read":
+		#### BIND ####
+		r = get("bind",{"id":app,"apikey":app_apikey,"to":device,"topic":"hello"})
+		check(r,200)
+
+		r = get("unbind",{"id":app,"apikey":app_apikey,"to":device,"topic":"hello"})
+		check(r,200)
+
+		r = get("unfollow",{"id":app,"apikey":app_apikey,"to":device,"topic":"hello"})
+		check(r,200)
+
 
 t_dregister = time.time()
 print "\nDeleting entities"
@@ -143,3 +155,30 @@ print "===>",t_register,"seconds to register   ",2*num_devices,"entities", " >> 
 print "===>",t_dregister,"seconds to de-register",2*num_devices,"entities", " >> avg = ", (t_dregister)/(2*num_devices),"seconds"
 
 print "\nDone"
+
+
+
+"""
+		# publish
+		print "publishing to {"+device+".protected} with {"+device_apikey+"}"
+		r = post("publish",{"id":device,"apikey":device_apikey,"message":"hello", "to":device+".protected", "topic":"hello"})
+		check(r,202)
+	
+		# subscribe
+		print "subscribing from queue {"+app+".} with {"+app_apikey+"}"
+		r = post("subscribe",{"id":app,"apikey":app_apikey,"num-messages":"1"})
+		check(r,200)
+	else:
+		#### No need to BIND as you want data from .command queue ####
+
+		# publish
+		print "publishing to {"+device+".protected} with {"+device_apikey+"}"
+		r = post("publish",{"id":device,"apikey":device_apikey,"message":"hello", "to":device+".protected", "topic":"hello"})
+		check(r,202)
+
+		# subscribe
+		print "subscribing from queue {"+app+".} with {"+app_apikey+"}"
+		r = post("subscribe",{"id":app,"apikey":app_apikey,"num-messages":"1"})
+		check(r,200)
+"""
+

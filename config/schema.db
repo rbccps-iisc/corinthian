@@ -45,7 +45,7 @@ SET default_with_oids = false;
 --
 
 CREATE TABLE public.acl (
-    id character varying NOT NULL,
+    from_id character varying NOT NULL,
     exchange character varying NOT NULL,
     permission character varying,
     valid_till timestamp without time zone,
@@ -85,13 +85,14 @@ ALTER SEQUENCE public.acl_acl_id_seq OWNED BY public.acl.acl_id;
 
 CREATE TABLE public.follow (
     follow_id integer NOT NULL,
-    id_from character varying,
-    id_to character varying,
+    requested_by character varying,
+    exchange character varying,
     "time" timestamp without time zone,
     permission character varying,
     topic character varying,
     validity character varying,
-    status character varying
+    status character varying,
+    from_id character varying
 );
 
 
@@ -128,7 +129,8 @@ CREATE TABLE public.users (
     password_hash character varying,
     schema jsonb,
     salt character varying,
-    blocked boolean
+    blocked boolean,
+    is_autonomous boolean
 );
 
 
@@ -153,7 +155,7 @@ ALTER TABLE ONLY public.follow ALTER COLUMN follow_id SET DEFAULT nextval('publi
 --
 
 ALTER TABLE ONLY public.acl
-    ADD CONSTRAINT acl_pkey PRIMARY KEY (id, exchange);
+    ADD CONSTRAINT acl_pkey PRIMARY KEY (from_id, exchange);
 
 
 --
@@ -169,7 +171,7 @@ ALTER TABLE ONLY public.users
 --
 
 ALTER TABLE ONLY public.acl
-    ADD CONSTRAINT acl_id_fkey FOREIGN KEY (id) REFERENCES public.users(id);
+    ADD CONSTRAINT acl_id_fkey FOREIGN KEY (from_id) REFERENCES public.users(id);
 
 
 --
