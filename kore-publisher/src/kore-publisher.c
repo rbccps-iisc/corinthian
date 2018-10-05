@@ -29,7 +29,7 @@
 	#define debug_printf(...) printf(__VA_ARGS__)
 #endif
 
-char password_chars[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789~!@#$^*-+=./";
+char password_chars[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:#-";
 
 int cat			(struct http_request *);
 
@@ -310,7 +310,7 @@ init (int state)
 #ifdef TEST
 	kore_pgsql_register("db","user=postgres password=password");
 #else
-	kore_pgsql_register("db","host=kore-postgres user=postgres password=nTIB4nchJlrc2V2sL5v4OCGVemWRc0f5");
+	kore_pgsql_register("db","host=kore-postgres user=postgres password=postgres_pwd");
 #endif
 
 	return KORE_RESULT_OK;
@@ -672,7 +672,7 @@ reconnect:
 		if (socket == NULL)
 			ERROR("could not create a new socket");
 
-		if (amqp_socket_open(socket, "broker", 5672))
+		if (amqp_socket_open(socket, "kore-broker", 5672))
 			ERROR("could not open a socket");
 
 		login_reply = amqp_login(*cached_conn, 
@@ -809,7 +809,7 @@ subscribe(struct http_request *req)
 	if (socket == NULL)
 		ERROR("could not create a new socket");
 
-	if (amqp_socket_open(socket, "broker", 5672))
+	if (amqp_socket_open(socket, "kore-broker", 5672))
 		ERROR("could not open a socket");
 
 	login_reply = amqp_login(connection, 

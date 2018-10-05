@@ -400,7 +400,9 @@ auth_resource(struct http_request *req)
 			DENY();
 
 		// devices/apps can write to their own exchanges
-		if (strncmp(name,username,strlen_username) == 0 && (name[strlen_username] != '.'))
+		debug_printf("name = %s username = % len = %d\n", name, username, strlen_username);
+
+		if (strncmp(name,username,strlen_username) == 0 && (name[strlen_username] == '.'))
 		{
 			// entities can write in to their 
 			// 	username.public
