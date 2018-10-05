@@ -2031,6 +2031,104 @@ done:
 }
 
 int
+unfollow (struct http_request *req)
+{
+	const char *id;
+	const char *apikey;
+	const char *follow_id;
+
+	char *queue;
+	char *exchange;
+	char *topic;
+
+	bool is_owner = false;
+	bool is_entity = false;
+
+	BAD_REQUEST_if
+	(
+		KORE_RESULT_OK != http_request_header(req, "id", &id)
+				||
+		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+				||
+		KORE_RESULT_OK != http_request_header(req, "follow-id", &follow_id)
+			,
+		"inputs missing in headers"
+	);
+
+	
+      	if ( looks_like_a_valid_entity(id))
+		is_entity = true;
+
+	if ( looks_like_a_valid_owner(id))
+		is_owner = true;	
+	
+	//requestor has to be either entity or owner
+	if( !(is_owner ^ is_entity ))
+		BAD_REQUEST("Neither entity nor owner");
+	
+	CREATE_STRING ( query, "SELECT id, exchange, topic FROM acl WHERE follow_id = '%s'", follow_id );
+
+	RUN_QUERY(query,"failed to query for permission");
+		
+	if (kore_pgsql_ntuples(&sql) != 1)
+		FORBIDDEN("unauthorized");
+	
+	queue	 = kore_pgsql_getvalue(&sql, 0, 0);
+	exchange = kore_pgsql_getvalue(&sql, 0, 1);
+	topic	 = kore_pgsql_getvalue(&sql, 0, 2);
+
+	debug_printf("queue = %s\n", queue);
+	debug_printf("exchange = %s\n", exchange);
+	debug_printf("topic = %s\n", topic); 
+
+	kore_buf_reset(query);
+
+	CREATE_STRING ( query, "DELETE FROM acl WHERE follow_id = '%s'", follow_id );
+
+	RUN_QUERY(query,"failed to query for permission");
+
+	CREATE_STRING ( query, "DELETE FROM follow WHERE follow_id = '%s'", follow_id );
+
+	RUN_QUERY(query,"failed to query for permission");
+	
+	if (! amqp_queue_unbind (
+		cached_admin_conn,
+		1,
+		amqp_cstring_bytes(queue),
+		amqp_cstring_bytes(exchange),
+		amqp_cstring_bytes(topic),
+		amqp_empty_table	
+	))
+	{
+		ERROR("unbind failed");
+	}
+	
+	char priority_queue[256];
+
+	strlcpy(priority_queue, queue, strlen(queue) + 1);
+	strncat(priority_queue, ".priority", 9);
+
+	debug_printf("priority queue = %s\n",priority_queue);
+
+	if (! amqp_queue_unbind (
+		cached_admin_conn,
+		1,
+		amqp_cstring_bytes(priority_queue),
+		amqp_cstring_bytes(exchange),
+		amqp_cstring_bytes(topic),
+		amqp_empty_table	
+	))
+	{
+		ERROR("unbind failed");
+	}
+
+	OK();
+
+done:
+	END();
+}
+
+int
 share (struct http_request *req)
 {
 	const char *id;
@@ -2191,104 +2289,6 @@ reject_follow (struct http_request *req)
 				follow_id
 	);
 	RUN_QUERY (query,"could not run update query on follow");
-
-	OK();
-
-done:
-	END();
-}
-
-int
-unfollow (struct http_request *req)
-{
-	const char *id;
-	const char *apikey;
-	const char *follow_id;
-
-	char *queue;
-	char *exchange;
-	char *topic;
-
-	bool is_owner = false;
-	bool is_entity = false;
-
-	BAD_REQUEST_if
-	(
-		KORE_RESULT_OK != http_request_header(req, "id", &id)
-				||
-		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
-				||
-		KORE_RESULT_OK != http_request_header(req, "follow-id", &follow_id)
-			,
-		"inputs missing in headers"
-	);
-
-	
-      	if ( looks_like_a_valid_entity(id))
-		is_entity = true;
-
-	if ( looks_like_a_valid_owner(id))
-		is_owner = true;	
-	
-	//requestor has to be either entity or owner
-	if( !(is_owner ^ is_entity ))
-		BAD_REQUEST("Neither entity nor owner");
-	
-	CREATE_STRING ( query, "SELECT id, exchange, topic FROM acl WHERE follow_id = '%s'", follow_id );
-
-	RUN_QUERY(query,"failed to query for permission");
-		
-	if (kore_pgsql_ntuples(&sql) != 1)
-		FORBIDDEN("unauthorized");
-	
-	queue	 = kore_pgsql_getvalue(&sql, 0, 0);
-	exchange = kore_pgsql_getvalue(&sql, 0, 1);
-	topic	 = kore_pgsql_getvalue(&sql, 0, 2);
-
-	debug_printf("queue = %s\n", queue);
-	debug_printf("exchange = %s\n", exchange);
-	debug_printf("topic = %s\n", topic); 
-
-	kore_buf_reset(query);
-
-	CREATE_STRING ( query, "DELETE FROM acl WHERE follow_id = '%s'", follow_id );
-
-	RUN_QUERY(query,"failed to query for permission");
-
-	CREATE_STRING ( query, "DELETE FROM follow WHERE follow_id = '%s'", follow_id );
-
-	RUN_QUERY(query,"failed to query for permission");
-	
-	if (! amqp_queue_unbind (
-		cached_admin_conn,
-		1,
-		amqp_cstring_bytes(queue),
-		amqp_cstring_bytes(exchange),
-		amqp_cstring_bytes(topic),
-		amqp_empty_table	
-	))
-	{
-		ERROR("unbind failed");
-	}
-	
-	char priority_queue[256];
-
-	strlcpy(priority_queue, queue, strlen(queue) + 1);
-	strncat(priority_queue, ".priority", 9);
-
-	debug_printf("priority queue = %s\n",priority_queue);
-
-	if (! amqp_queue_unbind (
-		cached_admin_conn,
-		1,
-		amqp_cstring_bytes(priority_queue),
-		amqp_cstring_bytes(exchange),
-		amqp_cstring_bytes(topic),
-		amqp_empty_table	
-	))
-	{
-		ERROR("unbind failed");
-	}
 
 	OK();
 
