@@ -21,7 +21,7 @@
 
 #include "ht.h"
 
-//#define TEST (1)
+#define TEST (1)
 
 #if 0
 	#define debug_printf(...)
@@ -152,9 +152,27 @@ bool is_request_from_localhost (struct http_request *);
 	);				\
 	kore_pgsql_cleanup(&sql);	\
 	kore_buf_reset(response);	\
-	kore_buf_reset(Q);		\
+	kore_buf_reset(query);		\
 	return (KORE_RESULT_OK);	\
 } 
+
+#define END_HTML() 	{		\
+	http_response_header(		\
+		req,			\
+		"content-type",		\
+		"text/html"		\
+	);				\
+	http_response (			\
+		req,			\
+		req->status, 		\
+		response->data,		\
+		response->offset	\
+	);				\
+	kore_pgsql_cleanup(&sql);	\
+	kore_buf_reset(response);	\
+	kore_buf_reset(query);		\
+	return (KORE_RESULT_OK);	\
+}
 
 struct kore_buf *Q = NULL;
 struct kore_buf *query = NULL;
@@ -175,10 +193,8 @@ struct kore_pgsql sql;
 
 ht connection_ht;
 
-
 amqp_table_entry_t *entry;
 amqp_table_t lazy_queue_table;
-amqp_table_t durable_binding_table;
 
 char admin_apikey[33];
 amqp_connection_state_t	cached_admin_conn;
@@ -198,6 +214,7 @@ init (int state)
 //////////////
 // lazy queues
 //////////////
+
 	lazy_queue_table.num_entries = 1;
 	lazy_queue_table.entries = malloc(lazy_queue_table.num_entries * sizeof(amqp_table_entry_t));
 
@@ -208,20 +225,6 @@ init (int state)
 	entry->key = amqp_cstring_bytes("x-queue-mode");
 	entry->value.kind = AMQP_FIELD_KIND_UTF8;
 	entry->value.value.bytes = amqp_cstring_bytes("lazy");
-
-//////////////
-// durable bindings 
-//////////////
-	durable_binding_table.num_entries = 1;
-	durable_binding_table.entries = malloc(durable_binding_table.num_entries * sizeof(amqp_table_entry_t));
-
-	if (! durable_binding_table.entries)
-		exit(-1);
-
-	entry = &durable_binding_table.entries[0];
-	entry->key = amqp_cstring_bytes("durable");
-	entry->value.kind = AMQP_FIELD_KIND_UTF8;
-	entry->value.value.bytes = amqp_cstring_bytes("true");
 
 //////////////
 
@@ -293,9 +296,6 @@ init (int state)
 		return KORE_RESULT_ERROR;	
 	}
 
-
-	// TODO drop privilages to read admin.apikey file
-
 	ht_init (&connection_ht);
 
 	if (Q == NULL)
@@ -356,7 +356,8 @@ is_owner(const char *id, const char *entity)
 	if (strncmp(id,entity,strlen_id) != 0)
 		return false;	
 
-	if (entity[strlen_id] != '/')
+	// '/' for owner and '.' for entity
+	if (entity[strlen_id] != '/' && entity[strlen_id] != '.')
 		return false;	
 
 	return true;
@@ -588,6 +589,9 @@ login_success (const char *id, const char *apikey)
 	}
 
 done:
+	kore_buf_reset(query);
+	kore_pgsql_cleanup(&sql);
+
 	return login_result;
 }
 
@@ -637,6 +641,9 @@ publish (struct http_request *req)
 	if (! looks_like_a_valid_entity(id))
 		BAD_REQUEST("id is not a valid entity");
 
+	if (! looks_like_a_valid_resource(exchange))
+		BAD_REQUEST("'to' is not a valid entity");
+
 	// let it not go to the broker
 	if (! login_success(id,apikey))
 		BAD_REQUEST("invalid id or apikey");
@@ -679,7 +686,7 @@ reconnect:
 			"/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN, id, apikey);
 
 		if (login_reply.reply_type != AMQP_RESPONSE_NORMAL)
-			FORBIDDEN("invalid id or apikey ...");
+			FORBIDDEN("broker: invalid id or apkey");
 
 		if(! amqp_channel_open(*cached_conn, 1))
 			ERROR("could not open an AMQP connection");
@@ -733,7 +740,7 @@ done:
 }
 
 int
-subscribe(struct http_request *req)
+subscribe (struct http_request *req)
 {
 	int i;
 
@@ -762,6 +769,9 @@ subscribe(struct http_request *req)
 			,
 		"inputs missing in headers"
 	);
+
+	if (! looks_like_a_valid_entity(id))
+		BAD_REQUEST("id is not a valid entity");
 
 	kore_buf_reset(Q);
 	kore_buf_append(Q,id,strlen(id));
@@ -796,9 +806,6 @@ subscribe(struct http_request *req)
 		else if (int_num_messages < 1 )
 			int_num_messages = 1;
 	}
-
-	if (! looks_like_a_valid_entity(id))
-		BAD_REQUEST("id is not a valid entity");
 
 	// let it not go to the broker
 	if (! login_success(id,apikey))
@@ -926,7 +933,7 @@ done:
 	END();
 }
 
-// one with register-bulk
+// TODO we need one register with bulk
 
 int
 register_entity (struct http_request *req)
@@ -1163,7 +1170,7 @@ done:
 }
 
 int
-cat(struct http_request *req)
+cat (struct http_request *req)
 {
 	int i;
 
@@ -1187,7 +1194,7 @@ cat(struct http_request *req)
 	else
 	{
 		entity = NULL;
-		CREATE_STRING (query,"SELECT id,schema FROM users WHERE schema is NOT NULL");
+		CREATE_STRING (query,"SELECT id,schema FROM users WHERE schema is NOT NULL LIMIT 50");
 	}
 
 	RUN_QUERY (query,"unable to query catalog data");
@@ -1195,7 +1202,7 @@ cat(struct http_request *req)
 	num_rows = kore_pgsql_ntuples(&sql);
 
 	kore_buf_reset(response);
-	if (entity == NULL) // get all data
+	if (entity == NULL) // get top 50 data 
 	{
 		kore_buf_append(response,"[",1);
 
@@ -1419,7 +1426,7 @@ deregister_owner(struct http_request *req)
 	thread_started = true;
 	// XXX TODO delete all entities of the owner
 
-	// delete all acls
+	// delete from acl
 	CREATE_STRING (query,
 			"DELETE FROM acl WHERE id LIKE '%s/%%' OR exchange LIKE '%s/%%'",
 				owner,
@@ -1461,6 +1468,7 @@ done:
 
 	END();
 }
+
 int
 queue_bind (struct http_request *req)
 {
@@ -1584,9 +1592,7 @@ queue_bind (struct http_request *req)
 		
 		if (kore_pgsql_ntuples(&sql) != 1)
 			FORBIDDEN("unauthorized");
-		
 	}
-
 	
 	if (! amqp_queue_bind (
 		cached_admin_conn,
@@ -1594,7 +1600,7 @@ queue_bind (struct http_request *req)
 		amqp_cstring_bytes(queue),
 		amqp_cstring_bytes(exchange),
 		amqp_cstring_bytes(topic),
-		durable_binding_table
+		amqp_empty_table	
 	))
 	{
 		ERROR("bind failed");
@@ -1606,12 +1612,9 @@ done:
 	END();
 }
 
-
-
 int
 queue_unbind (struct http_request *req)
 {
-	
 	const char *id;
 	const char *apikey;
 
@@ -1742,7 +1745,7 @@ queue_unbind (struct http_request *req)
 		amqp_cstring_bytes(queue),
 		amqp_cstring_bytes(exchange),
 		amqp_cstring_bytes(topic),
-		durable_binding_table
+		amqp_empty_table	
 	))
 	{
 		ERROR("unbind failed");
@@ -2262,7 +2265,7 @@ unfollow (struct http_request *req)
 		amqp_cstring_bytes(queue),
 		amqp_cstring_bytes(exchange),
 		amqp_cstring_bytes(topic),
-		durable_binding_table	
+		amqp_empty_table	
 	))
 	{
 		ERROR("unbind failed");
@@ -2281,14 +2284,14 @@ unfollow (struct http_request *req)
 		amqp_cstring_bytes(priority_queue),
 		amqp_cstring_bytes(exchange),
 		amqp_cstring_bytes(topic),
-		durable_binding_table	
+		amqp_empty_table	
 	))
 	{
 		ERROR("unbind failed");
 	}
 
 	OK();
-	
+
 done:
 	END();
 }
@@ -2625,7 +2628,7 @@ delete_exchanges_and_queues (void *v)
 			fprintf(stderr,"amqp_exchange_delete failed {%s}\n",exchange);
 			goto done;
 		}
-		debug_printf("[owner] done creating exchange {%s}\n",exchange);
+		debug_printf("[owner] done deleting exchange {%s}\n",exchange);
 
 		snprintf(q,129,"%s.notification",id);
 		debug_printf("[owner] deleting queue {%s}\n",q);

@@ -198,9 +198,10 @@ login_success (const char *id, const char *apikey)
 
 	debug_printf("login_success STRING TO BE HASHED = {%s}\n",string_to_be_hashed);
 
-	sprintf	
+	snprintf
 	(
 		hash_string,
+		65,
 		"%02x%02x%02x%02x"
 		"%02x%02x%02x%02x"
 		"%02x%02x%02x%02x"
@@ -230,7 +231,6 @@ login_success (const char *id, const char *apikey)
 
 done:
 	kore_buf_reset(query);
-
 	kore_pgsql_cleanup(&sql);
 
 	return login_result;
@@ -400,9 +400,7 @@ auth_resource(struct http_request *req)
 			DENY();
 
 		// devices/apps can write to their own exchanges
-		debug_printf("name = %s username = % len = %d\n", name, username, strlen_username);
-
-		if (strncmp(name,username,strlen_username) == 0 && (name[strlen_username] == '.'))
+		if (strncmp(name,username,strlen_username) == 0 && (name[strlen_username] != '.'))
 		{
 			// entities can write in to their 
 			// 	username.public
