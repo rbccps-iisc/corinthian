@@ -21,7 +21,7 @@
 
 #include "ht.h"
 
-#define TEST (1)
+//#define TEST (1)
 
 #if 0
 	#define debug_printf(...)
