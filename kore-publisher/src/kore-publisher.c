@@ -264,10 +264,12 @@ init (int state)
 		return KORE_RESULT_ERROR;
 	}
 
+retry:
 	if (amqp_socket_open(socket, "kore-broker", 5672))
 	{
-		fprintf(stderr,"Could not connect to kore-broker");
-		return KORE_RESULT_ERROR;	
+		fprintf(stderr,"Could not connect to kore-broker\n");
+		sleep(1);
+		goto retry;
 	}
 
 	login_reply = amqp_login
