@@ -692,10 +692,11 @@ reconnect:
 	}
 
 	memset(&props, 0, sizeof props);
+	props._flags 		= AMQP_BASIC_CONTENT_TYPE_FLAG | AMQP_BASIC_USER_ID_FLAG ;
 	props.user_id 		= amqp_cstring_bytes(id);
 	props.content_type 	= amqp_cstring_bytes(content_type);
 
-	debug_printf("Got content-type {%s}\n",content_type);
+	debug_printf("Got content-type {%s} : {%s}\n",content_type,id);
 
 	FORBIDDEN_if
 	(
@@ -790,8 +791,10 @@ subscribe(struct http_request *req)
 	{
 		int_num_messages = atoi(num_messages);
 
-		if (int_num_messages > 10 || int_num_messages < 1)
+		if (int_num_messages > 10 )
 			int_num_messages = 10;
+		else if (int_num_messages < 1 )
+			int_num_messages = 1;
 	}
 
 	if (! looks_like_a_valid_entity(id))
@@ -875,12 +878,9 @@ subscribe(struct http_request *req)
 		/* construct the response */
 		kore_buf_append(response,"{\"sent-by\":\"",12);
 
-		if (message.properties.user_id.len == 0)
-			kore_buf_append (response,"\"\"",2);
-		else
+		if (message.properties._flags & AMQP_BASIC_USER_ID_FLAG)
 			kore_buf_append (response,message.properties.user_id.bytes,
 				message.properties.user_id.len);
-
 
 		kore_buf_append(response,"\",\"from\":\"",10);
 		if(header->exchange.len > 0)

@@ -11,17 +11,6 @@ docker exec kore-postgres chmod +x postgres.sh
 docker exec -d kore-postgres ./postgres.sh
 docker cp kore-postgres:/postgres_pwd .
 
-#if [ -f kore-publisher/src/kore-publisher.c.bak ]
-#then
-#mv kore-publisher/src/kore-publisher.c.bak kore-publisher/src/kore-publisher.c || true
-#fi
-#
-#
-#if [ -f authenticator/src/authenticator.c.bak ]
-#then
-#mv authenticator/src/authenticator.c.bak authenticator/src/authenticator.c || true
-#fi
-
 pwd=`cat postgres_pwd | cut -d ":" -f 2`
 
 sed 's/postgres_pwd/'$pwd'/g' authenticator/src/authenticator.c > authenticator/src/authenticator_new.c
