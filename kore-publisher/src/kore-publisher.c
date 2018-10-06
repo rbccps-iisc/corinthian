@@ -886,7 +886,7 @@ subscribe (struct http_request *req)
 					connection,
 					1,
 					amqp_cstring_bytes((const char *)Q->data),
-					/*no ack*/ 1
+					/*ack*/ 0
 			);
 
 		} while (
@@ -1000,14 +1000,9 @@ register_entity (struct http_request *req)
 	if (! is_alpha_numeric(entity))
 		BAD_REQUEST("entity is not valid");	
 
-	BAD_REQUEST_if	
-	(
-		req->http_body == NULL
-			||
-		(body = (char *)req->http_body->data) == NULL
-			,
-		"no body found in request"	
-	);	
+	body = NULL;
+	if (req->http_body)
+		body = (char *)req->http_body->data;
 
 	bool is_autonomous = false;
 	if (KORE_RESULT_OK != http_request_header(req, "is-autonomous", &char_is_autonomous))
@@ -1023,13 +1018,13 @@ register_entity (struct http_request *req)
 
 	sanitize(id);
 	sanitize(entity);
-	sanitize(body);
+
+	if (body)
+		sanitize(body);
 
 /////////////////////////////////////////////////
 
-	strlcpy(entity_name,id,32);
-	strcat(entity_name,"/");
-	strlcat(entity_name,entity,66);
+	snprintf(entity_name,66,"%s/%s",id,entity);
 
 	// create entries in to RabbitMQ
 	pthread_create(&thread,NULL,create_exchanges_and_queues,(void *)&entity_name); 
@@ -1049,7 +1044,9 @@ register_entity (struct http_request *req)
 
 	gen_salt_password_and_apikey (entity_name, salt, password_hash, entity_apikey);
 
-	CREATE_STRING (query,
+	if (body)
+	{
+		CREATE_STRING (query,
 			"INSERT INTO users (id,password_hash,schema,salt,blocked,is_autonomous) "
 			"values('%s','%s','%s','%s','f','%s')",
 			entity_name,
@@ -1057,7 +1054,20 @@ register_entity (struct http_request *req)
 			body,		// schema
 			salt,
 			is_autonomous ? "t" : "f"
-	);
+		);
+	}
+	else
+	{
+		CREATE_STRING (query,
+			"INSERT INTO users (id,password_hash,schema,salt,blocked,is_autonomous) "
+			"values('%s','%s','%s',NULL,'f','%s')",
+			entity_name,
+			password_hash,
+			salt,
+			is_autonomous ? "t" : "f"
+		);
+	}
+
 	RUN_QUERY (query,"failed to create the entity");
 
 	// generate response
@@ -1076,13 +1086,15 @@ done:
 	{
 		bool *result;
 		pthread_join(thread,(void *)&result);
-
-		if (result == NULL || !*result) {
+		if (!result && !*result)
+		{
 			req->status = 500;
 			kore_buf_reset(response);
 		}
-
-		free(result);
+		else
+		{
+			free(result);
+		}
 	}
 
 	END();
@@ -1168,17 +1180,7 @@ deregister_entity (struct http_request *req)
 done:
 	// wait for thread ...
 	if (thread_started)
-	{
-		bool *result;
-		pthread_join(thread,(void *)&result);
-
-		if (result == NULL || !*result) {
-			req->status = 500;
-			kore_buf_reset(response);
-		}
-
-		free(result);
-	}
+		pthread_join(thread,NULL);
 
 	END();
 }
@@ -1379,14 +1381,16 @@ done:
 	if (thread_started)
 	{
 		bool *result;
-		pthread_join(thread,&result);
-
-		if (result == NULL || !*result) {
+		pthread_join(thread,(void *)&result);
+		if (!result && !*result)
+		{
 			req->status = 500;
 			kore_buf_reset(response);
 		}
-
-		free(result);
+		else
+		{
+			free(result);
+		}
 	}
 
 	END();
@@ -1401,6 +1405,8 @@ deregister_owner(struct http_request *req)
 
 	pthread_t thread;
 	bool thread_started = false; 
+
+	pthread_t del_threads[5];
 
 	req->status = 403;
 
@@ -1423,7 +1429,7 @@ deregister_owner(struct http_request *req)
 
 	// cannot delete admin
 	if (strcmp(owner,"admin") == 0 || strcmp(owner,"DATABASE") == 0 || strcmp(owner,"database") == 0)
-		FORBIDDEN("cannot delete user x");
+		FORBIDDEN("cannot delete user");
 
 	// it should look like an owner
 	if (! looks_like_a_valid_owner(owner))
@@ -1438,10 +1444,30 @@ deregister_owner(struct http_request *req)
 
 /////////////////////////////////////////////////
 
+	// XXX TODO delete all entities of the owner
+
+	CREATE_STRING (query,
+			"SELECT id FROM users where id = '%s' or id like '%s/%%'",
+				owner,
+				owner
+	);
+
+	RUN_QUERY (query,"could not get app/devices associated with owner");
+
+	uint32_t num_rows = kore_pgsql_ntuples(&sql);
+	char *entry;
+	for (int i = 0; i < num_rows; ++i)
+	{
+		entry = kore_pgsql_getvalue(&sql,i,0);
+		debug_printf("Deleting {%s}\n",entry);
+
+		pthread_create	(&thread,NULL,delete_exchanges_and_queues,(void *)entry); 
+		pthread_join	(thread,NULL);
+	}
+
 	// delete entries in to RabbitMQ
 	pthread_create(&thread,NULL,delete_exchanges_and_queues,(void *)owner); 
 	thread_started = true;
-	// XXX TODO delete all entities of the owner
 
 	// delete from acl
 	CREATE_STRING (query,
@@ -1471,17 +1497,7 @@ deregister_owner(struct http_request *req)
 done:
 	// wait for thread ...
 	if (thread_started)
-	{
-		bool *result;
-		pthread_join(thread,&result);
-
-		if (result == NULL || !*result) {
-			req->status = 500;
-			kore_buf_reset(response);
-		}
-
-		free(result);
-	}
+		pthread_join(thread,NULL);
 
 	END();
 }
@@ -2574,6 +2590,8 @@ create_exchanges_and_queues (void *v)
 			goto done;
 		}
 
+		debug_printf("done creating queue {%s}\n",queue);
+
 		if (! amqp_queue_bind (
 			cached_admin_conn,
 			1,
@@ -2587,6 +2605,8 @@ create_exchanges_and_queues (void *v)
 			goto done;
 		}
 
+		debug_printf("bound queue {%s} to exchange {%s}\n",queue,exchange);
+
 		if (! amqp_queue_bind (
 			cached_admin_conn,
 			1,
@@ -2599,6 +2619,7 @@ create_exchanges_and_queues (void *v)
 			fprintf(stderr,"failed to bind {%s} to DATABASE queue for\n",exchange);
 			goto done;
 		}
+		debug_printf("bound queue {%s} to exchange {%s}\n",queue,"DATABASE");
 	}
 	else
 	{
@@ -2704,12 +2725,6 @@ delete_exchanges_and_queues (void *v)
 	char queue[129];
 	char exchange[129];
 
-	bool *is_success = malloc (sizeof(bool));
-	if (! is_success)
-		return NULL;
-
-	*is_success = false;
-
 	if (looks_like_a_valid_owner(id))
 	{
 		// delete notification exchange 
@@ -2791,10 +2806,9 @@ delete_exchanges_and_queues (void *v)
 		}
 	}
 
-	*is_success = true;
-
 done:
-	return is_success;
+
+	return NULL;
 }
 
 char*
@@ -2816,7 +2830,7 @@ sanitize (char *string)
 
 		++p;
 	}
-	
+
 	return string;
 }
 
