@@ -299,19 +299,18 @@ retry:
 	}
 
 	// declare the "DATABASE" queue if it does not exist
-	if (! amqp_exchange_declare (
+	if (! amqp_queue_declare (
 		cached_admin_conn,
 		1,
 		amqp_cstring_bytes("DATABASE"),
-		amqp_cstring_bytes("topic"),
 		0,
 		1, /* durable */
 		0,
 		0,
-		amqp_empty_table
+		lazy_queue_table	
 	))
 	{
-		fprintf(stderr,"amqp_exchange_declare failed for {DATABASE}\n");
+		fprintf(stderr,"amqp_queue_declare failed for {DATABASE}\n");
 		return KORE_RESULT_ERROR;
 	}
 
@@ -1325,7 +1324,7 @@ register_owner(struct http_request *req)
 		FORBIDDEN("only admin can call this api");
 
 	// cannot create an admin
-	if (strcmp(owner,"admin") == 0 || strcmp(owner,"DATABASE") || strcmp(owner,"database"))
+	if (strcmp(owner,"admin") == 0 || strcmp(owner,"DATABASE") == 0 || strcmp(owner,"database") == 0)
 		FORBIDDEN("cannot create the user");
 
 	// it should look like an owner
@@ -1423,8 +1422,8 @@ deregister_owner(struct http_request *req)
 		FORBIDDEN("only admin can call this api");
 
 	// cannot delete admin
-	if (strcmp(owner,"admin") == 0 || strcmp(owner,"DATABASE") || strcmp(owner,"database"))
-		FORBIDDEN("cannot delete user");
+	if (strcmp(owner,"admin") == 0 || strcmp(owner,"DATABASE") == 0 || strcmp(owner,"database") == 0)
+		FORBIDDEN("cannot delete user x");
 
 	// it should look like an owner
 	if (! looks_like_a_valid_owner(owner))
