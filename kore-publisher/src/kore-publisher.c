@@ -298,11 +298,11 @@ retry:
 		return KORE_RESULT_ERROR;	
 	}
 
-	// declare the "_database" queue if it does not exist
+	// declare the "DATABASE" queue if it does not exist
 	if (! amqp_exchange_declare (
 		cached_admin_conn,
 		1,
-		amqp_cstring_bytes("_database"),
+		amqp_cstring_bytes("DATABASE"),
 		amqp_cstring_bytes("topic"),
 		0,
 		1, /* durable */
@@ -311,7 +311,7 @@ retry:
 		amqp_empty_table
 	))
 	{
-		fprintf(stderr,"amqp_exchange_declare failed for {_database}\n");
+		fprintf(stderr,"amqp_exchange_declare failed for {DATABASE}\n");
 		return KORE_RESULT_ERROR;
 	}
 
@@ -1321,12 +1321,12 @@ register_owner(struct http_request *req)
 		"inputs missing in headers"
 	);
 
-	// cannot create an admin
-	if (strcmp(owner,"admin") == 0)
-		FORBIDDEN("cannot create admin");
-
 	if (strcmp(id,"admin") != 0)
 		FORBIDDEN("only admin can call this api");
+
+	// cannot create an admin
+	if (strcmp(owner,"admin") == 0 || strcmp(owner,"DATABASE") || strcmp(owner,"database"))
+		FORBIDDEN("cannot create the user");
 
 	// it should look like an owner
 	if (! looks_like_a_valid_owner(owner))
@@ -1423,8 +1423,8 @@ deregister_owner(struct http_request *req)
 		FORBIDDEN("only admin can call this api");
 
 	// cannot delete admin
-	if (strcmp(owner,"admin") == 0)
-		FORBIDDEN("cannot delete admin");
+	if (strcmp(owner,"admin") == 0 || strcmp(owner,"DATABASE") || strcmp(owner,"database"))
+		FORBIDDEN("cannot delete user");
 
 	// it should look like an owner
 	if (! looks_like_a_valid_owner(owner))
@@ -2430,7 +2430,12 @@ block (struct http_request *req)
 	if (! looks_like_a_valid_owner(id))
 		BAD_REQUEST("id is not valid owner");	
 
-	if (strcmp(id,"admin") != 0)
+	if (strcmp(id,"admin") == 0)
+	{
+		if (! is_request_from_localhost(req))
+			FORBIDDEN("admin can only use from localhost");	
+	}
+	else	
 	{
 		if (! is_owner(id,entity))
 			FORBIDDEN("you are not the owner of the entity");
@@ -2479,7 +2484,12 @@ unblock (struct http_request *req)
 	if (! looks_like_a_valid_owner(id))
 		BAD_REQUEST("id is not valid owner");	
 
-	if (strcmp(id,"admin") != 0)
+	if (strcmp(id,"admin") == 0)
+	{
+		if (! is_request_from_localhost(req))
+			FORBIDDEN("admin can only use from localhost");	
+	}
+	else
 	{
 		if (! is_owner(id,entity))
 			FORBIDDEN("you are not the owner of the entity");
@@ -2581,13 +2591,13 @@ create_exchanges_and_queues (void *v)
 		if (! amqp_queue_bind (
 			cached_admin_conn,
 			1,
-			amqp_cstring_bytes("_database"),
+			amqp_cstring_bytes("DATABASE"),
 			amqp_cstring_bytes(exchange),
 			amqp_cstring_bytes("#"),
 			amqp_empty_table
 		))
 		{
-			fprintf(stderr,"failed to bind {%s} to _database queue for\n",exchange);
+			fprintf(stderr,"failed to bind {%s} to DATABASE queue for\n",exchange);
 			goto done;
 		}
 	}
@@ -2622,13 +2632,13 @@ create_exchanges_and_queues (void *v)
 			if (! amqp_queue_bind (
 				cached_admin_conn,
 				1,
-				amqp_cstring_bytes("_database"),
+				amqp_cstring_bytes("DATABASE"),
 				amqp_cstring_bytes(exchange),
 				amqp_cstring_bytes("#"),
 				amqp_empty_table
 			))
 			{
-				fprintf(stderr,"failed to bind {%s} to _database queue for\n",exchange);
+				fprintf(stderr,"failed to bind {%s} to DATABASE queue for\n",exchange);
 				goto done;
 			}
 		}
