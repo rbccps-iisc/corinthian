@@ -298,6 +298,23 @@ retry:
 		return KORE_RESULT_ERROR;	
 	}
 
+	// declare the "_database" queue if it does not exist
+	if (! amqp_exchange_declare (
+		cached_admin_conn,
+		1,
+		amqp_cstring_bytes("_database"),
+		amqp_cstring_bytes("topic"),
+		0,
+		1, /* durable */
+		0,
+		0,
+		amqp_empty_table
+	))
+	{
+		fprintf(stderr,"amqp_exchange_declare failed for {_database}\n");
+		return KORE_RESULT_ERROR;
+	}
+
 	ht_init (&connection_ht);
 
 	if (Q == NULL)
