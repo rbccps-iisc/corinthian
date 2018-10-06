@@ -307,7 +307,7 @@ retry:
 		query = kore_buf_alloc(512);
 
 	if (response == NULL)
-		response = kore_buf_alloc(65536);
+		response = kore_buf_alloc(1024*1024);
 
 #ifdef TEST
 	kore_pgsql_register("db","user=postgres password=password");
@@ -2557,7 +2557,20 @@ create_exchanges_and_queues (void *v)
 			amqp_empty_table
 		))
 		{
-			fprintf(stderr,"bind failed for {%s} -> {%s}",queue,exchange);
+			fprintf(stderr,"bind failed for {%s} -> {%s}\n",queue,exchange);
+			goto done;
+		}
+
+		if (! amqp_queue_bind (
+			cached_admin_conn,
+			1,
+			amqp_cstring_bytes("_database"),
+			amqp_cstring_bytes(exchange),
+			amqp_cstring_bytes("#"),
+			amqp_empty_table
+		))
+		{
+			fprintf(stderr,"failed to bind {%s} to _database queue for\n",exchange);
 			goto done;
 		}
 	}
@@ -2588,6 +2601,19 @@ create_exchanges_and_queues (void *v)
 				goto done;
 			}
 			debug_printf("[entity] DONE creating exchange {%s}\n",exchange);
+
+			if (! amqp_queue_bind (
+				cached_admin_conn,
+				1,
+				amqp_cstring_bytes("_database"),
+				amqp_cstring_bytes(exchange),
+				amqp_cstring_bytes("#"),
+				amqp_empty_table
+			))
+			{
+				fprintf(stderr,"failed to bind {%s} to _database queue for\n",exchange);
+				goto done;
+			}
 		}
 
 		char *_q[] = {"\0", ".private", ".priority", ".command", ".notification", NULL};
@@ -2629,7 +2655,7 @@ create_exchanges_and_queues (void *v)
 					amqp_empty_table	
 				))
 				{
-					fprintf(stderr,"failed to bind {%s} to {%s}",queue,exchange);
+					fprintf(stderr,"failed to bind {%s} to {%s}\n",queue,exchange);
 					goto done;
 				}
 			}
