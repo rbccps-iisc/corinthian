@@ -2211,8 +2211,6 @@ reject_follow (struct http_request *req)
 		"inputs missing in headers"
 	);
 
-	if (! looks_like_a_valid_owner(id))
-		BAD_REQUEST("id is not valid owner");	
 
 /////////////////////////////////////////////////
 
@@ -2224,12 +2222,25 @@ reject_follow (struct http_request *req)
 
 /////////////////////////////////////////////////
 
-	CREATE_STRING (query, 
-		"SELECT follow_id FROM follow "
-		"WHERE follow_id = '%s' AND exchange LIKE '%s/%%.%%' and status='pending'",
-			follow_id,
-			id
-	);
+	if (looks_like_a_valid_owner(id))
+	{
+		CREATE_STRING (query, 
+			"SELECT from_id FROM follow "
+			"WHERE follow_id = '%s' AND exchange LIKE '%s/%%.%%' and status='pending'",
+				follow_id,
+				id
+		);
+	}
+	else
+	{
+		CREATE_STRING (query, 
+			"SELECT from_id FROM follow "
+			"WHERE follow_id = '%s' AND exchange LIKE '%s.%%' and status='pending'",
+				follow_id,
+				id
+		);
+
+	}
 
 	RUN_QUERY (query,"could not run select query on follow");
 
