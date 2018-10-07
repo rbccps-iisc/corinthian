@@ -199,6 +199,8 @@ amqp_table_t lazy_queue_table;
 char admin_apikey[33];
 amqp_connection_state_t	cached_admin_conn;
 
+bool is_success = false;
+
 int
 init (int state)
 {
@@ -886,7 +888,7 @@ subscribe (struct http_request *req)
 					connection,
 					1,
 					amqp_cstring_bytes((const char *)Q->data),
-					/*ack*/ 0
+					/*no ack*/ 1
 			);
 
 		} while (
@@ -1086,14 +1088,10 @@ done:
 	{
 		bool *result;
 		pthread_join(thread,(void *)&result);
-		if (!result && !*result)
+		if (!result || !*result)
 		{
 			req->status = 500;
 			kore_buf_reset(response);
-		}
-		else
-		{
-			free(result);
 		}
 	}
 
@@ -1382,14 +1380,10 @@ done:
 	{
 		bool *result;
 		pthread_join(thread,(void *)&result);
-		if (!result && !*result)
+		if (!result || !*result)
 		{
 			req->status = 500;
 			kore_buf_reset(response);
-		}
-		else
-		{
-			free(result);
 		}
 	}
 
@@ -1461,8 +1455,7 @@ deregister_owner(struct http_request *req)
 		entry = kore_pgsql_getvalue(&sql,i,0);
 		debug_printf("Deleting {%s}\n",entry);
 
-		pthread_create	(&thread,NULL,delete_exchanges_and_queues,(void *)entry); 
-		pthread_join	(thread,NULL);
+		delete_exchanges_and_queues((void *)entry); 
 	}
 
 	// delete entries in to RabbitMQ
@@ -1582,33 +1575,17 @@ queue_bind (struct http_request *req)
 	// if he is not the owner, he needs an entry in acl
 	if(! is_owner(id,to))
 	{
-		if (looks_like_a_valid_owner(id))
-		{
-			CREATE_STRING (
-				query,
-				"SELECT 1 FROM acl WHERE "
-				"from_id = '%s' "
-				"AND exchange = '%s' "
-				"AND permission = 'read' "
-				"AND valid_till > now() AND topic = '%s'",
-				from,
-				exchange,
-				topic
-			);
-		}
-		else
-		{	
-			CREATE_STRING (
-				query,
-				"SELECT 1 FROM acl WHERE from_id = '%s' "
-				"AND exchange = '%s' "
-				"AND permission = 'read' "
-				"AND valid_till > now() AND topic = '%s'",
-				id,
-				exchange,
-				topic
-			);
-		}
+		CREATE_STRING (
+			query,
+			"SELECT 1 FROM acl WHERE "
+			"from_id = '%s' "
+			"AND exchange = '%s' "
+			"AND permission = 'read' "
+			"AND valid_till > now() AND topic = '%s'",
+			from,
+			exchange,
+			topic
+		);
 
 		RUN_QUERY(query,"failed to query for permission");
 		
@@ -1714,33 +1691,17 @@ queue_unbind (struct http_request *req)
 	// if he is not the owner, he needs an entry in acl
 	if(! is_owner(id,to))
 	{
-		if (looks_like_a_valid_owner(id))
-		{
-			CREATE_STRING (
-				query,
-				"SELECT 1 FROM acl WHERE "
-				"from_id = '%s' "
-				"AND exchange = '%s' "
-				"AND permission = 'read' "
-				"AND valid_till > now() AND topic = '%s'",
-				from,
-				exchange,
-				topic
-			);
-		}
-		else
-		{	
-			CREATE_STRING (
-				query,
-				"SELECT 1 FROM acl WHERE from_id = '%s' "
-				"AND exchange = '%s' "
-				"AND permission = 'read' "
-				"AND valid_till > now() AND topic = '%s'",
-				id,
-				exchange,
-				topic
-			);
-		}
+		CREATE_STRING (
+			query,
+			"SELECT 1 FROM acl WHERE "
+			"from_id = '%s' "
+			"AND exchange = '%s' "
+			"AND permission = 'read' "
+			"AND valid_till > now() AND topic = '%s'",
+			from,
+			exchange,
+			topic
+		);
 
 		RUN_QUERY(query,"failed to query for permission");
 		
@@ -1980,12 +1941,14 @@ unfollow (struct http_request *req)
 {
 	const char *id;
 	const char *apikey;
+
 	const char *from;
 	const char *to;
 	const char *topic;
 	const char *permission;
 
 	char *acl_id;
+	char *follow_id;
 	char *exchange;
 
 	BAD_REQUEST_if
@@ -2021,12 +1984,13 @@ unfollow (struct http_request *req)
 		from = id;
 	}
 
-	if((strcmp(permission,"read")!=0)
+	if(
+		(strcmp(permission,"read") !=0)
 			&&
-	   (strcmp(permission,"write")!=0)
+		(strcmp(permission,"write") !=0)
 			&&
-	   (strcmp(permission, "read-write")!=0)
-	   )
+		(strcmp(permission, "read-write") !=0)
+	)
 	{
 		BAD_REQUEST("Invalid permission string");
 	}
@@ -2045,7 +2009,7 @@ unfollow (struct http_request *req)
 	if(strcmp(permission, "read")==0)
 	{
 		CREATE_STRING ( query,
-			"SELECT acl_id,exchange FROM acl "
+			"SELECT acl_id,follow_id,exchange FROM acl "
 				"WHERE "
 				"from_id = '%s' "
 					"AND "
@@ -2053,20 +2017,17 @@ unfollow (struct http_request *req)
 					"AND "
 				"topic = '%s' "
 					"AND "
-				"permission = '%s'",
+				"permission = 'read'",
 
 					from,
 					to,
-					topic,
-					permission
+					topic
 			);
-		
-		RUN_QUERY(query,"failed to query for permission");
 	}
 	else if(strcmp(permission, "write")==0)
 	{
 		CREATE_STRING ( query,
-			"SELECT acl_id,exchange FROM acl "
+			"SELECT acl_id,follow_id,exchange FROM acl "
 				"WHERE "
 				"from_id = '%s' "
 					"AND "
@@ -2074,131 +2035,53 @@ unfollow (struct http_request *req)
 					"AND "
 				"topic = '%s' "
 					"AND "
-				"permission = '%s'",
+				"permission = 'write'",
 
 					from,
 					to,
-					topic,
-					permission
+					topic
 			);
-
-		RUN_QUERY(query,"failed to query for permission");
 	}
-	else if(strcmp(permission, "read-write")==0)
+	else if (strcmp(permission, "read-write") == 0)
 	{
 		CREATE_STRING ( query,
-                        "SELECT acl_id,exchange FROM acl "
+                        "SELECT acl_id,follow_id,exchange FROM acl "
                                 "WHERE "
                                 "from_id = '%s' "
                                         "AND "
-                                "exchange = '%s.protected' "
+                                "exchange = '%s.%%' "
                                         "AND "
-                                "topic = '%s' "
-                                        "AND "
-                                "permission = 'read'",
-
+                                "topic = '%s' ",
                                         from,
                                         to,
                                         topic
                         );
-
-		RUN_QUERY(query,"failed to query for permission");
-		
-		if (kore_pgsql_ntuples(&sql) == 0)
-			FORBIDDEN("unauthorized");
-	
-		acl_id		= kore_pgsql_getvalue(&sql,0,0);
-		exchange 	= kore_pgsql_getvalue(&sql,0,1);
-
-		CREATE_STRING (query, "DELETE FROM acl WHERE acl_id='%s'", acl_id);
-
-		RUN_QUERY(query,"failed to query for permission");
-					
-		if (! amqp_queue_unbind (
-			cached_admin_conn,
-			1,
-			amqp_cstring_bytes(from),
-			amqp_cstring_bytes(exchange),
-			amqp_cstring_bytes(topic),
-			amqp_empty_table	
-		))
-		{	
-			ERROR("unbind failed");
-		}
-
-		char priority_queue[256];
-		
-		strlcpy(priority_queue, from, 128);
-		strlcat(priority_queue, ".priority", 128);
-
-		if (! amqp_queue_unbind (
-			cached_admin_conn,
-			1,
-			amqp_cstring_bytes(priority_queue),
-			amqp_cstring_bytes(exchange),
-			amqp_cstring_bytes(topic),
-			amqp_empty_table	
-		))
-		{
-			ERROR("unfollow failed");
-		}
-
-		CREATE_STRING ( query,
-                        "SELECT acl_id,exchange FROM acl "
-                                "WHERE "
-                                "from_id = '%s' "
-                                        "AND "
-                                "exchange = '%s.command' "
-                                        "AND "
-                                "topic = '%s' "
-                                        "AND "
-                                "permission = 'write'",
-
-                                        from,
-                                        to,
-                                        topic
-                        );
-
-		RUN_QUERY(query,"failed to query for permission");
-				
-		if (kore_pgsql_ntuples(&sql) == 0)
-			FORBIDDEN("unauthorized");
-	
-		acl_id		= kore_pgsql_getvalue(&sql,0,0);
-		exchange 	= kore_pgsql_getvalue(&sql,0,1);
-
-		CREATE_STRING (query, "DELETE FROM acl WHERE acl_id='%s'", acl_id);
-
-		RUN_QUERY(query,"failed to query for permission");
-		
-		CREATE_STRING (query, "DELETE FROM follow WHERE requested_by='%s' AND exchange = '%s.protected'" 
-				"AND permission = 'read' AND topic = '%s'", from,to,topic);
-
-		RUN_QUERY(query,"failed to query for permission");
-
-		CREATE_STRING (query, "DELETE FROM follow WHERE requested_by='%s' AND exchange = '%s.command'" 
-				"AND permission = 'write' AND topic = '%s'", from,to,topic);
-
-		RUN_QUERY(query,"failed to query for permission");
-		
-		OK();
 	}
+
+	RUN_QUERY(query,"failed to query acl table for permission");
 		
 	if (kore_pgsql_ntuples(&sql) == 0)
 		FORBIDDEN("unauthorized");
-	
-	acl_id		= kore_pgsql_getvalue(&sql,0,0);
-	exchange 	= kore_pgsql_getvalue(&sql,0,1);
 
-	CREATE_STRING (query, "DELETE FROM acl WHERE acl_id='%s'", acl_id);
+	char priority_queue[256];
 
-	RUN_QUERY(query,"failed to query for permission");
-	
-	debug_printf("exchange = %s\n", exchange);
-	debug_printf("topic = %s\n", topic); 
+	strlcpy(priority_queue, from, 128);
+	strlcat(priority_queue, ".priority", 128);
 
-	if(strcmp(permission,"read")==0)
+	uint32_t num_rows = kore_pgsql_ntuples(&sql);
+
+	for (int i = 0; i < num_rows; ++i)
 	{
+		acl_id		= kore_pgsql_getvalue(&sql,i,0);
+		follow_id	= kore_pgsql_getvalue(&sql,i,1);
+		exchange 	= kore_pgsql_getvalue(&sql,i,2);
+
+		CREATE_STRING 	(query, "DELETE FROM acl WHERE acl_id='%s'", acl_id);
+		RUN_QUERY	(query,"failed to delete from acl table");
+
+		CREATE_STRING 	(query, "DELETE FROM follow WHERE follow_id='%s'", follow_id);
+		RUN_QUERY	(query, "failed to delete from follow table");
+
 		if (! amqp_queue_unbind (
 			cached_admin_conn,
 			1,
@@ -2208,13 +2091,8 @@ unfollow (struct http_request *req)
 			amqp_empty_table	
 		))
 		{	
-			ERROR("unbind failed");
+			ERROR("unfollow failed");
 		}
-	
-		char priority_queue[256];
-
-		strlcpy(priority_queue, from, 128);
-		strlcat(priority_queue, ".priority", 128);
 
 		if (! amqp_queue_unbind (
 			cached_admin_conn,
@@ -2225,14 +2103,9 @@ unfollow (struct http_request *req)
 			amqp_empty_table	
 		))
 		{
-			ERROR("unfollow failed");
+			ERROR("unbind priority queue failed");
 		}
 	}
-
-	CREATE_STRING (query, "DELETE FROM follow WHERE from_id ='%s' AND exchange = '%s'" 
-			"AND permission = '%s' AND topic = '%s'", from,exchange,permission,topic);
-
-	RUN_QUERY(query,"failed to query for permission");
 
 	OK();
 
@@ -2709,11 +2582,7 @@ create_exchanges_and_queues (void *v)
 	char queue	[129];
 	char exchange	[129];
 
-	bool *is_success = malloc (sizeof(bool));
-	if (! is_success)
-		return NULL;
-
-	*is_success = false;
+	is_success = false;
 
 	if (looks_like_a_valid_owner(id))
 	{
@@ -2876,10 +2745,10 @@ create_exchanges_and_queues (void *v)
 		}
 	}
 
-	*is_success = true;
+	is_success = true;
 
 done:
-	return is_success;
+	return &is_success;
 }
 
 void *
