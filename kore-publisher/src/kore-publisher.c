@@ -21,7 +21,7 @@
 
 #include "ht.h"
 
-//#define TEST (1)
+#define TEST (1)
 
 #if 0
 	#define debug_printf(...)
@@ -1904,6 +1904,7 @@ follow (struct http_request *req)
 
 		CREATE_STRING 	(query,"SELECT currval(pg_get_serial_sequence('follow','follow_id'))");
 		RUN_QUERY 	(query,"failed pg_get_serial write");
+
 		strlcpy(write_follow_id,kore_pgsql_getvalue(&sql,0,0),10);
 	}
 
@@ -2118,9 +2119,6 @@ share (struct http_request *req)
 		"inputs missing in headers"
 	);
 
-	if (! looks_like_a_valid_owner(id))
-		BAD_REQUEST("id is not valid owner");	
-
 /////////////////////////////////////////////////
 
 	if (! login_success(id,apikey))
@@ -2131,12 +2129,25 @@ share (struct http_request *req)
 
 /////////////////////////////////////////////////
 
-	CREATE_STRING (query, 
-		"SELECT from_id,exchange,permission,validity,topic FROM follow "
-		"WHERE follow_id = '%s' AND exchange LIKE '%s/%%.%%' and status='pending'",
-			follow_id,
-			id
-	);
+	if (looks_like_a_valid_owner(id))
+	{
+		CREATE_STRING (query, 
+			"SELECT from_id,exchange,permission,validity,topic FROM follow "
+			"WHERE follow_id = '%s' AND exchange LIKE '%s/%%.%%' and status='pending'",
+				follow_id,
+				id
+		);
+	}
+	else
+	{
+		CREATE_STRING (query, 
+			"SELECT from_id,exchange,permission,validity,topic FROM follow "
+			"WHERE follow_id = '%s' AND exchange LIKE '%s.%%' and status='pending'",
+				follow_id,
+				id
+		);
+
+	}
 
 	RUN_QUERY (query,"could not run select query on follow");
 

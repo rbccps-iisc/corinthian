@@ -94,9 +94,17 @@ for i in xrange(0,num_devices):
 
 	perm = random.choice(["read","write"])
 
-	r = get("follow", {"id":"owner-b", "apikey":owner_b_apikey,
-		"from": app, "to":device, "validity":"2", "permission":perm,
-		"topic":"hello"})
+	x = random.choice(["owner","device"])
+	if x == "owner": 
+		r = get("follow", {"id":"owner-b", "apikey":owner_b_apikey,
+			"from": app, "to":device, "validity":"2", "permission":perm,
+			"topic":"hello"})
+	else:
+		r = get("follow", {"id":app, "apikey":app_apikey,
+			"from": app, "to":device, "validity":"2", "permission":perm,
+			"topic":"hello"})
+		
+
 	follow_id = r.json()["follow-id-"+perm]
 	check(r,202)
 
@@ -108,7 +116,12 @@ for i in xrange(0,num_devices):
 	check(r,200)
 	assert (r.json()[0]['follow-id'] == follow_id)
 
-	r = get("share", {"id":"owner-a", "apikey":owner_a_apikey, "follow-id":follow_id})
+	x = random.choice(["owner","device"])
+	if x == "owner": 
+		r = get("share", {"id":"owner-a", "apikey":owner_a_apikey, "follow-id":follow_id})
+	else:
+		r = get("share", {"id":device, "apikey":device_apikey, "follow-id":follow_id})
+
 	check(r,200)
 
 	if perm == "read":
@@ -121,7 +134,6 @@ for i in xrange(0,num_devices):
 
 		r = get("unfollow",{"id":app,"apikey":app_apikey,"to":device,"topic":"hello"})
 		check(r,200)
-
 
 t_dregister = time.time()
 print "\nDeleting entities"
@@ -139,7 +151,6 @@ for i in xrange(0,num_devices):
 	check(r,200)
 
 t_dregister =time.time() - t_dregister
-
 
 print "\nDeleting owners"
 # delete owners
