@@ -3,7 +3,7 @@ import random
 import sys
 import requests
 
-admin_api = "x"
+admin_api = "admin"
 num_devices = 10 
 
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
