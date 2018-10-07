@@ -29,7 +29,7 @@
 	#define debug_printf(...) printf(__VA_ARGS__)
 #endif
 
-char password_chars[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:#-";
+char password_chars[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-";
 
 int cat			(struct http_request *);
 
@@ -265,9 +265,9 @@ init (int state)
 	}
 
 retry:
-	if (amqp_socket_open(socket, "kore-broker", 5672))
+	if (amqp_socket_open(socket, "broker", 5672))
 	{
-		fprintf(stderr,"Could not connect to kore-broker\n");
+		fprintf(stderr,"Could not connect to broker\n");
 		sleep(1);
 		goto retry;
 	}
@@ -328,7 +328,7 @@ retry:
 #ifdef TEST
 	kore_pgsql_register("db","user=postgres password=password");
 #else
-	kore_pgsql_register("db","host=kore-postgres user=postgres password=postgres_pwd");
+	kore_pgsql_register("db","host=postgres user=postgres password=postgres_pwd");
 #endif
 
 	return KORE_RESULT_OK;
@@ -702,7 +702,7 @@ reconnect:
 		if (socket == NULL)
 			ERROR("could not create a new socket");
 
-		if (amqp_socket_open(socket, "kore-broker", 5672))
+		if (amqp_socket_open(socket, "broker", 5672))
 			ERROR("could not open a socket");
 
 		login_reply = amqp_login(*cached_conn, 
@@ -845,7 +845,7 @@ subscribe (struct http_request *req)
 	if (socket == NULL)
 		ERROR("could not create a new socket");
 
-	if (amqp_socket_open(socket, "kore-broker", 5672))
+	if (amqp_socket_open(socket, "broker", 5672))
 		ERROR("could not open a socket");
 
 	login_reply = amqp_login(connection, 
@@ -1587,12 +1587,11 @@ queue_bind (struct http_request *req)
 			CREATE_STRING (
 				query,
 				"SELECT 1 FROM acl WHERE "
-				"(from_id = '%s' OR from_id LIKE '%s/%%') "
+				"from_id = '%s' "
 				"AND exchange = '%s' "
 				"AND permission = 'read' "
 				"AND valid_till > now() AND topic = '%s'",
-				id,
-				id,
+				from,
 				exchange,
 				topic
 			);
@@ -1720,12 +1719,11 @@ queue_unbind (struct http_request *req)
 			CREATE_STRING (
 				query,
 				"SELECT 1 FROM acl WHERE "
-				"(from_id = '%s' OR from_id LIKE '%s/%%') "
+				"from_id = '%s' "
 				"AND exchange = '%s' "
 				"AND permission = 'read' "
 				"AND valid_till > now() AND topic = '%s'",
-				id,
-				id,
+				from,
 				exchange,
 				topic
 			);
@@ -1985,6 +1983,7 @@ unfollow (struct http_request *req)
 	const char *from;
 	const char *to;
 	const char *topic;
+	const char *permission;
 
 	char *acl_id;
 	char *exchange;
@@ -1998,6 +1997,8 @@ unfollow (struct http_request *req)
 		KORE_RESULT_OK != http_request_header(req, "to", &to)
 				||
 		KORE_RESULT_OK != http_request_header(req, "topic", &topic)
+				||
+		KORE_RESULT_OK != http_request_header(req, "permission", &permission)
 			,
 		"inputs missing in headers"
 	);
@@ -2020,6 +2021,16 @@ unfollow (struct http_request *req)
 		from = id;
 	}
 
+	if((strcmp(permission,"read")!=0)
+			&&
+	   (strcmp(permission,"write")!=0)
+			&&
+	   (strcmp(permission, "read-write")!=0)
+	   )
+	{
+		BAD_REQUEST("Invalid permission string");
+	}
+
 /////////////////////////////////////////////////
 
 	if (! login_success(id,apikey))
@@ -2031,23 +2042,147 @@ unfollow (struct http_request *req)
 
 /////////////////////////////////////////////////
 	
-	CREATE_STRING ( query,
-		"SELECT acl_id,exchange FROM acl "
-			"WHERE "
-			"from_id = '%s' "
-				"AND "
-			"exchange = '%s.protected' "
-				"AND "
-			"topic = '%s' "
-				"AND "
-			"permission = 'read' ",
+	if(strcmp(permission, "read")==0)
+	{
+		CREATE_STRING ( query,
+			"SELECT acl_id,exchange FROM acl "
+				"WHERE "
+				"from_id = '%s' "
+					"AND "
+				"exchange = '%s.protected' "
+					"AND "
+				"topic = '%s' "
+					"AND "
+				"permission = '%s'",
 
-				from,
-				to,
-				topic
-	);
+					from,
+					to,
+					topic,
+					permission
+			);
+		
+		RUN_QUERY(query,"failed to query for permission");
+	}
+	else if(strcmp(permission, "write")==0)
+	{
+		CREATE_STRING ( query,
+			"SELECT acl_id,exchange FROM acl "
+				"WHERE "
+				"from_id = '%s' "
+					"AND "
+				"exchange = '%s.command' "
+					"AND "
+				"topic = '%s' "
+					"AND "
+				"permission = '%s'",
 
-	RUN_QUERY(query,"failed to query for permission");
+					from,
+					to,
+					topic,
+					permission
+			);
+
+		RUN_QUERY(query,"failed to query for permission");
+	}
+	else if(strcmp(permission, "read-write")==0)
+	{
+		CREATE_STRING ( query,
+                        "SELECT acl_id,exchange FROM acl "
+                                "WHERE "
+                                "from_id = '%s' "
+                                        "AND "
+                                "exchange = '%s.protected' "
+                                        "AND "
+                                "topic = '%s' "
+                                        "AND "
+                                "permission = 'read'",
+
+                                        from,
+                                        to,
+                                        topic
+                        );
+
+		RUN_QUERY(query,"failed to query for permission");
+		
+		if (kore_pgsql_ntuples(&sql) == 0)
+			FORBIDDEN("unauthorized");
+	
+		acl_id		= kore_pgsql_getvalue(&sql,0,0);
+		exchange 	= kore_pgsql_getvalue(&sql,0,1);
+
+		CREATE_STRING (query, "DELETE FROM acl WHERE acl_id='%s'", acl_id);
+
+		RUN_QUERY(query,"failed to query for permission");
+					
+		if (! amqp_queue_unbind (
+			cached_admin_conn,
+			1,
+			amqp_cstring_bytes(from),
+			amqp_cstring_bytes(exchange),
+			amqp_cstring_bytes(topic),
+			amqp_empty_table	
+		))
+		{	
+			ERROR("unbind failed");
+		}
+
+		char priority_queue[256];
+		
+		strlcpy(priority_queue, from, 128);
+		strlcat(priority_queue, ".priority", 128);
+
+		if (! amqp_queue_unbind (
+			cached_admin_conn,
+			1,
+			amqp_cstring_bytes(priority_queue),
+			amqp_cstring_bytes(exchange),
+			amqp_cstring_bytes(topic),
+			amqp_empty_table	
+		))
+		{
+			ERROR("unfollow failed");
+		}
+
+		CREATE_STRING ( query,
+                        "SELECT acl_id,exchange FROM acl "
+                                "WHERE "
+                                "from_id = '%s' "
+                                        "AND "
+                                "exchange = '%s.command' "
+                                        "AND "
+                                "topic = '%s' "
+                                        "AND "
+                                "permission = 'write'",
+
+                                        from,
+                                        to,
+                                        topic
+                        );
+
+		RUN_QUERY(query,"failed to query for permission");
+				
+		if (kore_pgsql_ntuples(&sql) == 0)
+			FORBIDDEN("unauthorized");
+	
+		acl_id		= kore_pgsql_getvalue(&sql,0,0);
+		exchange 	= kore_pgsql_getvalue(&sql,0,1);
+
+		CREATE_STRING (query, "DELETE FROM acl WHERE acl_id='%s'", acl_id);
+
+		RUN_QUERY(query,"failed to query for permission");
+		
+		CREATE_STRING (query, "DELETE FROM follow WHERE requested_by='%s' AND exchange = '%s.protected'" 
+				"AND permission = 'read' AND topic = '%s'", from,to,topic);
+
+		RUN_QUERY(query,"failed to query for permission");
+
+		CREATE_STRING (query, "DELETE FROM follow WHERE requested_by='%s' AND exchange = '%s.command'" 
+				"AND permission = 'write' AND topic = '%s'", from,to,topic);
+
+		RUN_QUERY(query,"failed to query for permission");
+		
+		OK();
+	}
 		
 	if (kore_pgsql_ntuples(&sql) == 0)
 		FORBIDDEN("unauthorized");
@@ -2062,34 +2197,42 @@ unfollow (struct http_request *req)
 	debug_printf("exchange = %s\n", exchange);
 	debug_printf("topic = %s\n", topic); 
 
-	if (! amqp_queue_unbind (
-		cached_admin_conn,
-		1,
-		amqp_cstring_bytes(from),
-		amqp_cstring_bytes(exchange),
-		amqp_cstring_bytes(topic),
-		amqp_empty_table	
-	))
+	if(strcmp(permission,"read")==0)
 	{
-		ERROR("unbind failed");
-	}
+		if (! amqp_queue_unbind (
+			cached_admin_conn,
+			1,
+			amqp_cstring_bytes(from),
+			amqp_cstring_bytes(exchange),
+			amqp_cstring_bytes(topic),
+			amqp_empty_table	
+		))
+		{	
+			ERROR("unbind failed");
+		}
 	
-	char priority_queue[256];
+		char priority_queue[256];
 
-	strlcpy(priority_queue, from, 128);
-	strlcat(priority_queue, ".priority", 128);
+		strlcpy(priority_queue, from, 128);
+		strlcat(priority_queue, ".priority", 128);
 
-	if (! amqp_queue_unbind (
-		cached_admin_conn,
-		1,
-		amqp_cstring_bytes(priority_queue),
-		amqp_cstring_bytes(exchange),
-		amqp_cstring_bytes(topic),
-		amqp_empty_table	
-	))
-	{
-		ERROR("unfollow failed");
+		if (! amqp_queue_unbind (
+			cached_admin_conn,
+			1,
+			amqp_cstring_bytes(priority_queue),
+			amqp_cstring_bytes(exchange),
+			amqp_cstring_bytes(topic),
+			amqp_empty_table	
+		))
+		{
+			ERROR("unfollow failed");
+		}
 	}
+
+	CREATE_STRING (query, "DELETE FROM follow WHERE from_id ='%s' AND exchange = '%s'" 
+			"AND permission = '%s' AND topic = '%s'", from,exchange,permission,topic);
+
+	RUN_QUERY(query,"failed to query for permission");
 
 	OK();
 
@@ -2293,7 +2436,7 @@ get_follow_status (struct http_request *req)
 	{
 		CREATE_STRING (query,
 			"SELECT "
-			"follow_id,requested_by,exchange,time,permission,topic,validity "
+			"follow_id,requested_by,exchange,time,permission,topic,validity,status "
 			"FROM follow "
 			"WHERE from_id LIKE '%s/%%' "
 			"ORDER BY time DESC",
@@ -2304,7 +2447,7 @@ get_follow_status (struct http_request *req)
 	{
 		CREATE_STRING (query,
 			"SELECT "
-			"follow_id,requested_by,exchange,time,permission,topic,validity "
+			"follow_id,requested_by,exchange,time,permission,topic,validity,status "
 			"FROM follow "
 			"WHERE from_id = '%s' "
 			"ORDER BY time DESC",
@@ -2328,7 +2471,8 @@ get_follow_status (struct http_request *req)
 			"\"time\":\"%s\","
 			"\"permission\":\"%s\","
 			"\"topic\":\"%s\","
-			"\"validity\":\"%s\"},"
+			"\"validity\":\"%s\","
+			"\"status\":\"%s\"},"
 			,
 			kore_pgsql_getvalue(&sql,i,0),
 			kore_pgsql_getvalue(&sql,i,1),
@@ -2336,7 +2480,8 @@ get_follow_status (struct http_request *req)
 			kore_pgsql_getvalue(&sql,i,3),
 			kore_pgsql_getvalue(&sql,i,4),
 			kore_pgsql_getvalue(&sql,i,5),
-			kore_pgsql_getvalue(&sql,i,6)
+			kore_pgsql_getvalue(&sql,i,6),
+			kore_pgsql_getvalue(&sql,i,7)
 		);
 	}
 	if (num_rows > 0)

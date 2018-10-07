@@ -21,9 +21,9 @@ services:
 
   broker:
     image: ideam/kore-broker
-    container_name: kore-broker 
+    container_name: broker 
     restart: always
-    hostname: kore-broker
+    hostname: broker
     ports:
       - "5672:5672"
       - "1883:1883"
@@ -35,8 +35,8 @@ services:
   
   postgres:
     image: postgres:10.5-alpine
-    container_name: kore-postgres
-    hostname: kore-postgres
+    container_name: postgres
+    hostname: postgres
     restart: always
     networks:
       - kore-net

@@ -5,21 +5,21 @@ set -e
 docker-compose down 
 docker-compose up -d 
 
-docker cp config/schema.db kore-postgres:/
-docker cp setup/postgres.sh kore-postgres:/
-docker exec kore-postgres chmod +x postgres.sh
-docker exec -d kore-postgres ./postgres.sh
-docker cp kore-postgres:/postgres_pwd .
+docker cp config/schema.db postgres:/
+docker cp setup/postgres.sh postgres:/
+docker exec postgres chmod +x postgres.sh
+docker exec -d postgres ./postgres.sh
+docker cp postgres:/postgres_pwd .
 
 pwd=`cat postgres_pwd | cut -d ":" -f 2`
 
 sed 's/postgres_pwd/'$pwd'/g' authenticator/src/authenticator.c > authenticator/src/authenticator_new.c
 sed 's/postgres_pwd/'$pwd'/g' kore-publisher/src/kore-publisher.c > kore-publisher/src/kore-publisher_new.c
 
-docker cp authenticator/ kore-broker:/
-docker cp setup/broker.sh kore-broker:/
-docker exec kore-broker chmod +x broker.sh
-docker exec -d kore-broker ./broker.sh 
+docker cp authenticator/ broker:/
+docker cp setup/broker.sh broker:/
+docker exec broker chmod +x broker.sh
+docker exec -d broker ./broker.sh 
 
 docker cp kore-publisher/ kore:/
 docker cp setup/kore.sh kore:/
