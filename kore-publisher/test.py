@@ -3,7 +3,7 @@ import random
 import sys
 import requests
 
-admin_api = "admin"
+admin_api = "x"
 num_devices = 10 
 
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
@@ -132,7 +132,7 @@ for i in xrange(0,num_devices):
 		r = get("unbind",{"id":app,"apikey":app_apikey,"to":device,"topic":"hello"})
 		check(r,200)
 
-		r = get("unfollow",{"id":app,"apikey":app_apikey,"to":device,"topic":"hello"})
+		r = get("unfollow",{"id":app,"apikey":app_apikey,"from":app,"to":device,"permission":perm,"topic":"hello"})
 		check(r,200)
 
 t_dregister = time.time()
