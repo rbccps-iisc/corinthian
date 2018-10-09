@@ -284,8 +284,7 @@ auth_vhost(struct http_request *req)
 int
 auth_topic(struct http_request *req)
 {
-	http_response(req, 200, "allow", 5);
-	return (KORE_RESULT_OK);
+	return 1;
 }
 
 int
@@ -306,10 +305,6 @@ auth_resource(struct http_request *req)
 	GET_MANDATORY_FIELD(resource);
 	GET_MANDATORY_FIELD(name);
 	GET_MANDATORY_FIELD(permission);
-
-	// we do not worry about topic
-	if (strcmp(resource,"topic") == 0)
-		OK()
 
 	// admin can do anything ???
 	if (strcmp(username,"admin") == 0)
@@ -387,7 +382,7 @@ auth_resource(struct http_request *req)
 			}
 		}
 	}
-	else if (strcmp(resource,"exchange") == 0)
+	else if (strcmp(resource,"exchange") == 0 || strcmp(resource,"topic") == 0)
 	{
 		// ok to allow read as configure is not allowed
 		if (strcmp(permission,"read") == 0)
