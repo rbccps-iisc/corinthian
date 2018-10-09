@@ -9,5 +9,4 @@ sudo apt-get install docker-ce -y
 sudo usermod -aG docker $USER
 
 sudo apt install python python-pip
-sudo pip install requests
-sudo pip install urllib3
+python -m pip install requests
