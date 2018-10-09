@@ -10,3 +10,4 @@ sudo usermod -aG docker $USER
 
 sudo apt install python python-pip
 python -m pip install requests
+python -m pip install urllib3

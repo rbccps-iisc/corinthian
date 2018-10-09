@@ -1,4 +1,5 @@
 import json
+import urllib3
 import requests
 import argparse
 import random
@@ -6,9 +7,8 @@ import string
 import argparse
 import logging
 import time
-from requests.packages.urllib3.exceptions import InsecureRequestWarning
 
-requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 logger = logging.getLogger(__name__)
 
