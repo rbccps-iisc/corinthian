@@ -1,0 +1,9 @@
+sudo: required
+dist: xenial
+before_install:
+  - ./tests/require.sh
+language: python
+install:
+  - ./install
+script:
+  - ./tests/test -d 10 -a 1

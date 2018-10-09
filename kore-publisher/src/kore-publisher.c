@@ -2060,6 +2060,8 @@ unfollow (struct http_request *req)
 		if (kore_pgsql_ntuples(&sql) == 0)
 			FORBIDDEN("unauthorized");
 
+		follow_id	= kore_pgsql_getvalue(&sql,0,0);
+		
 		char write_exchange 	[129];
 		char command_queue	[129];
 		char write_topic	[129];
@@ -2080,6 +2082,9 @@ unfollow (struct http_request *req)
 			ERROR("unbind failed for app.write with device.command");
 		}
 
+		CREATE_STRING 	(query, "DELETE FROM follow WHERE follow_id='%s'", follow_id);
+		RUN_QUERY	(query, "failed to delete from follow table");
+		
 		// if its just write then stop 
 		if (strcmp(permission,"write") == 0)
 			OK();
