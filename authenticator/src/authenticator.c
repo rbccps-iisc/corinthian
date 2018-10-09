@@ -327,7 +327,7 @@ auth_resource(struct http_request *req)
 	if (looks_like_a_valid_owner(name))
 		DENY()
 
-	// get user info in acl, if blocked deny
+	// XXX do we need this query ?
 	CREATE_STRING (query,
 			"SELECT blocked FROM users WHERE id='%s'",
 				sanitize(username)
@@ -418,6 +418,8 @@ auth_resource(struct http_request *req)
 				strcmp(exchange_ends_with,".protected") == 0
 						||
 				strcmp(exchange_ends_with,".diagnostics") == 0
+						||
+				strcmp(exchange_ends_with,".write") == 0
 			)
 			{
 				OK();
@@ -425,31 +427,7 @@ auth_resource(struct http_request *req)
 		}
 		else
 		{
-			// else there must a share entry 
-
-			CREATE_STRING (query,
-				"SELECT permission FROM acl "
-					"WHERE from_id='%s' AND exchange='%s' and permission='write'"
-						" AND now() < valid_till",
-				sanitize(username),
-				sanitize(name)
-			);
-			kore_pgsql_cleanup(&sql);
-			if (! kore_pgsql_setup(&sql,"db",KORE_PGSQL_SYNC))
-			{
-				kore_pgsql_logerror(&sql);
-				DENY();
-			}
-			if (! kore_pgsql_query(&sql, (const char *)query->data))
-			{
-				kore_pgsql_logerror(&sql);
-				DENY();
-			}
-
-			printf("for query = {%s} got {%d] results\n",query->data,kore_pgsql_ntuples(&sql));
-
-			if (kore_pgsql_ntuples(&sql) == 1)
-				OK();
+			DENY();
 		}
 	}
 

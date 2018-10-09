@@ -21,7 +21,7 @@
 
 #include "ht.h"
 
-//#define TEST (1)
+#define TEST (1)
 
 #if 0
 	#define debug_printf(...)
@@ -277,27 +277,27 @@ retry:
 	login_reply = amqp_login
 #ifdef TEST
 		(cached_admin_conn, "/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN, "guest", "guest");
-#else	
+#else
 		(cached_admin_conn, "/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN, "admin", admin_apikey);
 #endif
 
 	if (login_reply.reply_type != AMQP_RESPONSE_NORMAL)
 	{
 		fprintf(stderr,"invalid id or apikey\n");
-		return KORE_RESULT_ERROR;	
+		return KORE_RESULT_ERROR;
 	}
 
 	if(! amqp_channel_open(cached_admin_conn, 1))
 	{
 		fprintf(stderr,"could not open an AMQP connection\n");
-		return KORE_RESULT_ERROR;	
+		return KORE_RESULT_ERROR;
 	}
 
 	rpc_reply = amqp_get_rpc_reply(cached_admin_conn);
 	if (rpc_reply.reply_type != AMQP_RESPONSE_NORMAL)
 	{
 		fprintf(stderr,"did not receive expected response from the broker\n");
-		return KORE_RESULT_ERROR;	
+		return KORE_RESULT_ERROR;
 	}
 
 	// declare the "DATABASE" queue if it does not exist
@@ -309,7 +309,7 @@ retry:
 		1, /* durable */
 		0,
 		0,
-		lazy_queue_table	
+		lazy_queue_table
 	))
 	{
 		fprintf(stderr,"amqp_queue_declare failed for {DATABASE}\n");
@@ -354,7 +354,7 @@ is_alpha_numeric (const char *str)
 				case '-':
 						break;
 				default:
-						return false;	
+						return false;
 			}
 		}
 	}
@@ -374,11 +374,11 @@ is_owner(const char *id, const char *entity)
 	int strlen_id = strlen(id);
 
 	if (strncmp(id,entity,strlen_id) != 0)
-		return false;	
+		return false;
 
 	// '/' for owner and '.' for entity
 	if (entity[strlen_id] != '/' && entity[strlen_id] != '.')
-		return false;	
+		return false;
 
 	return true;
 }
@@ -408,7 +408,7 @@ looks_like_a_valid_entity (const char *str)
 				case '-':
 						break;
 				default:
-						return false;	
+						return false;
 			}
 		}
 
@@ -454,7 +454,7 @@ looks_like_a_valid_resource (const char *str)
 						++dot_count;
 						break;
 				default:
-						return false;	
+						return false;
 			}
 		}
 
@@ -463,7 +463,7 @@ looks_like_a_valid_resource (const char *str)
 				  ||
 		            (dot_count > 1)
 		   )
-		   {	
+		   {
 			return false;
 	           }
 	}
@@ -497,7 +497,7 @@ gen_salt_password_and_apikey (const char *entity, char *salt, char *password_has
 
 	debug_printf("gen STRING TO BE HASHED = {%s}\n",string_to_be_hashed);
 
-	snprintf	
+	snprintf
 	(
 		password_hash,
 		65,
@@ -548,16 +548,16 @@ login_success (const char *id, const char *apikey)
 	if (! kore_pgsql_setup(&sql,"db",KORE_PGSQL_SYNC))
 	{
 		kore_pgsql_logerror(&sql);
-		goto done;	
+		goto done;
 	}
 	if (! kore_pgsql_query(&sql,(const char *)query->data))
 	{
 		kore_pgsql_logerror(&sql);
-		goto done;	
+		goto done;
 	}
 
 	if (kore_pgsql_ntuples(&sql) == 0)
-		goto done;	
+		goto done;
 
 	salt 	 	= kore_pgsql_getvalue(&sql,0,0);
 	password_hash	= kore_pgsql_getvalue(&sql,0,1);
@@ -620,11 +620,14 @@ publish (struct http_request *req)
 {
 	const char *id;
 	const char *apikey;
-	const char *exchange;
+	const char *to;
 	const char *topic;
 	const char *message;
+	const char *message_type;
 
 	const char *content_type;
+
+	char exchange[129];
 
 	amqp_basic_properties_t props;
 
@@ -639,12 +642,24 @@ publish (struct http_request *req)
 				||
 		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
 				||
-		KORE_RESULT_OK != http_request_header(req, "to", &exchange)
+		KORE_RESULT_OK != http_request_header(req, "to", &to)
 				||
 		KORE_RESULT_OK != http_request_header(req, "topic", &topic)
+				||
+		KORE_RESULT_OK != http_request_header(req, "message-type", &message_type)
 			,
 		"inputs missing in headers"
 	);
+
+	if(
+		(strcmp(message_type,"public") 		!= 0)	&&
+		(strcmp(message_type,"private") 	!= 0)	&&
+		(strcmp(message_type,"protected") 	!= 0)	&&
+		(strcmp(message_type,"command") 	!= 0)
+	)
+	{
+		BAD_REQUEST("message-type is not valid");
+	}
 
 	if (http_request_header(req, "message", &message) != KORE_RESULT_OK)
 	{
@@ -669,7 +684,7 @@ publish (struct http_request *req)
 	if (! login_success(id,apikey))
 		BAD_REQUEST("invalid id or apikey");
 
-	sanitize(exchange);
+	sanitize(to);
 
 /////////////////////////////////////////////////
 
@@ -700,7 +715,7 @@ reconnect:
 
 		*cached_conn = amqp_new_connection();
 		socket = amqp_tcp_socket_new(*cached_conn);
-		
+
 		if (socket == NULL)
 			ERROR("could not create a new socket");
 
@@ -730,13 +745,27 @@ reconnect:
 
 	debug_printf("Got content-type {%s} : {%s}\n",content_type,id);
 
+
+	char topic_to_publish[129] = {0};
+
+	if (is_owner(id,to))
+	{
+		snprintf(exchange,129,"%s.%s",to,message_type);
+		strlcpy(topic_to_publish,topic,129);
+	}
+	else
+	{
+		snprintf(topic_to_publish,129,"%s:%s",to,topic);
+		snprintf(exchange,129,"%s.write",to);
+	}
+
 	FORBIDDEN_if
 	(
-		AMQP_STATUS_OK != amqp_basic_publish (	
+		AMQP_STATUS_OK != amqp_basic_publish (
 			*cached_conn,
 			1,
 			amqp_cstring_bytes(exchange),
-        		amqp_cstring_bytes(topic),
+        		amqp_cstring_bytes(topic_to_publish),
 			0,
 			0,
 			&props,
@@ -877,7 +906,7 @@ subscribe (struct http_request *req)
 	{
 		amqp_rpc_reply_t res;
 		amqp_message_t 	 message;
-		
+
 		time_t t;
 		t = time(NULL);
 		int time_spent = 0;
@@ -952,7 +981,7 @@ subscribe (struct http_request *req)
 
 done:
 	if (connection_opened)
-	{	
+	{
 		amqp_channel_close	(connection, 1, AMQP_REPLY_SUCCESS);
 		amqp_connection_close	(connection,    AMQP_REPLY_SUCCESS);
 		amqp_destroy_connection	(connection);
@@ -995,12 +1024,12 @@ register_entity (struct http_request *req)
 		"inputs missing in headers"
 	);
 
-	// deny if the user is not a owner	
+	// deny if the user is not a owner
 	if (! looks_like_a_valid_owner(id))
 		FORBIDDEN("id is not valid");
 
 	if (! is_alpha_numeric(entity))
-		BAD_REQUEST("entity is not valid");	
+		BAD_REQUEST("entity is not valid");
 
 	body = NULL;
 	if (req->http_body)
@@ -1010,7 +1039,7 @@ register_entity (struct http_request *req)
 	if (KORE_RESULT_OK != http_request_header(req, "is-autonomous", &char_is_autonomous))
 	{
 		if (strcmp(char_is_autonomous,"true") == 0)
-			is_autonomous = true;	
+			is_autonomous = true;
 	}
 
 /////////////////////////////////////////////////
@@ -1199,7 +1228,7 @@ cat (struct http_request *req)
 		// if not a valid entity
 		if (! looks_like_a_valid_entity(entity))
 			FORBIDDEN("id is not a valid entity");
-	
+
 		CREATE_STRING (query,
 				"SELECT schema FROM users WHERE schema is NOT NULL AND id='%s'",
 					sanitize(entity)
@@ -1212,7 +1241,7 @@ cat (struct http_request *req)
 	}
 
 	RUN_QUERY (query,"unable to query catalog data");
-	
+
 	num_rows = kore_pgsql_ntuples(&sql);
 
 	kore_buf_reset(response);
@@ -1265,7 +1294,7 @@ db_cleanup (struct http_request *req)
 	req->status = 403;
 
 	if (! is_request_from_localhost(req))
-		FORBIDDEN("this api can only be called from localhost");	
+		FORBIDDEN("this api can only be called from localhost");
 
 	BAD_REQUEST_if
 	(
@@ -1283,7 +1312,7 @@ db_cleanup (struct http_request *req)
 
 	CREATE_STRING 	(query,"DELETE FROM acl WHERE now() > valid_till");
 	RUN_QUERY 	(query,"could not delete old entiries from acl table");
-	
+
 	OK();
 
 done:
@@ -1307,7 +1336,7 @@ register_owner(struct http_request *req)
 	req->status = 403;
 
 	if (! is_request_from_localhost(req))
-		FORBIDDEN("this api can only be called from localhost");	
+		FORBIDDEN("this api can only be called from localhost");
 
 	BAD_REQUEST_if
 	(
@@ -1329,10 +1358,10 @@ register_owner(struct http_request *req)
 
 	// it should look like an owner
 	if (! looks_like_a_valid_owner(owner))
-		BAD_REQUEST("entity should be an owner");	
+		BAD_REQUEST("entity should be an owner");
 
 /////////////////////////////////////////////////
-		
+
 	if (! login_success("admin",apikey))
 		FORBIDDEN("wrong apikey");
 
@@ -1405,7 +1434,7 @@ deregister_owner(struct http_request *req)
 	req->status = 403;
 
 	if (! is_request_from_localhost(req))
-		FORBIDDEN("this api can only be called from localhost");	
+		FORBIDDEN("this api can only be called from localhost");
 
 	BAD_REQUEST_if
 	(
@@ -1427,7 +1456,7 @@ deregister_owner(struct http_request *req)
 
 	// it should look like an owner
 	if (! looks_like_a_valid_owner(owner))
-		BAD_REQUEST("not a valid owner");	
+		BAD_REQUEST("not a valid owner");
 
 /////////////////////////////////////////////////
 
@@ -1511,7 +1540,7 @@ queue_bind (struct http_request *req)
 	char exchange	[129];
 
  	req->status = 403;
-	
+
 	BAD_REQUEST_if
 	(
 		KORE_RESULT_OK != http_request_header(req, "id", &id)
@@ -1588,25 +1617,25 @@ queue_bind (struct http_request *req)
 		);
 
 		RUN_QUERY(query,"failed to query for permission");
-		
+
 		if (kore_pgsql_ntuples(&sql) != 1)
 			FORBIDDEN("unauthorized");
 	}
-	
+
 	if (! amqp_queue_bind (
 		cached_admin_conn,
 		1,
 		amqp_cstring_bytes(queue),
 		amqp_cstring_bytes(exchange),
 		amqp_cstring_bytes(topic),
-		amqp_empty_table	
+		amqp_empty_table
 	))
 	{
 		ERROR("bind failed");
 	}
 
 	OK();
-	
+
 done:
 	END();
 }
@@ -1627,7 +1656,7 @@ queue_unbind (struct http_request *req)
 	char exchange	[129];
 
  	req->status = 403;
-	
+
 	BAD_REQUEST_if
 	(
 		KORE_RESULT_OK != http_request_header(req, "id", &id)
@@ -1704,25 +1733,25 @@ queue_unbind (struct http_request *req)
 		);
 
 		RUN_QUERY(query,"failed to query for permission");
-		
+
 		if (kore_pgsql_ntuples(&sql) != 1)
 			FORBIDDEN("unauthorized");
 	}
-	
+
 	if (! amqp_queue_unbind (
 		cached_admin_conn,
 		1,
 		amqp_cstring_bytes(queue),
 		amqp_cstring_bytes(exchange),
 		amqp_cstring_bytes(topic),
-		amqp_empty_table	
+		amqp_empty_table
 	))
 	{
 		ERROR("unbind failed");
 	}
 
 	OK();
-	
+
 done:
 	END();
 }
@@ -1757,21 +1786,11 @@ follow (struct http_request *req)
 		KORE_RESULT_OK != http_request_header(req, "permission", &permission)
 				||
 		KORE_RESULT_OK != http_request_header(req, "validity", &validity)
+				||
+		KORE_RESULT_OK != http_request_header(req, "topic", &topic)
 			,
 		"inputs missing in headers"
 	);
-
-	if (strcmp(permission,"read") == 0 || strcmp(permission,"read-write") == 0)
-	{
-		if (KORE_RESULT_OK != http_request_header(req, "topic", &topic))
-		{
-			BAD_REQUEST ("topic is missing in headers");
-		}
-	}
-	else
-	{
-		topic = "#";
-	}
 
 	if (looks_like_a_valid_owner(id))
 	{
@@ -1809,9 +1828,7 @@ follow (struct http_request *req)
 
 	// if both from and to are owned by id
 	if (is_owner(id,to))
-	{
-		status = "approved";	
-	}
+		status = "approved";
 
 	char read_follow_id  [10];
 	char write_follow_id [10];
@@ -1892,21 +1909,28 @@ follow (struct http_request *req)
 
 		if (strcmp(permission,"write") == 0 || strcmp(permission,"read-write") == 0)
 		{
-			CREATE_STRING (query,
-			"INSERT INTO acl (acl_id,from_id,exchange,follow_id,permission,topic,valid_till) "
-			"values(DEFAULT,'%s','%s.command','%s','%s', '%s', now() + interval '%s  hours')",
-			        	from,
-					to,		// .command is appended to it
-					write_follow_id,
-					"write",
-					topic,
-					validity
-			);
+			char write_exchange 	[129];
+			char command_queue	[129];
+			char write_topic	[129];
 
-			RUN_QUERY (query,"could not run insert query on acl - write");
+			snprintf(write_exchange,129,"%s.write",from);
+			snprintf(command_queue,129,"%s.command",to);
+			snprintf(write_topic,129,"%s:%s",to,topic);
+
+			if (! amqp_queue_bind (
+				cached_admin_conn,
+				1,
+				amqp_cstring_bytes(command_queue),
+				amqp_cstring_bytes(write_exchange),
+				amqp_cstring_bytes(write_topic),
+				amqp_empty_table
+			))
+			{
+				ERROR("bind failed for app.write with device.command");
+			}
 		}
 
-		req->status = 200;	
+		req->status = 200;
 	}
 	else
 	{
@@ -1925,7 +1949,7 @@ follow (struct http_request *req)
 	{
 		// put a comma
 		if (strlen(read_follow_id) > 0)
-			kore_buf_append(response,",",1);			
+			kore_buf_append(response,",",1);
 
 		kore_buf_appendf(response,"\"follow-id-write\":\"%s\"",write_follow_id);
 	}
@@ -1989,7 +2013,7 @@ unfollow (struct http_request *req)
 			&&
 		(strcmp(permission,"write") !=0)
 			&&
-		(strcmp(permission, "read-write") !=0)
+		(strcmp(permission,"read-write") !=0)
 	)
 	{
 		BAD_REQUEST("Invalid permission string");
@@ -2005,31 +2029,13 @@ unfollow (struct http_request *req)
 	sanitize(to);
 
 /////////////////////////////////////////////////
-	
-	if(strcmp(permission, "read")==0)
-	{
-		CREATE_STRING ( query,
-			"SELECT acl_id,follow_id,exchange FROM acl "
-				"WHERE "
-				"from_id = '%s' "
-					"AND "
-				"exchange = '%s.protected' "
-					"AND "
-				"topic = '%s' "
-					"AND "
-				"permission = 'read'",
 
-					from,
-					to,
-					topic
-			);
-	}
-	else if(strcmp(permission, "write")==0)
+	if (strcmp(permission,"write") == 0 || strcmp(permission,"read-write") == 0)
 	{
 		CREATE_STRING ( query,
-			"SELECT acl_id,follow_id,exchange FROM acl "
+			"SELECT follow_id,exchange FROM follow "
 				"WHERE "
-				"from_id = '%s' "
+				"requested_by = '%s' "
 					"AND "
 				"exchange = '%s.command' "
 					"AND "
@@ -2040,71 +2046,98 @@ unfollow (struct http_request *req)
 					from,
 					to,
 					topic
-			);
+		);
+
+		RUN_QUERY(query,"failed to query follow table for permission");
+
+		if (kore_pgsql_ntuples(&sql) == 0)
+			FORBIDDEN("unauthorized");
+
+		char write_exchange 	[129];
+		char command_queue	[129];
+		char write_topic	[129];
+
+		snprintf(write_exchange,129,"%s.write",from);
+		snprintf(command_queue,129,"%s.command",to);
+		snprintf(write_topic,129,"%s:%s",to,topic);
+
+		if (! amqp_queue_unbind (
+			cached_admin_conn,
+			1,
+			amqp_cstring_bytes(command_queue),
+			amqp_cstring_bytes(write_exchange),
+			amqp_cstring_bytes(write_topic),
+			amqp_empty_table
+		))
+		{
+			ERROR("unbind failed for app.write with device.command");
+		}
+
+		// if its just write then stop 
+		if (strcmp(permission,"write") == 0)
+			OK();
 	}
-	else if (strcmp(permission, "read-write") == 0)
-	{
-		CREATE_STRING ( query,
-                        "SELECT acl_id,follow_id,exchange FROM acl "
-                                "WHERE "
-                                "from_id = '%s' "
-                                        "AND "
-                                "exchange = '%s.%%' "
-                                        "AND "
-                                "topic = '%s' ",
-                                        from,
-                                        to,
-                                        topic
-                        );
-	}
+
+//// for read permissions /////
+
+	CREATE_STRING ( query,
+		"SELECT acl_id,follow_id,exchange FROM acl "
+			"WHERE "
+			"from_id = '%s' "
+				"AND "
+			"exchange = '%s.protected' "
+				"AND "
+			"topic = '%s' "
+				"AND "
+			"permission = 'read'",
+
+				from,
+				to,
+				topic
+	);
 
 	RUN_QUERY(query,"failed to query acl table for permission");
-		
-	if (kore_pgsql_ntuples(&sql) == 0)
+
+	if (kore_pgsql_ntuples(&sql) != 1)
 		FORBIDDEN("unauthorized");
 
-	char priority_queue[256];
+	char priority_queue[129];
 
 	strlcpy(priority_queue, from, 128);
 	strlcat(priority_queue, ".priority", 128);
 
-	uint32_t num_rows = kore_pgsql_ntuples(&sql);
+	acl_id		= kore_pgsql_getvalue(&sql,0,0);
+	follow_id	= kore_pgsql_getvalue(&sql,0,1);
+	exchange 	= kore_pgsql_getvalue(&sql,0,2);
 
-	for (int i = 0; i < num_rows; ++i)
+	CREATE_STRING 	(query, "DELETE FROM acl WHERE acl_id='%s'", acl_id);
+	RUN_QUERY	(query, "failed to delete from acl table");
+
+	CREATE_STRING 	(query, "DELETE FROM follow WHERE follow_id='%s'", follow_id);
+	RUN_QUERY	(query, "failed to delete from follow table");
+
+	if (! amqp_queue_unbind (
+		cached_admin_conn,
+		1,
+		amqp_cstring_bytes(from),
+		amqp_cstring_bytes(exchange),
+		amqp_cstring_bytes(topic),
+		amqp_empty_table
+	))
 	{
-		acl_id		= kore_pgsql_getvalue(&sql,i,0);
-		follow_id	= kore_pgsql_getvalue(&sql,i,1);
-		exchange 	= kore_pgsql_getvalue(&sql,i,2);
+		ERROR("unfollow failed");
+	}
 
-		CREATE_STRING 	(query, "DELETE FROM acl WHERE acl_id='%s'", acl_id);
-		RUN_QUERY	(query,"failed to delete from acl table");
-
-		CREATE_STRING 	(query, "DELETE FROM follow WHERE follow_id='%s'", follow_id);
-		RUN_QUERY	(query, "failed to delete from follow table");
-
-		if (! amqp_queue_unbind (
-			cached_admin_conn,
-			1,
-			amqp_cstring_bytes(from),
-			amqp_cstring_bytes(exchange),
-			amqp_cstring_bytes(topic),
-			amqp_empty_table	
-		))
-		{	
-			ERROR("unfollow failed");
-		}
-
-		if (! amqp_queue_unbind (
-			cached_admin_conn,
-			1,
-			amqp_cstring_bytes(priority_queue),
-			amqp_cstring_bytes(exchange),
-			amqp_cstring_bytes(topic),
-			amqp_empty_table	
-		))
-		{
-			ERROR("unbind priority queue failed");
-		}
+	if (! amqp_queue_unbind (
+		cached_admin_conn,
+		1,
+		amqp_cstring_bytes(priority_queue),
+		amqp_cstring_bytes(exchange),
+		amqp_cstring_bytes(topic),
+		amqp_empty_table
+	))
+	{
+		ERROR("unbind priority queue failed");
 	}
 
 	OK();
@@ -2131,7 +2164,7 @@ share (struct http_request *req)
 				||
 		KORE_RESULT_OK != http_request_header(req, "follow-id", &follow_id)
 		,
-		
+
 		"inputs missing in headers"
 	);
 
@@ -2162,7 +2195,6 @@ share (struct http_request *req)
 				follow_id,
 				id
 		);
-
 	}
 
 	RUN_QUERY (query,"could not run select query on follow");
@@ -2185,8 +2217,10 @@ share (struct http_request *req)
 	);
 	RUN_QUERY (query,"could not run update query on follow");
 
-	// add entry in acl
-	CREATE_STRING (query,
+	if (strcmp(permission,"read") == 0)
+	{
+		// add entry in acl
+		CREATE_STRING (query,
 			"INSERT INTO acl (acl_id,from_id,exchange,follow_id,permission,topic,valid_till) "
 			"values(DEFAULT,'%s','%s','%s','%s', '%s', now() + interval '%s  hours')",
 		        	from_id,
@@ -2195,10 +2229,48 @@ share (struct http_request *req)
 				permission,
 				topic,
 				validity_hours
-	);
+		);
 
-	RUN_QUERY (query,"could not run insert query on acl");
-	
+		RUN_QUERY (query,"could not run insert query on acl");
+	}
+	else
+	{
+		char write_exchange 	[129];
+		char command_queue	[129];
+		char write_topic	[129];
+
+		snprintf(write_exchange,129,"%s.write",from_id);
+		snprintf(command_queue,129,"%s",exchange);	// exchange in follow is device.command
+
+		// remove the stuff after . from exchange
+		char *p = exchange;
+		while (*p)
+		{
+			if (*p == '.')
+			{
+				*p = '\0';
+				break;
+			}
+			++p;
+		}
+
+		snprintf(write_topic,129,"%s:%s",exchange,topic);
+
+		debug_printf("\n--->binding {%s} with {%s} {%s}\n",command_queue,write_exchange,write_topic);
+
+		if (! amqp_queue_bind (
+			cached_admin_conn,
+			1,
+			amqp_cstring_bytes(command_queue),
+			amqp_cstring_bytes(write_exchange),
+			amqp_cstring_bytes(write_topic),
+			amqp_empty_table
+		))
+		{
+			ERROR("bind failed for app.write with device.command");
+		}
+	}
+
 	OK();
 
 done:
@@ -2223,7 +2295,7 @@ reject_follow (struct http_request *req)
 				||
 		KORE_RESULT_OK != http_request_header(req, "follow-id", &follow_id)
 		,
-		
+
 		"inputs missing in headers"
 	);
 
@@ -2292,7 +2364,7 @@ get_follow_status (struct http_request *req)
 				||
 		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
 		,
-		
+
 		"inputs missing in headers"
 	);
 
@@ -2387,7 +2459,7 @@ get_follow_requests (struct http_request *req)
 				||
 		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
 		,
-		
+
 		"inputs missing in headers"
 	);
 
@@ -2483,14 +2555,14 @@ block (struct http_request *req)
 	);
 
 	if (! looks_like_a_valid_owner(id))
-		BAD_REQUEST("id is not valid owner");	
+		BAD_REQUEST("id is not valid owner");
 
 	if (strcmp(id,"admin") == 0)
 	{
 		if (! is_request_from_localhost(req))
-			FORBIDDEN("admin can only use from localhost");	
+			FORBIDDEN("admin can only use from localhost");
 	}
-	else	
+	else
 	{
 		if (! is_owner(id,entity))
 			FORBIDDEN("you are not the owner of the entity");
@@ -2537,12 +2609,12 @@ unblock (struct http_request *req)
 	);
 
 	if (! looks_like_a_valid_owner(id))
-		BAD_REQUEST("id is not valid owner");	
+		BAD_REQUEST("id is not valid owner");
 
 	if (strcmp(id,"admin") == 0)
 	{
 		if (! is_request_from_localhost(req))
-			FORBIDDEN("admin can only use from localhost");	
+			FORBIDDEN("admin can only use from localhost");
 	}
 	else
 	{
@@ -2563,7 +2635,7 @@ unblock (struct http_request *req)
 			"UPDATE users set blocked='f' WHERE id='%s'",
 				entity
 	);
-	
+
 	RUN_QUERY(query, "could not block the entity");
 
 	OK();
@@ -2619,7 +2691,7 @@ create_exchanges_and_queues (void *v)
 			1, /* durable */
 			0,
 			0,
-			lazy_queue_table	
+			lazy_queue_table
 		))
 		{
 			fprintf(stderr,"amqp_queue_declare failed {%s}\n",queue);
@@ -2659,7 +2731,7 @@ create_exchanges_and_queues (void *v)
 	}
 	else
 	{
-		char *_e[] = {".public", ".private", ".protected", ".command", ".notification", NULL};
+		char *_e[] = {".public", ".private", ".protected", ".command", ".notification", ".write", NULL};
 
 		for (i = 0; _e[i]; ++i)
 		{
@@ -2715,7 +2787,7 @@ create_exchanges_and_queues (void *v)
 				1, /* durable */
 				0,
 				0,
-				lazy_queue_table	
+				lazy_queue_table
 			))
 			{
 				fprintf(stderr,"amqp_queue_declare failed {%s}\n",queue);
@@ -2735,7 +2807,7 @@ create_exchanges_and_queues (void *v)
 					amqp_cstring_bytes(queue),
 					amqp_cstring_bytes(exchange),
 					amqp_cstring_bytes("#"),
-					amqp_empty_table	
+					amqp_empty_table
 				))
 				{
 					fprintf(stderr,"failed to bind {%s} to {%s}\n",queue,exchange);
@@ -2757,7 +2829,7 @@ delete_exchanges_and_queues (void *v)
 	int i;
 
 	const char *id = (const char *)v;
-	
+
 	char queue[129];
 	char exchange[129];
 
@@ -2798,7 +2870,7 @@ delete_exchanges_and_queues (void *v)
 	}
 	else
 	{
-		char *_e[] = {".public", ".private", ".protected", ".command", ".notification", NULL};
+		char *_e[] = {".public", ".private", ".protected", ".command", ".notification", ".write", NULL};
 
 		for (i = 0; _e[i]; ++i)
 		{
@@ -2875,8 +2947,8 @@ is_request_from_localhost (struct http_request *req)
 {
 	if (req->owner->addrtype == AF_INET)
 	{
-		if (req->owner->addr.ipv4.sin_addr.s_addr != htonl(INADDR_LOOPBACK))	
-			return false;	
+		if (req->owner->addr.ipv4.sin_addr.s_addr != htonl(INADDR_LOOPBACK))
+			return false;
 	}
 	else
 	{

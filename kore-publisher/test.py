@@ -25,10 +25,10 @@ def check(r,c):
 		print r._content
 		sys.exit(0)
 	else:
-		if len(r._content) > 65:
-			print "---> Ok [",r.status_code,"]",r.url, r._content[:65].strip(),"..."
+		if len(r._content) > 85:
+			print "---> Ok [",r.status_code,"]",r.url.split("/")[-1], r._content[:85].strip(),"..."
 		else:
-			print "---> Ok [",r.status_code,"]",r.url, r._content.strip()
+			print "---> Ok [",r.status_code,"]",r.url.split("/")[-1], r._content.strip()
 
 
 print "De registering owners"
