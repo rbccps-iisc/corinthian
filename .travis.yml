@@ -6,4 +6,4 @@ language: python
 install:
   - ./install
 script:
-  - ./tests/test -d 10 -a 1
+  - python2.7 ./tests/test.py -d 10 -a 1
