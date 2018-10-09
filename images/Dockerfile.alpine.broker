@@ -11,6 +11,7 @@ RUN apk update && \
     chmod -R 777 /etc && \
     mkdir /etc/rabbitmq && \
     apk add git build-base openssl libbsd-dev bsd-compat-headers postgresql-dev && \
+    apk add perl elixir python libxslt xmlto zip rsync && \
     git clone https://github.com/jorisvink/kore && \
     cd kore && \
     make NOTLS=1 PGSQL=1 && \

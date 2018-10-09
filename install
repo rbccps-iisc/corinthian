@@ -17,6 +17,7 @@ sed 's/postgres_pwd/'$pwd'/g' authenticator/src/authenticator.c > authenticator/
 sed 's/postgres_pwd/'$pwd'/g' kore-publisher/src/kore-publisher.c > kore-publisher/src/kore-publisher_new.c
 
 docker cp authenticator/ broker:/
+#docker cp config/rabbitmq.config broker:/etc/rabbitmq/
 docker cp setup/broker.sh broker:/
 docker exec broker chmod +x broker.sh
 docker exec -d broker ./broker.sh 

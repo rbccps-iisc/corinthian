@@ -655,7 +655,7 @@ publish (struct http_request *req)
 		(strcmp(message_type,"public") 		!= 0)	&&
 		(strcmp(message_type,"private") 	!= 0)	&&
 		(strcmp(message_type,"protected") 	!= 0)	&&
-		(strcmp(message_type,"command") 	!= 0)
+		(strcmp(message_type,"command") 	!= 0)	
 	)
 	{
 		BAD_REQUEST("message-type is not valid");
@@ -676,7 +676,7 @@ publish (struct http_request *req)
 	if (! looks_like_a_valid_entity(id))
 		BAD_REQUEST("id is not a valid entity");
 
-	if (! looks_like_a_valid_resource(exchange))
+	if (! looks_like_a_valid_entity(to))
 		BAD_REQUEST("'to' is not a valid entity");
 
 /////////////////////////////////////////////////
@@ -748,15 +748,22 @@ reconnect:
 
 	char topic_to_publish[129] = {0};
 
-	if (is_owner(id,to))
+	if (strcmp(id,to)==0)
 	{
 		snprintf(exchange,129,"%s.%s",to,message_type);
 		strlcpy(topic_to_publish,topic,129);
+
+		debug_printf("------------------> exchange = %s\n",exchange);
+		debug_printf("------------------> topic = %s\n",topic_to_publish);
+		
 	}
 	else
 	{
-		snprintf(topic_to_publish,129,"%s:%s",to,topic);
-		snprintf(exchange,129,"%s.write",to);
+		snprintf(topic_to_publish,129,"%s",topic);
+		snprintf(exchange,129,"%s.write",id);
+
+		debug_printf("------------------> exchange = %s\n",exchange);
+		debug_printf("------------------> topic = %s\n",topic_to_publish);
 	}
 
 	FORBIDDEN_if
