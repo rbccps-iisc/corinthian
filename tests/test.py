@@ -1,5 +1,4 @@
 import json
-import urllib3
 import requests
 import argparse
 import random
@@ -7,6 +6,9 @@ import string
 import argparse
 import logging
 import time
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
+
+requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 logger = logging.getLogger(__name__)
 
@@ -23,9 +25,6 @@ apps = results.apps
 
 device_keys = {}
 app_keys = {}
-
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
 
 class colour:
     HEADER = '\033[95m'
