@@ -1,4 +1,3 @@
-#!/usr/bin/env python2
 import json
 import urllib3
 import requests
