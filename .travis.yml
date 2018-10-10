@@ -2,7 +2,6 @@ sudo: required
 dist: xenial
 before_install:
   - ./tests/require.sh
-language: python
 install:
   - ./install
 script:
