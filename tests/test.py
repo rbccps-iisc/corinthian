@@ -34,6 +34,8 @@ from functools import wraps
 #s.mount('https://', MyAdapter())
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+http = urllib3.PoolManager()
+
 logger = logging.getLogger(__name__)
 
 base_url = "https://localhost:8888"
@@ -73,7 +75,8 @@ def register(owner_id, apikey, entity_id):
 	
 	url = base_url + "/register"
 	headers = {"id": owner_id, "apikey":apikey, "entity": entity_id, "content-type":"application/json"}
-	r = requests.post(url=url, headers=headers, data="{\"test\":\"schema\"}", verify=False)
+	r = http.request('POST',url, fields=headers)
+	#r = requests.post(url=url, headers=headers, data="{\"test\":\"schema\"}", verify=False)
 	return r
 
 def deregister(owner_id, apikey, entity_id):
