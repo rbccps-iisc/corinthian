@@ -8,6 +8,7 @@ sudo apt update
 #sudo apt-get install docker-ce -y
 sudo usermod -aG docker $USER
 
+sudo apt-get install openssl ca-certificates
 sudo apt-get install libffi-dev
 sudo python -m pip install -U requests[security]
 #sudo apt install python python-pip libssl-dev 
