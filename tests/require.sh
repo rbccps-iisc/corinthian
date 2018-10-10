@@ -13,11 +13,11 @@ sudo apt-get install -y software-properties-common
 sudo apt-get install -y apt-transport-https  ca-certificates curl software-properties-common
 sudo apt-get install openssl ca-certificates
 sudo apt-get install libffi-dev
-sudo python -m pip install -U requests[security]
+#sudo python -m pip install -U requests[security]
 #sudo apt install python python-pip libssl-dev 
 #sudo pip install -U pyopenssl
 #sudo pip install --upgrade cryptography
-python -m pip install requests
-python -m pip install urllib3
+python -m pip3 install requests
+python -m pip3 install urllib3
 #python -m pip install pyasn1 
 #python -m pip install ndg-httpsclient 
