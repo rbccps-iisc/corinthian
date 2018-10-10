@@ -18,7 +18,7 @@ sudo apt-get install python3 python3-pip
 #sudo apt install python python-pip libssl-dev 
 #sudo pip install -U pyopenssl
 #sudo pip install --upgrade cryptography
-python -m pip3 install requests
-python -m pip3 install urllib3
+python3 -m pip install requests
+python3 -m pip install urllib3
 #python -m pip install pyasn1 
 #python -m pip install ndg-httpsclient 
