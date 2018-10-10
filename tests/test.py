@@ -12,16 +12,26 @@ import urllib3
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.poolmanager import PoolManager
 import ssl
+from functools import wraps
 
-class MyAdapter(HTTPAdapter):
-    def init_poolmanager(self, connections, maxsize, block=False):
-        self.poolmanager = PoolManager(num_pools=connections,
-                                       maxsize=maxsize,
-                                       block=block,
-                                       ssl_version=ssl.PROTOCOL_TLSv1_2)
+def sslwrap(func):
+    @wraps(func)
+    def bar(*args, **kw):
+        kw['ssl_version'] = ssl.PROTOCOL_TLSv1
+        return func(*args, **kw)
+    return bar
 
-s = requests.Session()
-s.mount('https://', MyAdapter())
+ssl.wrap_socket = sslwrap(ssl.wrap_socket)
+
+#class MyAdapter(HTTPAdapter):
+#    def init_poolmanager(self, connections, maxsize, block=False):
+#        self.poolmanager = PoolManager(num_pools=connections,
+#                                       maxsize=maxsize,
+#                                       block=block,
+#                                       ssl_version=ssl.PROTOCOL_TLSv1_2)
+#
+#s = requests.Session()
+#s.mount('https://', MyAdapter())
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 logger = logging.getLogger(__name__)
@@ -63,7 +73,7 @@ def register(owner_id, apikey, entity_id):
 	
 	url = base_url + "/register"
 	headers = {"id": owner_id, "apikey":apikey, "entity": entity_id, "content-type":"application/json"}
-	r = s.post(url=url, headers=headers, data="{\"test\":\"schema\"}", verify=False)
+	r = requests.post(url=url, headers=headers, data="{\"test\":\"schema\"}", verify=False)
 	return r
 
 def deregister(owner_id, apikey, entity_id):
