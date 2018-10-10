@@ -11,7 +11,7 @@ sudo usermod -aG docker $USER
 #sudo apt install python python-pip libssl-dev 
 #sudo pip install -U pyopenssl
 #sudo pip install --upgrade cryptography
-pythom -m pip install requests
-pythom -m pip install urllib3
+python -m pip install requests
+python -m pip install urllib3
 #python -m pip install pyasn1 
 #python -m pip install ndg-httpsclient 
