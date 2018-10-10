@@ -746,9 +746,9 @@ reconnect:
 	debug_printf("Got content-type {%s} : {%s}\n",content_type,id);
 
 
-	char topic_to_publish[129] = {0};
+	char topic_to_publish[129];
 
-	if (strcmp(id,to)==0)
+	if (strcmp(id,to) == 0)
 	{
 		snprintf(exchange,129,"%s.%s",to,message_type);
 		strlcpy(topic_to_publish,topic,129);
@@ -759,8 +759,8 @@ reconnect:
 	}
 	else
 	{
-		snprintf(topic_to_publish,129,"%s",topic);
-		snprintf(exchange,129,"%s.write",id);
+		snprintf(topic_to_publish,129,"%s.%s",to,topic);
+		snprintf(exchange,129,"%s.write",to);
 
 		debug_printf("------------------> exchange = %s\n",exchange);
 		debug_printf("------------------> topic = %s\n",topic_to_publish);
@@ -1879,7 +1879,7 @@ follow (struct http_request *req)
 				id,
 				from,
 				to,	// .command is appended to it
-				"#",
+				topic,
 				validity,
 				status
 		);
@@ -1922,7 +1922,7 @@ follow (struct http_request *req)
 
 			snprintf(write_exchange,129,"%s.write",from);
 			snprintf(command_queue,129,"%s.command",to);
-			snprintf(write_topic,129,"%s:%s",to,topic);
+			snprintf(write_topic,129,"%s.command.%s",to,topic);
 
 			if (! amqp_queue_bind (
 				cached_admin_conn,
@@ -1935,6 +1935,20 @@ follow (struct http_request *req)
 			{
 				ERROR("bind failed for app.write with device.command");
 			}
+
+			CREATE_STRING (query,
+			"INSERT INTO acl "
+			"(acl_id,from_id,exchange,follow_id,permission,topic,valid_till) "
+			"values(DEFAULT,'%s','%s.command','%s','%s', '%s', now() + interval '%s  hours')",
+			        	from,
+					to,		// .command is appended to it
+					read_follow_id,
+					"write",
+					topic,
+					validity
+			);
+
+			RUN_QUERY (query,"could not run insert query on acl - read ");
 		}
 
 		req->status = 200;
@@ -2066,7 +2080,7 @@ unfollow (struct http_request *req)
 
 		snprintf(write_exchange,129,"%s.write",from);
 		snprintf(command_queue,129,"%s.command",to);
-		snprintf(write_topic,129,"%s:%s",to,topic);
+		snprintf(write_topic,129,"%s.command.%s",to,topic);
 
 		if (! amqp_queue_unbind (
 			cached_admin_conn,
@@ -2224,23 +2238,21 @@ share (struct http_request *req)
 	);
 	RUN_QUERY (query,"could not run update query on follow");
 
-	if (strcmp(permission,"read") == 0)
-	{
-		// add entry in acl
-		CREATE_STRING (query,
-			"INSERT INTO acl (acl_id,from_id,exchange,follow_id,permission,topic,valid_till) "
-			"values(DEFAULT,'%s','%s','%s','%s', '%s', now() + interval '%s  hours')",
-		        	from_id,
-				exchange,
-				follow_id,
-				permission,
-				topic,
-				validity_hours
-		);
+	// add entry in acl
+	CREATE_STRING (query,
+		"INSERT INTO acl (acl_id,from_id,exchange,follow_id,permission,topic,valid_till) "
+		"values(DEFAULT,'%s','%s','%s','%s','%s',now() + interval '%s  hours')",
+	        	from_id,
+			exchange,
+			follow_id,
+			permission,
+			topic,
+			validity_hours
+	);
 
-		RUN_QUERY (query,"could not run insert query on acl");
-	}
-	else
+	RUN_QUERY (query,"could not run insert query on acl");
+
+	if (strcmp(permission,"write") == 0)
 	{
 		char write_exchange 	[129];
 		char command_queue	[129];
@@ -2248,20 +2260,7 @@ share (struct http_request *req)
 
 		snprintf(write_exchange,129,"%s.write",from_id);
 		snprintf(command_queue,129,"%s",exchange);	// exchange in follow is device.command
-
-		// remove the stuff after . from exchange
-		char *p = exchange;
-		while (*p)
-		{
-			if (*p == '.')
-			{
-				*p = '\0';
-				break;
-			}
-			++p;
-		}
-
-		snprintf(write_topic,129,"%s:%s",exchange,topic);
+		snprintf(write_topic,129,"%s.%s",exchange,topic); // routing key will be dev.command.topic
 
 		debug_printf("\n--->binding {%s} with {%s} {%s}\n",command_queue,write_exchange,write_topic);
 
@@ -2738,7 +2737,7 @@ create_exchanges_and_queues (void *v)
 	}
 	else
 	{
-		char *_e[] = {".public", ".private", ".protected", ".command", ".notification", ".write", NULL};
+		char *_e[] = {".public",".private",".protected",".notification",".write",NULL};
 
 		for (i = 0; _e[i]; ++i)
 		{
@@ -2802,8 +2801,8 @@ create_exchanges_and_queues (void *v)
 			}
 			debug_printf("[entity] DONE creating queue {%s}\n",queue);
 
-			// bind all except null and .priority
-			if (_q[i][0] && strcmp(_q[i],".priority") != 0)
+			// bind all except null and .priority and .command
+			if (_q[i][0] && strcmp(_q[i],".priority") != 0 && strcmp(_q[i],".command") != 0)
 			{
 				snprintf(exchange,129,"%s%s",id,_q[i]);
 				debug_printf("[entity] binding {%s} -> {%s}\n",queue,exchange);
@@ -2877,7 +2876,7 @@ delete_exchanges_and_queues (void *v)
 	}
 	else
 	{
-		char *_e[] = {".public", ".private", ".protected", ".command", ".notification", ".write", NULL};
+		char *_e[] = {".public",".private",".protected",".notification",".write",NULL};
 
 		for (i = 0; _e[i]; ++i)
 		{
