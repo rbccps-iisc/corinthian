@@ -13,6 +13,7 @@ sudo apt-get install -y software-properties-common
 sudo apt-get install -y apt-transport-https  ca-certificates curl software-properties-common
 sudo apt-get install openssl ca-certificates
 sudo apt-get install libffi-dev
+sudo apt-get install python3 python3-pip
 #sudo python -m pip install -U requests[security]
 #sudo apt install python python-pip libssl-dev 
 #sudo pip install -U pyopenssl
