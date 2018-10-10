@@ -14,6 +14,8 @@ logger = logging.getLogger(__name__)
 
 base_url = "https://127.0.0.1:8888"
 
+cert = "kore-publisher/cert/server.pem"
+
 parser = argparse.ArgumentParser(description='Test cases for Corinthian')
 parser.add_argument('-d', action="store", dest="devices", type=int)
 parser.add_argument('-a', action="store", dest="apps", type=int)
@@ -47,21 +49,21 @@ def check(response, code):
 def register(owner_id, apikey, entity_id):
     url = base_url + "/register"
     headers = {"id": owner_id, "apikey": apikey, "content-type": "application/json", "entity": entity_id}
-    r = requests.post(url=url, headers=headers, data='{"test": "schema"}', verify=False)
+    r = requests.post(url=url, headers=headers, data='{"test": "schema"}', verify=cert)
     return r
 
 
 def deregister(owner_id, apikey, entity_id):
     url = base_url + "/deregister"
     headers = {"id": owner_id, "apikey": apikey, "entity": entity_id}
-    r = requests.get(url=url, headers=headers, verify=False)
+    r = requests.get(url=url, headers=headers, verify=cert)
     return r
 
 
 def publish(entity_id, apikey, to, topic, message_type, data):
     url = base_url + "/publish"
     headers = {"id": entity_id, "apikey": apikey, "to": to, "topic": topic, "message-type": message_type}
-    r = requests.post(url=url, headers=headers, data=data, verify=False)
+    r = requests.post(url=url, headers=headers, data=data, verify=cert)
     return r
 
 
@@ -79,7 +81,7 @@ def follow(user_id, apikey, to_id, permission, from_id=""):
     headers['permission'] = permission
 
     url = base_url + "/follow"
-    r = requests.get(url=url, headers=headers, verify=False)
+    r = requests.get(url=url, headers=headers, verify=cert)
     return r
 
 
@@ -96,14 +98,14 @@ def unfollow(ID, apikey, to, topic, permission, from_id=""):
     headers['permission'] = permission
 
     url = base_url + "/unfollow"
-    r = requests.get(url=url, headers=headers, verify=False)
+    r = requests.get(url=url, headers=headers, verify=cert)
     return r
 
 
 def share(ID, apikey, follow_id):
     url = base_url + "/share"
     headers = {"id": ID, "apikey": apikey, "follow-id": follow_id}
-    r = requests.get(url=url, headers=headers, verify=False)
+    r = requests.get(url=url, headers=headers, verify=cert)
     return r
 
 
@@ -125,7 +127,7 @@ def bind_unbind(ID, apikey, to, topic, req_type, from_id="", message_type=""):
     elif req_type == "unbind":
         url = base_url + "/unbind"
 
-    r = requests.get(url=url, headers=headers, verify=False)
+    r = requests.get(url=url, headers=headers, verify=cert)
     return r
 
 
@@ -141,7 +143,7 @@ def subscribe(ID, apikey, message_type="", num_messages=""):
     headers['apikey'] = apikey
 
     url = base_url + "/subscribe"
-    r = requests.get(url=url, headers=headers, verify=False)
+    r = requests.get(url=url, headers=headers, verify=cert)
     return r
 
 
@@ -153,7 +155,7 @@ def follow_requests(ID, apikey, request_type):
     elif request_type == "status":
         url = url + "/follow-status"
 
-    r = requests.get(url=url, headers={"id": ID, "apikey": apikey}, verify=False)
+    r = requests.get(url=url, headers={"id": ID, "apikey": apikey}, verify=cert)
     return r
 
 
