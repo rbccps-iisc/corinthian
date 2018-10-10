@@ -7,44 +7,38 @@ import string
 import argparse
 import logging
 import time
-from requests.adapters import HTTPAdapter
-from requests.packages.urllib3.util.ssl_ import create_urllib3_context
 import warnings
 import contextlib
 from urllib3.exceptions import InsecureRequestWarning
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.poolmanager import PoolManager
+from requests.packages.urllib3.util.ssl_ import create_urllib3_context
 
 session = requests.Session()
 session.verify = False
-
-#try:
-#    from functools import partialmethod
-#except ImportError:
-    # Python 2 fallback: https://gist.github.com/carymrobbins/8940382
-#    from functools import partial
-#
-#    class partialmethod(partial):
-#        def __get__(self, instance, owner):
-#            if instance is None:
-#                return self
-#
-#            return partial(self.func, instance, *(self.args or ()), **(self.keywords or {}))
-#
-#@contextlib.contextmanager
-#def no_ssl_verification(session=requests.Session):
-#    old_request = session.request
-#    session.request = partialmethod(old_request, verify=False)
-#
-#    with warnings.catch_warnings():
-#        warnings.simplefilter('ignore', InsecureRequestWarning)
-#        yield
-#
-#    session.request = old_request
 
 logger = logging.getLogger(__name__)
 
 base_url = "https://localhost:8888"
 
-#cert = "kore-publisher/cert/server.pem"
+CIPHERS = (
+    'ECDH+AESGCM:DH+AESGCM:ECDH+AES256:DH+AES256:ECDH+AES128:DH+AES:ECDH+HIGH:'
+    'DH+HIGH:ECDH+3DES:DH+3DES:RSA+AESGCM:RSA+AES:RSA+HIGH:RSA+3DES:!aNULL:'
+    '!eNULL:!MD5'
+)
+
+requests.packages.urllib3.disable_warnings()
+
+class DESAdapter(HTTPAdapter):
+    def init_poolmanager(self, connections, maxsize, block=False,*args, **kwargs):
+        context = create_urllib3_context(ciphers=CIPHERS)
+        kwargs['ssl_context'] = context
+        self.poolmanager = PoolManager(
+            num_pools=connections, maxsize=maxsize,
+            block=block, ssl_version=ssl.PROTOCOL_TLSv1_2,*args, **kwargs)
+
+s = requests.Session()
+s.mount('https://localhost:8888', DESAdapter())
 
 parser = argparse.ArgumentParser(description='Test cases for Corinthian')
 parser.add_argument('-d', action="store", dest="devices", type=int)
@@ -80,8 +74,7 @@ def register(owner_id, apikey, entity_id):
 
 	url = base_url + "/register"
     	headers = {"id": owner_id, "apikey": apikey, "content-type": "application/json", "entity": entity_id}
-
-    	r = session.post(url=url, headers=headers, data='{"test": "schema"}', verify=False)
+    	r = s.post(url=url, headers=headers, data='{"test": "schema"}', verify=False)
 
     	return r
 
