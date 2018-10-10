@@ -9,8 +9,33 @@ import logging
 import time
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.ssl_ import create_urllib3_context
+import warnings
+import contextlib
+from urllib3.exceptions import InsecureRequestWarning
 
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+try:
+    from functools import partialmethod
+except ImportError:
+    # Python 2 fallback: https://gist.github.com/carymrobbins/8940382
+    from functools import partial
+
+    class partialmethod(partial):
+        def __get__(self, instance, owner):
+            if instance is None:
+                return self
+
+            return partial(self.func, instance, *(self.args or ()), **(self.keywords or {}))
+
+@contextlib.contextmanager
+def no_ssl_verification(session=requests.Session):
+    old_request = session.request
+    session.request = partialmethod(old_request, verify=False)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore', InsecureRequestWarning)
+        yield
+
+    session.request = old_request
 
 logger = logging.getLogger(__name__)
 
@@ -49,10 +74,14 @@ def check(response, code):
 
 
 def register(owner_id, apikey, entity_id):
-    url = base_url + "/register"
-    headers = {"id": owner_id, "apikey": apikey, "content-type": "application/json", "entity": entity_id}
-    r = requests.post(url=url, headers=headers, data='{"test": "schema"}', verify=False)
-    return r
+
+	url = base_url + "/register"
+    	headers = {"id": owner_id, "apikey": apikey, "content-type": "application/json", "entity": entity_id}
+
+	with no_ssl_verification():
+    		r = requests.post(url=url, headers=headers, data='{"test": "schema"}', verify=False)
+
+    	return r
 
 
 def deregister(owner_id, apikey, entity_id):
