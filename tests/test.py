@@ -13,29 +13,32 @@ import warnings
 import contextlib
 from urllib3.exceptions import InsecureRequestWarning
 
-try:
-    from functools import partialmethod
-except ImportError:
+session = requests.Session()
+session.verify = False
+
+#try:
+#    from functools import partialmethod
+#except ImportError:
     # Python 2 fallback: https://gist.github.com/carymrobbins/8940382
-    from functools import partial
-
-    class partialmethod(partial):
-        def __get__(self, instance, owner):
-            if instance is None:
-                return self
-
-            return partial(self.func, instance, *(self.args or ()), **(self.keywords or {}))
-
-@contextlib.contextmanager
-def no_ssl_verification(session=requests.Session):
-    old_request = session.request
-    session.request = partialmethod(old_request, verify=False)
-
-    with warnings.catch_warnings():
-        warnings.simplefilter('ignore', InsecureRequestWarning)
-        yield
-
-    session.request = old_request
+#    from functools import partial
+#
+#    class partialmethod(partial):
+#        def __get__(self, instance, owner):
+#            if instance is None:
+#                return self
+#
+#            return partial(self.func, instance, *(self.args or ()), **(self.keywords or {}))
+#
+#@contextlib.contextmanager
+#def no_ssl_verification(session=requests.Session):
+#    old_request = session.request
+#    session.request = partialmethod(old_request, verify=False)
+#
+#    with warnings.catch_warnings():
+#        warnings.simplefilter('ignore', InsecureRequestWarning)
+#        yield
+#
+#    session.request = old_request
 
 logger = logging.getLogger(__name__)
 
@@ -78,8 +81,7 @@ def register(owner_id, apikey, entity_id):
 	url = base_url + "/register"
     	headers = {"id": owner_id, "apikey": apikey, "content-type": "application/json", "entity": entity_id}
 
-	with no_ssl_verification():
-    		r = requests.post(url=url, headers=headers, data='{"test": "schema"}', verify=False)
+    	r = session.post(url=url, headers=headers, data='{"test": "schema"}', verify=False)
 
     	return r
 
