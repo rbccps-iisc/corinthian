@@ -1,7 +1,4 @@
 import json
-import ssl
-import urllib3
-import requests
 import argparse
 import random
 import string
@@ -9,37 +6,27 @@ import argparse
 import logging
 import time
 import warnings
-import contextlib
-from urllib3.exceptions import InsecureRequestWarning
+import subprocess
+import requests 
+import urllib3
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.poolmanager import PoolManager
-from requests.packages.urllib3.util.ssl_ import create_urllib3_context
+import ssl
 
-session = requests.Session()
-session.verify = False
+class MyAdapter(HTTPAdapter):
+    def init_poolmanager(self, connections, maxsize, block=False):
+        self.poolmanager = PoolManager(num_pools=connections,
+                                       maxsize=maxsize,
+                                       block=block,
+                                       ssl_version=ssl.PROTOCOL_TLSv1_2)
+
+s = requests.Session()
+s.mount('https://', MyAdapter())
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 logger = logging.getLogger(__name__)
 
 base_url = "https://localhost:8888"
-
-CIPHERS = (
-    'ECDH+AESGCM:DH+AESGCM:ECDH+AES256:DH+AES256:ECDH+AES128:DH+AES:ECDH+HIGH:'
-    'DH+HIGH:ECDH+3DES:DH+3DES:RSA+AESGCM:RSA+AES:RSA+HIGH:RSA+3DES:!aNULL:'
-    '!eNULL:!MD5'
-)
-
-requests.packages.urllib3.disable_warnings()
-
-class DESAdapter(HTTPAdapter):
-    def init_poolmanager(self, connections, maxsize, block=False,*args, **kwargs):
-        context = create_urllib3_context(ciphers=CIPHERS)
-        kwargs['ssl_context'] = context
-        self.poolmanager = PoolManager(
-            num_pools=connections, maxsize=maxsize,
-            block=block, ssl_version=ssl.PROTOCOL_TLSv1_2,*args, **kwargs)
-
-s = requests.Session()
-s.mount('https://localhost:8888', DESAdapter())
 
 parser = argparse.ArgumentParser(description='Test cases for Corinthian')
 parser.add_argument('-d', action="store", dest="devices", type=int)
@@ -65,6 +52,7 @@ class colour:
 
 
 def check(response, code):
+	
     if response.status_code == code:
         return True
     else:
@@ -72,13 +60,11 @@ def check(response, code):
 
 
 def register(owner_id, apikey, entity_id):
-
+	
 	url = base_url + "/register"
-    	headers = {"id": owner_id, "apikey": apikey, "content-type": "application/json", "entity": entity_id}
-    	r = s.post(url=url, headers=headers, data='{"test": "schema"}', verify=False)
-
-    	return r
-
+	headers = {"id": owner_id, "apikey":apikey, "entity": entity_id, "content-type":"application/json"}
+	r = s.post(url=url, headers=headers, data="{\"test\":\"schema\"}", verify=False)
+	return r
 
 def deregister(owner_id, apikey, entity_id):
     url = base_url + "/deregister"
@@ -379,7 +365,7 @@ def functional_test():
         	dev_name = "dev" + ''.join(
             	random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(16))
         	r = register('admin', 'admin', dev_name)
-        	response = r.json()
+		response = r.json()
         	logger.info(json.dumps(response))
         	reg_status = check(r, 200)
 
@@ -394,7 +380,7 @@ def functional_test():
         	app_name = "app" + ''.join(
             	random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(16))
         	r = register('admin1', 'admin1', app_name)
-        	response = r.json()
+        	response = r.json() 
         	logger.info(json.dumps(response))
         	reg_status = check(r, 200)
 
