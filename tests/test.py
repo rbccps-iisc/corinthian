@@ -12,7 +12,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 logger = logging.getLogger(__name__)
 
-base_url = "https://127.0.0.1:8888"
+base_url = "https://localhost:8888"
 
 cert = "kore-publisher/cert/server.pem"
 
