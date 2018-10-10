@@ -4,5 +4,7 @@ before_install:
   - ./tests/require.sh
 install:
   - ./install
+language:
+  - python
 script:
   - python2.7 ./tests/test.py -d 10 -a 1

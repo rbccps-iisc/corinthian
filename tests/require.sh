@@ -8,10 +8,10 @@ sudo apt upgrade
 #sudo apt-get install docker-ce -y
 sudo usermod -aG docker $USER
 
-sudo apt install python python-pip libssl-dev 
-sudo pip install -U pyopenssl
-sudo pip install --upgrade cryptography
-python -m pip install requests
-python -m pip install urllib3
+#sudo apt install python python-pip libssl-dev 
+#sudo pip install -U pyopenssl
+#sudo pip install --upgrade cryptography
+#python -m pip install requests
+#python -m pip install urllib3
 #python -m pip install pyasn1 
 #python -m pip install ndg-httpsclient 
