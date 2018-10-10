@@ -7,4 +7,4 @@ install:
 language:
   - python
 script:
-  - python ./tests/test.py -d 10 -a 1
+  - python3 ./tests/test.py -d 10 -a 1
