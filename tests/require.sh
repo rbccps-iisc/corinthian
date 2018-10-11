@@ -8,8 +8,8 @@
 #sudo apt-get install docker-ce -y
 sudo usermod -aG docker $USER
 
-sudo apt-get -y update 
-sudo apt-get upgrade 
+#sudo apt-get -y update 
+#sudo apt-get upgrade 
 #sudo apt-get install -y software-properties-common
 #sudo apt-get install -y apt-transport-https  ca-certificates curl software-properties-common
 #sudo apt-get install openssl ca-certificates
