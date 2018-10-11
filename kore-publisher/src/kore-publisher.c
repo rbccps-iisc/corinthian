@@ -655,7 +655,8 @@ publish (struct http_request *req)
 		(strcmp(message_type,"public") 		!= 0)	&&
 		(strcmp(message_type,"private") 	!= 0)	&&
 		(strcmp(message_type,"protected") 	!= 0)	&&
-		(strcmp(message_type,"command") 	!= 0)	
+		(strcmp(message_type,"command") 	!= 0)	&&
+		(strcmp(message_type,"diagnostics") 	!= 0)	
 	)
 	{
 		BAD_REQUEST("message-type is not valid");
@@ -836,6 +837,7 @@ subscribe (struct http_request *req)
 
 	kore_buf_reset(Q);
 	kore_buf_append(Q,id,strlen(id));
+
 	if (KORE_RESULT_OK == http_request_header(req, "message-type", &message_type))
 	{
 		if (strcmp(message_type,"priority") == 0)
@@ -850,12 +852,17 @@ subscribe (struct http_request *req)
 		{
 			kore_buf_append (Q,".notification",sizeof(".notification") - 1);
 		}
+		else if (strcmp(message_type,"regular") == 0)
+		{
+			goto queue;
+		}
 		else
 		{
 			BAD_REQUEST("invalid message-type");
 		}
 	}
-	kore_buf_append(Q,"\0",1);
+
+queue:	kore_buf_append(Q,"\0",1);
 
 	int_num_messages = 1;
 	if (KORE_RESULT_OK == http_request_header(req, "num-messages", &num_messages))

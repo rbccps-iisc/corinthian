@@ -1,4 +1,5 @@
 import json
+import math
 import argparse
 import random
 import string
@@ -7,34 +8,6 @@ import logging
 import time
 import warnings
 import subprocess
-import requests 
-import urllib3
-from requests.adapters import HTTPAdapter
-from requests.packages.urllib3.poolmanager import PoolManager
-import ssl
-from functools import wraps
-
-def sslwrap(func):
-	@wraps(func)
-	def bar(*args, **kw):
-		kw['ssl_version'] = ssl.PROTOCOL_TLSv1
-		return func(*args, **kw)
-	return bar
-
-ssl.wrap_socket = sslwrap(ssl.wrap_socket)
-
-#class MyAdapter(HTTPAdapter):
-#    def init_poolmanager(self, connections, maxsize, block=False):
-#        self.poolmanager = PoolManager(num_pools=connections,
-#                                       maxsize=maxsize,
-#                                       block=block,
-#                                       ssl_version=ssl.PROTOCOL_TLSv1_2)
-#
-#s = requests.Session()
-#s.mount('https://', MyAdapter())
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-http = urllib3.PoolManager()
 
 logger = logging.getLogger(__name__)
 
@@ -62,135 +35,108 @@ class colour:
 	BOLD = '\033[1m'
 	UNDERLINE = '\033[4m'
 
-
 def check(response, code):
 	
-	if response.status == code:
+	if code in response:
 		return True
 	else:
 		return False
 
-
 def register(owner_id, apikey, entity_id):
 	
-	url = base_url + "/register"
-	headers = {"id": owner_id, "apikey":apikey, "entity": entity_id, "content-type":"application/json"}
-	body = {"test":"schema"}
-	r = http.request('POST',url, headers=headers, body=json.dumps(body).encode('utf-8'))
-	#r = requests.post(url=url, headers=headers, data="{\"test\":\"schema\"}", verify=False)
-	return r
+	cmd = "./tests/register.sh "+owner_id+" "+apikey+" "+entity_id 
+	process = subprocess.check_output(cmd,shell=True)
+	return process.decode("utf-8")
 
 def deregister(owner_id, apikey, entity_id):
-	url = base_url + "/deregister"
-	headers = {"id": owner_id, "apikey": apikey, "entity": entity_id}
-	r = requests.get(url=url, headers=headers, verify=False)
-	return r
 
+	cmd = "./tests/deregister.sh "+owner_id+" "+apikey+" "+entity_id 
+	process = subprocess.check_output(cmd,shell=True)
+	return process.decode("utf-8")
 
 def publish(entity_id, apikey, to, topic, message_type, data):
-	url = base_url + "/publish"
-	headers = {"id": entity_id, "apikey": apikey, "to": to, "topic": topic, "message-type": message_type}
-	r = requests.post(url=url, headers=headers, data=data, verify=False)
-	return r
 
+	cmd = "./tests/publish.sh "+entity_id+" "+apikey+" "+to+" "+topic+" "+message_type+" "+data 
+	process = subprocess.check_output(cmd,shell=True)
+	return process.decode("utf-8")
 
 def follow(user_id, apikey, to_id, permission, from_id=""):
-	headers = {}
 
+	cmd = "./tests/follow.sh "+user_id+" "+apikey+" "+to_id+" "+permission
+	
 	if from_id:
-		headers['from'] = from_id
+		cmd = cmd+" "+from_id
 
-	headers['id'] = user_id
-	headers['apikey'] = apikey
-	headers['to'] = to_id
-	headers['validity'] = "24"
-	headers['topic'] = "#"
-	headers['permission'] = permission
-
-	url = base_url + "/follow"
-	r = requests.get(url=url, headers=headers, verify=False)
-	return r
-
+	process = subprocess.check_output(cmd,shell=True)
+	return process.decode("utf-8")
 
 def unfollow(ID, apikey, to, topic, permission, from_id=""):
-	headers = {}
 
+	cmd = "./tests/unfollow.sh "+ID+" "+apikey+" "+to+" "+topic+" "+permission
+	
 	if from_id:
-		headers['from'] = from_id
+		cmd = cmd+" "+from_id
 
-	headers['id'] = ID
-	headers['apikey'] = apikey
-	headers['to'] = to
-	headers['topic'] = topic
-	headers['permission'] = permission
-
-	url = base_url + "/unfollow"
-	r = requests.get(url=url, headers=headers, verify=False)
-	return r
-
+	process = subprocess.check_output(cmd,shell=True)
+	return process.decode("utf-8")
 
 def share(ID, apikey, follow_id):
-	url = base_url + "/share"
-	headers = {"id": ID, "apikey": apikey, "follow-id": follow_id}
-	r = requests.get(url=url, headers=headers, verify=False)
-	return r
 
+	cmd = "./tests/share.sh "+ID+" "+apikey+" "+follow_id
+	process = subprocess.check_output(cmd,shell=True)
+	return process.decode("utf-8")
 
 def bind_unbind(ID, apikey, to, topic, req_type, from_id="", message_type=""):
-	headers = {}
 
-	if from_id:
-		headers['from'] = from_id
-	if message_type:
-		headers['message_type'] = message_type
-
-	headers['id'] = ID
-	headers['apikey'] = apikey
-	headers['to'] = to
-	headers['topic'] = topic
+	cmd = ""
 
 	if req_type == "bind":
-		url = base_url + "/bind"
+		cmd = "./tests/bind.sh"
 	elif req_type == "unbind":
-		url = base_url + "/unbind"
+		cmd = "./tests/unbind.sh"
+	
+	cmd = cmd+" "+ID+" "+apikey+" "+to+" "+topic
 
-	r = requests.get(url=url, headers=headers, verify=False)
-	return r
-
-
-def subscribe(ID, apikey, message_type="", num_messages=""):
-	headers = {}
+	if from_id:
+		cmd = cmd + " " + from_id
 
 	if message_type:
-		headers['message-type'] = message_type
+		cmd = cmd + " " + message_type
+
+	process = subprocess.check_output(cmd,shell=True)
+	return process.decode("utf-8")
+
+def subscribe(ID, apikey, message_type="", num_messages=""):
+
+	cmd = "./tests/subscribe.sh "+ID+" "+apikey
+	
+	if message_type:
+		cmd = cmd + " " + message_type
+
 	if num_messages:
-		headers['num-messages'] = num_messages
+		cmd = cmd + " " + num_messages
 
-	headers['id'] = ID
-	headers['apikey'] = apikey
-
-	url = base_url + "/subscribe"
-	r = requests.get(url=url, headers=headers, verify=False)
-	return r
-
+	process = subprocess.check_output(cmd, shell=True)
+	return process.decode("utf-8")
 
 def follow_requests(ID, apikey, request_type):
-	url = base_url
+
+	cmd = ""
 
 	if request_type == "requests":
-		url = url + "/follow-requests"
+		cmd = "./tests/follow_requests.sh"
 	elif request_type == "status":
-		url = url + "/follow-status"
+		cmd = "./tests/follow_status.sh"
 
-	r = requests.get(url=url, headers={"id": ID, "apikey": apikey}, verify=False)
-	return r
-
+	cmd = cmd + " " + ID + " " + apikey + " "
+	process = subprocess.check_output(cmd, shell=True)
+	return process.decode("utf-8")
 
 def dev_publish():
 	for device, apikey in device_keys.items():
 		logger.info("PUBLISHING MESSAGE FROM " + device)
-		pub_req = publish(device, apikey, device, "#", "protected", "test message from " + device)
-		pub_status = check(pub_req, 202)
+		pub_req = publish(device, apikey, device, "\\#", "protected", "test message from " + device)
+		pub_status = check(pub_req, "202")
 		assert (pub_status)
 
 
@@ -201,11 +147,16 @@ def bind_unbind_dev(as_admin="", req_type="", expected=devices):
 		for app, apikey in app_keys.items():
 			logger.info("APP " + app + " CHECKING APPROVAL STATUS OF FOLLOW REQUESTS BEFORE BINDING")
 			follow_status = follow_requests(app, apikey, "status")
-			flag = check(follow_status, 200)
+			response = json.loads(follow_status.split("\n")[8])
+			print(follow_status)
+			flag = check(follow_status, "200")
 
-			for entry in follow_status.json():
+			for entry in response:
 				if entry['status'] == "approved":
 					approved = approved + 1
+
+			print(approved)
+			print(expected)
 
 			assert (approved == expected)
 			logger.info("APP " + app + " HAS RECEIVED " + str(approved) + " APPROVALS")
@@ -213,8 +164,8 @@ def bind_unbind_dev(as_admin="", req_type="", expected=devices):
 		for app, apikey in app_keys.items():
 			for device in device_keys:
 				logger.info("APP " + app + " (UN)BINDING FROM DEVICE " + device)
-				bind_req = bind_unbind(app, apikey, device, "#", req_type)
-				bind_status = check(bind_req, 200)
+				bind_req = bind_unbind(app, apikey, device, "\\#", req_type)
+				bind_status = check(bind_req, "200")
 				assert (bind_status)
 
 	elif as_admin == True:
@@ -225,9 +176,11 @@ def bind_unbind_dev(as_admin="", req_type="", expected=devices):
 
 			logger.info("APP " + app + " CHECKING APPROVAL STATUS OF FOLLOW REQUESTS BEFORE BINDING")
 			follow_status = follow_requests("admin1", "admin1", "status")
-			flag = check(follow_status, 200)
+			response = json.loads(follow_status.split("\n")[8])
 
-			for entry in follow_status.json():
+			flag = check(follow_status, "200")
+
+			for entry in response:
 				if entry['status'] == "approved":
 					approved = approved + 1
 
@@ -238,8 +191,8 @@ def bind_unbind_dev(as_admin="", req_type="", expected=devices):
 		for app in app_keys:
 			for device in device_keys:
 				logger.info("APP " + app + " BINDING TO DEVICE " + device)
-				bind_req = bind_unbind("admin1", "admin1", device, "#", req_type, from_id=app)
-				bind_status = check(bind_req, 200)
+				bind_req = bind_unbind("admin1", "admin1", device, "\\#", req_type, from_id=app)
+				bind_status = check(bind_req, "200")
 				assert (bind_status)
 
 
@@ -249,27 +202,21 @@ def bind_unbind_without_follow(as_admin="", req_type=""):
 			for app, apikey in app_keys.items():
 					for device in device_keys:
 						logger.info("APP " + app + " (UN)BINDING FROM DEVICE " + device)
-						bind_req = bind_unbind(app, apikey, device, "#", req_type)
-						bind_status = check(bind_req, 403)
+						bind_req = bind_unbind(app, apikey, device, "\\#", req_type)
+						bind_status = check(bind_req, "403")
 						assert (bind_status)
 
 	elif as_admin == True:
 		for app in app_keys:
 			for device in device_keys:
 				logger.info("APP " + app + " BINDING TO DEVICE " + device)
-				bind_req = bind_unbind("admin1", "admin1", device, "#", req_type, from_id=app)
-				bind_status = check(bind_req, 403)
+				bind_req = bind_unbind("admin1", "admin1", device, "\\#", req_type, from_id=app)
+				bind_status = check(bind_req, "403")
 				assert (bind_status)
 
 def app_subscribe(expected):
 
-	try:
-		count = devices % 10
-
-		if count == 0:
-			count = devices / 10
-	except Exception as e:
-		print(e)
+	count = math.ceil(devices / 10.0)
 
 	actual = 0
 
@@ -277,12 +224,12 @@ def app_subscribe(expected):
 
 		logger.info("APP " + app + " SUBSCRIBING TO ITS QUEUE")
 
-		for i in range(0, count):
-			sub_req = subscribe(app, apikey, num_messages="10")
-			sub_status = check(sub_req, 200)
-			response = sub_req.json()
+		for i in range(0, int(count)):
+			sub_req = subscribe(app, apikey, message_type="regular", num_messages="10")
+			sub_status = check(sub_req, "200")
+			response = json.loads(sub_req.split("\n")[8])
 			actual = actual + len(response)
-
+		
 		assert (actual == expected)
 		actual = 0
 		logger.info("APP " + app + " has successfully received " + str(expected) + " messages")
@@ -294,7 +241,7 @@ def follow_dev(as_admin="", permission=""):
 			for device in device_keys:
 				logger.info("FOLLOW REQUEST FROM APP " + app + " TO DEVICE " + device)
 				r = follow("admin1", "admin1", device, permission, from_id=app)
-				follow_status = check(r, 202)
+				follow_status = check(r, "202")
 				assert (follow_status)
 
 	elif as_admin == False:
@@ -302,7 +249,7 @@ def follow_dev(as_admin="", permission=""):
 			for device in device_keys:
 				logger.info("FOLLOW REQUEST FROM APP " + app + " TO DEVICE " + device)
 				r = follow(app, apikey, device, permission)
-				follow_status = check(r, 202)
+				follow_status = check(r, "202")
 				assert (follow_status)
 
 
@@ -311,31 +258,31 @@ def unfollow_dev(as_admin="", permission=""):
 		for app in app_keys:
 			for device in device_keys:
 				logger.info("UNFOLLOW REQUEST FROM APP " + app + " TO DEVICE " + device)
-				r = unfollow("admin1", "admin1", device, "#", permission, from_id=app)
-				follow_status = check(r, 200)
+				r = unfollow("admin1", "admin1", device, "\\#", permission, from_id=app)
+				follow_status = check(r, "200")
 				assert (follow_status)
 
 	elif as_admin == False:
 		for app, apikey in app_keys.items():
 			for device in device_keys:
 				logger.info("UNFOLLOW REQUEST FROM APP " + app + " TO DEVICE " + device)
-				r = unfollow(app, apikey, device, "#", permission)
-				follow_status = check(r, 200)
+				r = unfollow(app, apikey, device, "\\#", permission)
+				follow_status = check(r, "200")
 				assert (follow_status)
 
 def share_dev(expected):
 
 	r = follow_requests("admin", "admin", "requests")
-	response = r.json()
+	response = json.loads(r.split("\n")[8])
 	count = 0
 	
-	assert(check(r,200))
+	assert(check(r,"200"))
 	
 	for follow_req in response:
 		count = count + 1
 		logger.info("SHARE FROM DEVICE " + str(follow_req['to']).split(".")[0] + " TO APP " + str(follow_req['from']))
 		share_req = share("admin", "admin", str(follow_req['follow-id']))
-		share_status = check(share_req, 200)
+		share_status = check(share_req, "200")
 		assert (share_status)
 
 	assert(count == expected)
@@ -345,16 +292,13 @@ def app_publish(expected_code):
 	for app, apikey in app_keys.items():
 		for device in device_keys:
 			logger.info("APP "+ app +" PUBLISHING TO DEVICE "+ device +".command EXCHANGE")
-			publish_req = publish(app,apikey, device, device+":#", "command", "test data")
+			publish_req = publish(app,apikey, device, device+":\\#", "command", "test data")
 			assert(check(publish_req, expected_code))
 
 
 def dev_subscribe(expected):
 
-	count = apps % 10
-
-	if count == 0:
-		count = apps / 10
+	count = math.ceil(apps / 10.0)
 
 	actual = 0
 
@@ -362,12 +306,12 @@ def dev_subscribe(expected):
 
 		logger.info("DEVICE " + device + " SUBSCRIBING TO ITS COMMAND QUEUE")
 
-		for i in range(0, count):
+		for i in range(0, int(count)):
 			sub_req = subscribe(device, apikey, message_type="command", num_messages="10")
-			sub_status = check(sub_req, 200)
-			response = sub_req.json()
+			sub_status = check(sub_req, "200")
+			response = json.loads(sub_req.split("\n")[8])
 			actual = actual + len(response)
-
+		
 		assert (actual == expected)
 		actual = 0
 		logger.info("DEVICE " + device + " HAS RECEIVED " + str(expected) + " COMMAND MESSAGES")
@@ -378,43 +322,34 @@ def functional_test():
 	# Device regsitration
 	logger.info(colour.HEADER + "---------------> REGISTERING DEVICES " + colour.ENDC)
 
-	try:
+	for i in range(0, devices):
+		logger.info("REGISTERING DEVICE " + str(i))
+		dev_name = "dev" + ''.join(
+		random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(16))
+		r = register('admin', 'admin', dev_name)
+		response = json.loads(r.split("\n")[8])
+		logger.info(json.dumps(response))
+		reg_status = check(r, "200")
 
-		for i in range(0, devices):
-			logger.info("REGISTERING DEVICE " + str(i))
-			dev_name = "dev" + ''.join(
-			random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(16))
-			r = register('admin', 'admin', dev_name)
-			response = json.loads(r.data.decode('utf-8'))
-			logger.info(json.dumps(response))
-			reg_status = check(r, 200)
+		assert (reg_status)
 
-			assert (reg_status)
-
-			device_keys[response['id']] = response['apikey']
-	except Exception as e:
-		print(e)
+		device_keys[response['id']] = response['apikey']
 
 	# App registration
 	logger.info(colour.HEADER + "---------------> REGISTERING APPS" + colour.ENDC)
 
-	try:
+	for i in range(0, apps):
+		logger.info("REGISTERING APP " + str(i))
+		app_name = "app" + ''.join(
+			random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(16))
+		r = register('admin1', 'admin1', app_name)
+		response = json.loads(r.split("\n")[8])
+		logger.info(json.dumps(response))
+		reg_status = check(r, "200")
 
-		for i in range(0, apps):
-			logger.info("REGISTERING APP " + str(i))
-			app_name = "app" + ''.join(
-				random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(16))
-			r = register('admin1', 'admin1', app_name)
-			response = json.loads(r.data.decode('utf-8'))
-			logger.info(json.dumps(response))
-			reg_status = check(r, 200)
+		assert (reg_status)
 
-			assert (reg_status)
-
-			app_keys[response['id']] = response['apikey']
-
-	except Exception as e:
-		print(e)
+		app_keys[response['id']] = response['apikey']
 
 	# Follow requests from apps to devices using apps' respective apikeys
 	logger.info(colour.HEADER + "---------------> FOLLOW REQUESTS WITH READ PERMISSION " + colour.ENDC)
@@ -423,10 +358,7 @@ def functional_test():
 	# Devices read all follow requests and share with apps
 	logger.info(colour.HEADER + "---------------> DEVICES READ FOLLOW REQUESTS AND ISSUE SHARE TO APPS" + colour.ENDC)
 
-	try:
-		share_dev(apps*devices)
-	except Exception as e:
-		print(e)
+	share_dev(apps*devices)
 
 	# Apps bind to devices' queues
 	logger.info(colour.HEADER + "---------------> APPS BIND TO DEVICES" + colour.ENDC)
@@ -455,10 +387,7 @@ def functional_test():
 	# Apps bind to devices again but this time using admin apikey
 	logger.info(colour.HEADER + "---------------> APPS BIND TO DEVICES USING ADMIN APIKEY" + colour.ENDC)
 
-	try:
-		bind_unbind_dev(as_admin=True, req_type="bind", expected=(devices*apps))
-	except Exception as e:
-		print(e)
+	bind_unbind_dev(as_admin=True, req_type="bind", expected=(devices*apps))
 
 	# Devices publish again
 	logger.info(colour.HEADER + "---------------> DEVICES PUBLISH DATA" + colour.ENDC)
@@ -471,10 +400,7 @@ def functional_test():
 	# Unbind from devices as admin
 	logger.info(colour.HEADER + "---------------> APPS UNBIND FROM DEVICES USING ADMIN APIKEY" + colour.ENDC)
 
-	try:
-		bind_unbind_dev(as_admin=True, req_type="unbind", expected=(devices*apps))
-	except Exception as e:
-		print(e)
+	bind_unbind_dev(as_admin=True, req_type="unbind", expected=(devices*apps))
 
 	# Devices now publish data
 	logger.info(colour.HEADER + "---------------> DEVICES PUBLISH DATA" + colour.ENDC)
@@ -499,10 +425,7 @@ def functional_test():
 	#Devices share with apps
 	logger.info(colour.HEADER + "---------------> DEVICES READ FOLLOW REQUESTS AND ISSUE SHARE TO APPS" + colour.ENDC)
 
-	try:
-		share_dev(apps*devices)
-	except Exception as e:
-		print(e)
+	share_dev(apps*devices)
 
 	# Apps bind to devices' queues
 	logger.info(colour.HEADER + "---------------> APPS BIND TO DEVICES" + colour.ENDC)
@@ -534,7 +457,7 @@ def functional_test():
 
 	#Apps publish to command queue of devices
 	logger.info(colour.HEADER+"---------------> APPS PUBLISH TO COMMAND EXCHANGE OF DEVICES"+colour.ENDC)
-	app_publish(202)
+	app_publish("202")
 
 	#Devices subscribe to their command queue
 	logger.info(colour.HEADER+"---------------> DEVICES SUBSCRIBE TO THEIR COMMAND QUEUES"+colour.ENDC)
@@ -546,7 +469,7 @@ def functional_test():
 
 	#Apps publish to command queue of devices
 	logger.info(colour.HEADER+"---------------> APPS TRY TO PUBLISH TO COMMAND EXCHANGE OF UNFOLLOWED DEVICES"+colour.ENDC)
-	app_publish(202)
+	app_publish("202")
 
 	#Apps request follow with read-write permissions
 	logger.info(colour.HEADER+"---------------> APPS REQUEST FOLLOW WITH READ-WRITE PERMISSIONS"+colour.ENDC)
@@ -558,7 +481,7 @@ def functional_test():
 
 	#Apps publish to command queue of devices
 	logger.info(colour.HEADER+"---------------> APPS PUBLISH TO COMMAND EXCHANGE OF DEVICES"+colour.ENDC)
-	app_publish(202)
+	app_publish("202")
 
 	#Devices subscribe to their command queue
 	logger.info(colour.HEADER+"---------------> DEVICES SUBSCRIBE TO THEIR COMMAND QUEUES"+colour.ENDC)
@@ -566,7 +489,7 @@ def functional_test():
 	
 	# Apps bind to devices' queues
 	logger.info(colour.HEADER + "---------------> APPS BIND TO DEVICES" + colour.ENDC)
-	bind_unbind_dev(as_admin=False, req_type="bind", expected=(devices*apps))
+	bind_unbind_dev(as_admin=False, req_type="bind", expected=(2*devices))
 
 	# Devices publish again
 	logger.info(colour.HEADER + "---------------> DEVICES PUBLISH DATA" + colour.ENDC)
@@ -582,7 +505,7 @@ def functional_test():
 
 	#Apps publish to command queue of devices
 	logger.info(colour.HEADER+"---------------> APPS TRY TO PUBLISH TO COMMAND EXCHANGE OF UNFOLLOWED DEVICES"+colour.ENDC)
-	app_publish(202)
+	app_publish("202")
 
 	# Devices publish again
 	logger.info(colour.HEADER + "---------------> DEVICES PUBLISH DATA AFTER WRITE UNFOLLOW" + colour.ENDC)
