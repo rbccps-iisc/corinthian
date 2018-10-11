@@ -1,5 +1,5 @@
 sudo: required
-dist: xenial
+dist: trusty 
 before_install:
   - ./tests/require.sh
 install:
