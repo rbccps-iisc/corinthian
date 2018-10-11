@@ -5,4 +5,4 @@ before_install:
 install:
   - ./install
 script:
-  - python ./tests/test.py -d 10 -a 5
+  - python ./tests/test.py -d 1 -a 1
