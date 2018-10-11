@@ -11,6 +11,13 @@ sudo usermod -aG docker $USER
 #sudo apt update 
 sudo apt remove curl
 sudo apt install curl
+
+echo "net.ipv6.conf.all.disable_ipv6 = 1" >> /etc/sysctl.conf
+echo "net.ipv6.conf.default.disable_ipv6 = 1" >> /etc/sysctl.conf
+echo "net.ipv6.conf.lo.disable_ipv6 = 1" >> /etc/sysctl.conf
+
+sudo service networking restart
+
 #sudo apt-get upgrade 
 #sudo apt-get install -y software-properties-common
 #sudo apt-get install -y apt-transport-https  ca-certificates curl software-properties-common
