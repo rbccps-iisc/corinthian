@@ -17,7 +17,7 @@ sudo apt-get install libffi-dev
 sudo apt-get install python3 python3-pip
 sudo python -m pip install -U requests[security]
 sudo python3 -m pip install -U pyopenssl
-sudo python3 -m pip install --upgrade cryptography
+#sudo python3 -m pip install --upgrade cryptography
 sudo python3 -m pip install requests
 sudo python3 -m pip install urllib3
 sudo python3 -m pip install pyasn1 
