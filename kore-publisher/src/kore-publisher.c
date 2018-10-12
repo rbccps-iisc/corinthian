@@ -31,6 +31,9 @@
 
 char password_chars[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-";
 
+char *_e[] = {".public",".private",".protected",".notification",".write",NULL};
+char *_q[] = {"\0", ".private", ".priority", ".command", ".notification", NULL};
+
 int cat			(struct http_request *);
 
 int publish		(struct http_request *);
@@ -1188,7 +1191,7 @@ deregister_entity (struct http_request *req)
 	CREATE_STRING (
 		query,
 		"SELECT 1 FROM users WHERE from_id = '%s'",
-		entity,
+		entity
 	);
 	RUN_QUERY(query,"could no query entity");
 
@@ -2758,8 +2761,6 @@ create_exchanges_and_queues (void *v)
 	}
 	else
 	{
-		char *_e[] = {".public",".private",".protected",".notification",".write",NULL};
-
 		for (i = 0; _e[i]; ++i)
 		{
 			snprintf(exchange,129,"%s%s",id,_e[i]);
@@ -2797,8 +2798,6 @@ create_exchanges_and_queues (void *v)
 				goto done;
 			}
 		}
-
-		char *_q[] = {"\0", ".private", ".priority", ".command", ".notification", NULL};
 
 		for (i = 0; _q[i]; ++i)
 		{
@@ -2897,8 +2896,6 @@ delete_exchanges_and_queues (void *v)
 	}
 	else
 	{
-		char *_e[] = {".public",".private",".protected",".notification",".write",NULL};
-
 		for (i = 0; _e[i]; ++i)
 		{
 			snprintf(exchange,129,"%s%s",id,_e[i]);
@@ -2919,7 +2916,6 @@ delete_exchanges_and_queues (void *v)
 			debug_printf("[entity] DONE deleting exchange {%s}\n",exchange);
 		}
 
-		char *_q[] = {"\0", ".private", ".priority", ".command", ".notification", NULL};
 		for (i = 0; _q[i]; ++i)
 		{
 			snprintf(queue,129,"%s%s",id,_q[i]);
