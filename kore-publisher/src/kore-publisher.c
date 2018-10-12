@@ -760,7 +760,7 @@ reconnect:
 	}
 	else
 	{
-		snprintf(topic_to_publish,129,"%s.%s",topic);
+		snprintf(topic_to_publish,129,"%s.%s.%s",to,message_type,topic);
 		snprintf(exchange,129,"%s.write",id);
 
 		debug_printf("------------------> exchange = %s\n",exchange);
@@ -1928,7 +1928,7 @@ follow (struct http_request *req)
 			char write_topic	[129];
 
 			snprintf(write_exchange,129,"%s.write",from);
-			snprintf(command_queue,129,"%s.command",to);
+			snprintf(command_queue,129,"%s.command",to);	// XXX use message_type instead of command
 			snprintf(write_topic,129,"%s.command.%s",to,topic);
 
 			if (! amqp_queue_bind (
@@ -2089,7 +2089,7 @@ unfollow (struct http_request *req)
 
 		snprintf(write_exchange,129,"%s.write",from);
 		snprintf(command_queue,129,"%s.command",to);
-		snprintf(write_topic,129,"%s.command.%s",to,topic);
+		snprintf(write_topic,129,"%s.command.%s",to,topic); // XXX use message_type instead of command
 
 		if (! amqp_queue_unbind (
 			cached_admin_conn,
