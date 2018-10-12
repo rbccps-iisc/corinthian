@@ -23,7 +23,7 @@
 
 //#define TEST (1)
 
-#if 0
+#if 1
 	#define debug_printf(...)
 #else
 	#define debug_printf(...) printf(__VA_ARGS__)
@@ -631,6 +631,7 @@ publish (struct http_request *req)
 	const char *content_type;
 
 	char exchange[129];
+	char topic_to_publish[129];
 
 	amqp_basic_properties_t props;
 
@@ -654,15 +655,37 @@ publish (struct http_request *req)
 		"inputs missing in headers"
 	);
 
-	if(
-		(strcmp(message_type,"public") 		!= 0)	&&
-		(strcmp(message_type,"private") 	!= 0)	&&
-		(strcmp(message_type,"protected") 	!= 0)	&&
-		(strcmp(message_type,"command") 	!= 0)	&&
-		(strcmp(message_type,"diagnostics") 	!= 0)	
-	)
+	// ok to publish to himself
+	if (strcmp(id,to) == 0)
 	{
-		BAD_REQUEST("message-type is not valid");
+		if (
+			(strcmp(message_type,"public") 		!= 0)	&&
+			(strcmp(message_type,"private") 	!= 0)	&&
+			(strcmp(message_type,"protected") 	!= 0)	&&
+			(strcmp(message_type,"diagnostics") 	!= 0)	
+		)
+		{
+			BAD_REQUEST("message-type is not valid");
+		}
+
+		snprintf(exchange,129,"%s.%s",to,message_type);
+		strlcpy(topic_to_publish,topic,129);
+
+		debug_printf("------------------> exchange = %s\n",exchange);
+		debug_printf("------------------> topic = %s\n",topic_to_publish);
+	}
+	else
+	{
+		if (strcmp(message_type,"command") != 0)
+		{
+			BAD_REQUEST("message type can only be command");		
+		}
+
+		snprintf(topic_to_publish,129,"%s.%s.%s",to,message_type,topic);
+		snprintf(exchange,129,"%s.write",id);
+
+		debug_printf("------------------> exchange = %s\n",exchange);
+		debug_printf("------------------> topic = %s\n",topic_to_publish);
 	}
 
 	if (http_request_header(req, "message", &message) != KORE_RESULT_OK)
@@ -748,27 +771,6 @@ reconnect:
 	props.content_type 	= amqp_cstring_bytes(content_type);
 
 	debug_printf("Got content-type {%s} : {%s}\n",content_type,id);
-
-
-	char topic_to_publish[129];
-
-	if (strcmp(id,to) == 0)
-	{
-		snprintf(exchange,129,"%s.%s",to,message_type);
-		strlcpy(topic_to_publish,topic,129);
-
-		debug_printf("------------------> exchange = %s\n",exchange);
-		debug_printf("------------------> topic = %s\n",topic_to_publish);
-		
-	}
-	else
-	{
-		snprintf(topic_to_publish,129,"%s.%s.%s",to,message_type,topic);
-		snprintf(exchange,129,"%s.write",id);
-
-		debug_printf("------------------> exchange = %s\n",exchange);
-		debug_printf("------------------> topic = %s\n",topic_to_publish);
-	}
 
 	FORBIDDEN_if
 	(
