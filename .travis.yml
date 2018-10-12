@@ -1,8 +1,0 @@
-sudo: required
-dist: xenial 
-before_install:
-  - ./tests/require.sh
-install:
-  - ./install
-script:
-  - python ./tests/test.py -d 1 -a 1

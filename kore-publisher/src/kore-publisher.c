@@ -760,8 +760,8 @@ reconnect:
 	}
 	else
 	{
-		snprintf(topic_to_publish,129,"%s.%s",to,topic);
-		snprintf(exchange,129,"%s.write",to);
+		snprintf(topic_to_publish,129,"%s.%s",topic);
+		snprintf(exchange,129,"%s.write",id);
 
 		debug_printf("------------------> exchange = %s\n",exchange);
 		debug_printf("------------------> topic = %s\n",topic_to_publish);
