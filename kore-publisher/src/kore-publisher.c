@@ -655,6 +655,12 @@ publish (struct http_request *req)
 		"inputs missing in headers"
 	);
 
+	if (! looks_like_a_valid_entity(id))
+		BAD_REQUEST("id is not a valid entity");
+
+	if (! looks_like_a_valid_entity(to))
+		BAD_REQUEST("'to' is not a valid entity");
+
 	// ok to publish to himself
 	if (strcmp(id,to) == 0)
 	{
@@ -678,7 +684,7 @@ publish (struct http_request *req)
 	{
 		if (strcmp(message_type,"command") != 0)
 		{
-			BAD_REQUEST("message type can only be command");		
+			BAD_REQUEST("message-type can only be command");		
 		}
 
 		snprintf(topic_to_publish,129,"%s.%s.%s",to,message_type,topic);
@@ -699,12 +705,6 @@ publish (struct http_request *req)
 	{
 		content_type = "";
 	}
-
-	if (! looks_like_a_valid_entity(id))
-		BAD_REQUEST("id is not a valid entity");
-
-	if (! looks_like_a_valid_entity(to))
-		BAD_REQUEST("'to' is not a valid entity");
 
 /////////////////////////////////////////////////
 
