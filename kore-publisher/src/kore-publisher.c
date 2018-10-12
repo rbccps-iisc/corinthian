@@ -1050,7 +1050,7 @@ register_entity (struct http_request *req)
 		body = (char *)req->http_body->data;
 
 	bool is_autonomous = false;
-	if (KORE_RESULT_OK != http_request_header(req, "is-autonomous", &char_is_autonomous))
+	if (http_request_header(req, "is-autonomous", &char_is_autonomous) == KORE_RESULT_OK)
 	{
 		if (strcmp(char_is_autonomous,"true") == 0)
 			is_autonomous = true;
@@ -1184,9 +1184,18 @@ deregister_entity (struct http_request *req)
 	if (! is_owner(id,entity))
 		FORBIDDEN("you are not the owner of the entity");
 
-	// TODO delete from follow where from_entity = entity or to_entity = entity
-	// delete entries in to RabbitMQ
+	// check if the entity exists
+	CREATE_STRING (
+		query,
+		"SELECT 1 FROM users WHERE from_id = '%s'",
+		entity,
+	);
+	RUN_QUERY(query,"could no query entity");
 
+	if (kore_pgsql_ntuples(&sql) != 1)
+		BAD_REQUEST("invalid entity");
+
+	// delete entries in to RabbitMQ
 	pthread_create(&thread,NULL,delete_exchanges_and_queues,(void *)entity); 
 	thread_started = true;
 
