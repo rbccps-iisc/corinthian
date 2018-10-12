@@ -711,8 +711,6 @@ publish (struct http_request *req)
 	if (! login_success(id,apikey))
 		BAD_REQUEST("invalid id or apikey");
 
-	sanitize(to);
-
 /////////////////////////////////////////////////
 
 	amqp_socket_t *socket = NULL;
