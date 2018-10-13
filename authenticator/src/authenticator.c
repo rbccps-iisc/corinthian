@@ -324,7 +324,7 @@ auth_resource(struct http_request *req)
 
 	// XXX do we need this query ?
 	CREATE_STRING (query,
-			"SELECT blocked FROM users WHERE id='%s'",
+			"SELECT 1 FROM users WHERE id='%s' AND blocked='f'",
 				sanitize(username)
 	);
 
@@ -343,9 +343,6 @@ auth_resource(struct http_request *req)
 	}
 
 	if (kore_pgsql_ntuples(&sql) != 1)
-		DENY();
-
-	if (strcmp(kore_pgsql_getvalue(&sql,0,0),"t")  == 0)
 		DENY();
 
 	strlen_username = strlen(username);
