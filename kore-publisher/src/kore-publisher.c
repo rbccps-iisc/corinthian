@@ -2740,8 +2740,7 @@ char*
 sanitize (char *string)
 {
 	// string should not be NULL. let it crash if it is 
-
-	char *p = string;
+	char *p = (char *)string;
 
 	while (*p)
 	{
@@ -2772,8 +2771,7 @@ is_request_from_localhost (struct http_request *req)
 			break;
 
 		case AF_INET6:
-			if (req->owner->addr.ipv6.sin6_addr.s6_addr == htonl(in6addr_loopback.s6_addr))
-				return true;
+			return false;
 			break;
 	}
 
