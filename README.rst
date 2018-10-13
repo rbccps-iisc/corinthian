@@ -1,4 +1,6 @@
-# Corinthian
+==========
+Corinthian
+==========
 
 .. image:: https://travis-ci.org/rbccps-iisc/corinthian.svg?branch=master
     :target: https://travis-ci.org/rbccps-iisc/corinthian
