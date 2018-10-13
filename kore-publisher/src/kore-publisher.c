@@ -1003,8 +1003,7 @@ deregister_entity (struct http_request *req)
 	pthread_create(&thread,NULL,delete_exchanges_and_queues,(void *)entity); 
 	thread_started = true;
 
-	CREATE_STRING (
-		query,
+	CREATE_STRING (query,
 		"DELETE FROM acl WHERE from_id = '%s' or exchange LIKE '%s.%%'",
 		entity,
 		entity
@@ -1867,7 +1866,7 @@ unfollow (struct http_request *req)
 	if (strcmp(permission,"write") == 0 || strcmp(permission,"read-write") == 0)
 	{
 		CREATE_STRING ( query,
-			"SELECT follow_id,exchange FROM follow "
+			"SELECT follow_id FROM follow "
 				"WHERE "
 				"requested_by = '%s' "
 					"AND "
