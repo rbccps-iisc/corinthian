@@ -42,7 +42,7 @@ Common to all APIs
 * Invalid ID
 * Invalid apikey
 
-Create / Delete owners
+Create/Delete owners
 ^^^^^^^^^^^^^^^^^^^^^^
 
 * Accesible only via localhost
