@@ -3,7 +3,7 @@
 char password_chars[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-";
 
 // variables for exchanges and queues
-char *_e[] = {".public",".private",".protected",".notification",".write",NULL};
+char *_e[] = {".public",".private",".protected",".notification",".publish",NULL};
 char *_q[] = {"\0", ".private", ".priority", ".command", ".notification", NULL};
 
 struct kore_pgsql sql;
@@ -504,7 +504,7 @@ publish (struct http_request *req)
 		}
 
 		snprintf(topic_to_publish,129,"%s.%s.%s",to,message_type,topic);
-		snprintf(exchange,129,"%s.write",id);
+		snprintf(exchange,129,"%s.publish",id);
 
 		debug_printf("------------------> exchange = %s\n",exchange);
 		debug_printf("------------------> topic = %s\n",topic_to_publish);
@@ -1733,7 +1733,7 @@ follow (struct http_request *req)
 			char command_queue	[129];
 			char write_topic	[129];
 
-			snprintf(write_exchange,129,"%s.write",from);
+			snprintf(write_exchange,129,"%s.publish",from);
 			snprintf(command_queue,129,"%s.command",to);	// XXX use message_type instead of command
 			snprintf(write_topic,129,"%s.command.%s",to,topic);
 
@@ -1746,7 +1746,7 @@ follow (struct http_request *req)
 				amqp_empty_table
 			))
 			{
-				ERROR("bind failed for app.write with device.command");
+				ERROR("bind failed for app.publish with device.command");
 			}
 
 			CREATE_STRING (query,
@@ -1893,7 +1893,7 @@ unfollow (struct http_request *req)
 		char command_queue	[129];
 		char write_topic	[129];
 
-		snprintf(write_exchange,129,"%s.write",from);
+		snprintf(write_exchange,129,"%s.publish",from);
 		snprintf(command_queue,129,"%s.command",to);
 		snprintf(write_topic,129,"%s.command.%s",to,topic); // XXX use message_type instead of command
 
@@ -1906,7 +1906,7 @@ unfollow (struct http_request *req)
 			amqp_empty_table
 		))
 		{
-			ERROR("unbind failed for app.write with device.command");
+			ERROR("unbind failed for app.publish with device.command");
 		}
 
 		CREATE_STRING 	(query, "DELETE FROM follow WHERE follow_id='%s'", follow_id);
@@ -2076,7 +2076,7 @@ share (struct http_request *req)
 		char command_queue	[129];
 		char write_topic	[129];
 
-		snprintf(write_exchange,129,"%s.write",from_id);
+		snprintf(write_exchange,129,"%s.publish",from_id);
 		snprintf(command_queue,129,"%s",exchange);	// exchange in follow is device.command
 		snprintf(write_topic,129,"%s.%s",exchange,topic); // routing key will be dev.command.topic
 
@@ -2091,7 +2091,7 @@ share (struct http_request *req)
 			amqp_empty_table
 		))
 		{
-			ERROR("bind failed for app.write with device.command");
+			ERROR("bind failed for app.publish with device.command");
 		}
 	}
 

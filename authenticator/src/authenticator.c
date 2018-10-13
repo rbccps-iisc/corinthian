@@ -411,7 +411,7 @@ auth_resource(struct http_request *req)
 						||
 				strcmp(exchange_ends_with,".diagnostics") == 0
 						||
-				strcmp(exchange_ends_with,".write") == 0
+				strcmp(exchange_ends_with,".publish") == 0
 			)
 			{
 				OK();
