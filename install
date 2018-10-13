@@ -5,10 +5,9 @@ set -e
 docker-compose down 
 docker-compose up -d 
 
-docker cp config/schema.db postgres:/
 docker cp setup/postgres.sh postgres:/
 docker exec postgres chmod +x postgres.sh
-docker exec -d postgres ./postgres.sh
+docker exec postgres ./postgres.sh
 docker cp postgres:/postgres_pwd .
 
 pwd=`cat postgres_pwd | cut -d ":" -f 2`
@@ -20,10 +19,10 @@ docker cp authenticator/ broker:/
 #docker cp config/rabbitmq.config broker:/etc/rabbitmq/
 docker cp setup/broker.sh broker:/
 docker exec broker chmod +x broker.sh
-docker exec -d broker ./broker.sh 
+docker exec broker ./broker.sh 
 
 docker cp kore-publisher/ kore:/
 docker cp setup/kore.sh kore:/
 docker exec kore chmod +x kore.sh
-docker exec -d kore ./kore.sh 
+docker exec kore ./kore.sh 
 

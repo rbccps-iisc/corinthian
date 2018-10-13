@@ -1914,7 +1914,12 @@ unfollow (struct http_request *req)
 		
 		// if its just write then stop 
 		if (strcmp(permission,"write") == 0)
+		{
+			CREATE_STRING 	(query, "DELETE FROM acl WHERE follow_id='%s'", follow_id);
+			RUN_QUERY	(query, "failed to delete from acl table");
 			OK();
+		}
+			
 	}
 
 //// for read permissions /////
