@@ -6,4 +6,4 @@ language: python
 install:
   - ./install
 script:
-  - python tests/test.py -d 1 -a 1
+  - python tests/test.py -d 10000 -a 1000
