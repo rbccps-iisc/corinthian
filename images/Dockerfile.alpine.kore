@@ -1,0 +1,15 @@
+FROM alpine:latest
+
+RUN apk update && \
+    apk upgrade && \
+    apk add tmux && \
+    apk add git build-base openssl libbsd-dev bsd-compat-headers postgresql-dev && \
+    git clone https://github.com/jorisvink/kore && \
+    cd kore && \
+    make NOTLS=1 PGSQL=1 && \
+    make install && \
+    cd .. && \
+    rm -rf kore && \
+    apk del --purge git curl 
+
+CMD tail -f /dev/null

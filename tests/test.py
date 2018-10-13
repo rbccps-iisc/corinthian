@@ -135,7 +135,7 @@ def follow_requests(ID, apikey, request_type):
 def dev_publish():
 	for device, apikey in device_keys.items():
 		logger.info("PUBLISHING MESSAGE FROM " + device)
-		pub_req = publish(device, apikey, device, "\\#", "protected", "test message from " + device)
+		pub_req = publish(device, apikey, device, "test", "protected", "test message from " + device)
 		pub_status = check(pub_req, "202")
 		assert (pub_status)
 
@@ -148,15 +148,11 @@ def bind_unbind_dev(as_admin="", req_type="", expected=devices):
 			logger.info("APP " + app + " CHECKING APPROVAL STATUS OF FOLLOW REQUESTS BEFORE BINDING")
 			follow_status = follow_requests(app, apikey, "status")
 			response = json.loads(follow_status.split("\n")[8])
-			print(follow_status)
 			flag = check(follow_status, "200")
 
 			for entry in response:
 				if entry['status'] == "approved":
 					approved = approved + 1
-
-			print(approved)
-			print(expected)
 
 			assert (approved == expected)
 			logger.info("APP " + app + " HAS RECEIVED " + str(approved) + " APPROVALS")
@@ -164,7 +160,7 @@ def bind_unbind_dev(as_admin="", req_type="", expected=devices):
 		for app, apikey in app_keys.items():
 			for device in device_keys:
 				logger.info("APP " + app + " (UN)BINDING FROM DEVICE " + device)
-				bind_req = bind_unbind(app, apikey, device, "\\#", req_type)
+				bind_req = bind_unbind(app, apikey, device, "test", req_type)
 				bind_status = check(bind_req, "200")
 				assert (bind_status)
 
@@ -191,7 +187,7 @@ def bind_unbind_dev(as_admin="", req_type="", expected=devices):
 		for app in app_keys:
 			for device in device_keys:
 				logger.info("APP " + app + " BINDING TO DEVICE " + device)
-				bind_req = bind_unbind("admin1", "admin1", device, "\\#", req_type, from_id=app)
+				bind_req = bind_unbind("admin1", "admin1", device, "test", req_type, from_id=app)
 				bind_status = check(bind_req, "200")
 				assert (bind_status)
 
@@ -202,7 +198,7 @@ def bind_unbind_without_follow(as_admin="", req_type=""):
 			for app, apikey in app_keys.items():
 					for device in device_keys:
 						logger.info("APP " + app + " (UN)BINDING FROM DEVICE " + device)
-						bind_req = bind_unbind(app, apikey, device, "\\#", req_type)
+						bind_req = bind_unbind(app, apikey, device, "test", req_type)
 						bind_status = check(bind_req, "403")
 						assert (bind_status)
 
@@ -210,7 +206,7 @@ def bind_unbind_without_follow(as_admin="", req_type=""):
 		for app in app_keys:
 			for device in device_keys:
 				logger.info("APP " + app + " BINDING TO DEVICE " + device)
-				bind_req = bind_unbind("admin1", "admin1", device, "\\#", req_type, from_id=app)
+				bind_req = bind_unbind("admin1", "admin1", device, "test", req_type, from_id=app)
 				bind_status = check(bind_req, "403")
 				assert (bind_status)
 
@@ -258,7 +254,7 @@ def unfollow_dev(as_admin="", permission=""):
 		for app in app_keys:
 			for device in device_keys:
 				logger.info("UNFOLLOW REQUEST FROM APP " + app + " TO DEVICE " + device)
-				r = unfollow("admin1", "admin1", device, "\\#", permission, from_id=app)
+				r = unfollow("admin1", "admin1", device, "test", permission, from_id=app)
 				follow_status = check(r, "200")
 				assert (follow_status)
 
@@ -266,7 +262,7 @@ def unfollow_dev(as_admin="", permission=""):
 		for app, apikey in app_keys.items():
 			for device in device_keys:
 				logger.info("UNFOLLOW REQUEST FROM APP " + app + " TO DEVICE " + device)
-				r = unfollow(app, apikey, device, "\\#", permission)
+				r = unfollow(app, apikey, device, "test", permission)
 				follow_status = check(r, "200")
 				assert (follow_status)
 
@@ -275,7 +271,7 @@ def share_dev(expected):
 	r = follow_requests("admin", "admin", "requests")
 	response = json.loads(r.split("\n")[8])
 	count = 0
-	
+
 	assert(check(r,"200"))
 	
 	for follow_req in response:
@@ -292,7 +288,7 @@ def app_publish(expected_code):
 	for app, apikey in app_keys.items():
 		for device in device_keys:
 			logger.info("APP "+ app +" PUBLISHING TO DEVICE "+ device +".command EXCHANGE")
-			publish_req = publish(app,apikey, device, device+":\\#", "command", "test data")
+			publish_req = publish(app,apikey, device, "test", "command", "data")
 			assert(check(publish_req, expected_code))
 
 
@@ -542,8 +538,22 @@ def functional_test():
 	# Apps subscribe to messages
 	logger.info(colour.HEADER + "---------------> APPS TRY TO READ PUBLISHED DATA" + colour.ENDC)
 	app_subscribe(devices)
-	
 
+	# Apps unfollow with read permissions
+	logger.info(colour.HEADER + "---------------> APPS UNFOLLOW DEVICES WITH READ-WRITE ACCESS" + colour.ENDC)
+	unfollow_dev(as_admin=True, permission="read-write")
+
+	#Deregister all apps and devices
+	logger.info(colour.HEADER+"---------------> DEREGISTERING DEVICES AND APPS"+colour.ENDC)
+
+	for device in device_keys:
+		dereg = deregister("admin","admin",device)
+		assert(check(dereg,"200"))
+ 
+	for app in app_keys:
+		dereg = deregister("admin1","admin1",app)
+		assert(check(dereg,"200"))
+		
 if __name__ == '__main__':
 
 	logging.basicConfig(format='%(asctime)s %(levelname)-6s %(message)s', level=logging.DEBUG,

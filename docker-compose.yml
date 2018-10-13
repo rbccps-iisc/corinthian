@@ -34,7 +34,7 @@ services:
       - ALL
   
   postgres:
-    image: postgres:10.5-alpine
+    image: ideam/postgres
     container_name: postgres
     hostname: postgres
     restart: always
