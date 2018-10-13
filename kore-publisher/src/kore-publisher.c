@@ -1,181 +1,12 @@
-#include <stdio.h>
-#include <stdbool.h>
-#include <unistd.h>
-#include <fcntl.h>
-
-#include <kore/kore.h>
-#include <kore/http.h>
-#include <kore/pgsql.h>
-
-#include <amqp.h>
-#include <amqp_tcp_socket.h>
-#include <amqp_framing.h>
-
-#include <bsd/stdlib.h>
-#include <bsd/string.h>
-
-#include <openssl/sha.h>
-
-#include <ctype.h>
-#include <pthread.h>
-
-#include "ht.h"
-
-//#define TEST (1)
-
-#if 1
-	#define debug_printf(...)
-#else
-	#define debug_printf(...) printf(__VA_ARGS__)
-#endif
+#include "kore-publisher.h"
 
 char password_chars[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-";
 
+// variables for exchanges and queues
 char *_e[] = {".public",".private",".protected",".notification",".write",NULL};
 char *_q[] = {"\0", ".private", ".priority", ".command", ".notification", NULL};
 
-int cat			(struct http_request *);
-
-int publish		(struct http_request *);
-int subscribe		(struct http_request *);
-
-int register_entity	(struct http_request *);
-int deregister_entity	(struct http_request *);
-
-int register_owner 	(struct http_request *);
-int deregister_owner 	(struct http_request *);
-
-int follow		(struct http_request *);
-int unfollow		(struct http_request *);
-
-int get_follow_requests (struct http_request *);
-
-int share		(struct http_request *);
-int unshare		(struct http_request *);
-int reject_follow	(struct http_request *);
-
-int queue_bind          (struct http_request *);
-int queue_unbind        (struct http_request *);
-
-int block		(struct http_request *);
-int unblock		(struct http_request *);
-
-int init (int);
-
-void gen_salt_password_and_apikey (const char *, char *, char *, char *);
-
-bool login_success (const char *, const char *);
-bool check_acl(const char *id, const char *exchange, const char *permission);
-
-bool looks_like_a_valid_owner	(const char *str);
-bool looks_like_a_valid_entity 	(const char *str);
-bool looks_like_a_valid_resource(const char *str);
-
-bool is_alpha_numeric 	(const char *str);
-bool is_owner		(const char *, const char *);
-
-void *create_exchanges_and_queues (void *);
-void *delete_exchanges_and_queues (void *);
-
-char *sanitize (char *string);
-
-bool is_request_from_localhost (struct http_request *);
-
-#define OK()    {req->status=200; goto done;}
-#define OK202() {req->status=202; goto done;}
-
-#define BAD_REQUEST(x) { 				\
-	req->status = 400;				\
-	kore_buf_reset(response); 			\
-	kore_buf_append(response,"{\"error\":\"",10); 	\
-	kore_buf_append(response,x,strlen(x));	 	\
-	kore_buf_append(response,"\"}\n",3);	 	\
-	goto done;					\
-}
-
-#define FORBIDDEN(x) {					\
-	req->status = 403;				\
-	kore_buf_reset(response); 			\
-	kore_buf_append(response,"{\"error\":\"",10); 	\
-	kore_buf_append(response,x,strlen(x));	 	\
-	kore_buf_append(response,"\"}\n",3);	 	\
-	goto done;					\
-}
-
-#define CONFLICT(x) { 					\
-	req->status = 409;				\
-	kore_buf_reset(response); 			\
-	kore_buf_append(response,"{\"error\":\"",10); 	\
-	kore_buf_append(response,x,strlen(x));	 	\
-	kore_buf_append(response,"\"}\n",3);	 	\
-	goto done;					\
-}
-
-#define ERROR(x) { 					\
-	req->status = 500;				\
-	kore_buf_reset(response); 			\
-	kore_buf_append(response,"{\"error\":\"",10); 	\
-	kore_buf_append(response,x,strlen(x));	 	\
-	kore_buf_append(response,"\"}\n",3);	 	\
-	goto done;					\
-}
-
-#define OK_if(x) {if(x) { OK(); }}
-#define FORBIDDEN_if(x,msg) {if(x) { FORBIDDEN(msg); }}
-#define ERROR_if(x,msg) {if(x) { ERROR(msg); }}
-#define BAD_REQUEST_if(x,msg) {if(x) { BAD_REQUEST(msg); }}
-
-#define RUN_QUERY(query,err) {					\
-	debug_printf("RUN_QUERY ==> {%s}\n",query->data);	\
-	kore_pgsql_cleanup(&sql);				\
-	kore_pgsql_init(&sql);					\
-	if (! kore_pgsql_setup(&sql,"db",KORE_PGSQL_SYNC))	\
-	{							\
-		kore_pgsql_logerror(&sql);			\
-		ERROR("DB error while setup");			\
-	}							\
-	if (! kore_pgsql_query(&sql, (char *)query->data))	\
-	{							\
-		kore_pgsql_logerror(&sql);			\
-		ERROR(err);					\
-	}							\
-}
-
-#define END() 	{			\
-	http_response_header(		\
-		req,			\
-		"content-type",		\
-		"application/json"	\
-	);				\
-	http_response (			\
-		req,			\
-		req->status, 		\
-		response->data,		\
-		response->offset	\
-	);				\
-	kore_pgsql_cleanup(&sql);	\
-	kore_buf_reset(response);	\
-	kore_buf_reset(query);		\
-	return (KORE_RESULT_OK);	\
-} 
-
-#define END_HTML() 	{		\
-	http_response_header(		\
-		req,			\
-		"content-type",		\
-		"text/html"		\
-	);				\
-	http_response (			\
-		req,			\
-		req->status, 		\
-		response->data,		\
-		response->offset	\
-	);				\
-	kore_pgsql_cleanup(&sql);	\
-	kore_buf_reset(response);	\
-	kore_buf_reset(query);		\
-	return (KORE_RESULT_OK);	\
-}
+struct kore_pgsql sql;
 
 struct kore_buf *Q = NULL;
 struct kore_buf *query = NULL;
@@ -185,26 +16,18 @@ char 	string_to_be_hashed 	[256];
 uint8_t	binary_hash 		[SHA256_DIGEST_LENGTH];
 char 	hash_string		[SHA256_DIGEST_LENGTH*2 + 1];
 
-struct kore_pgsql sql;
-
-#define CREATE_STRING(buf,...)	{			\
-	kore_buf_reset(buf);				\
-	kore_buf_appendf(buf,__VA_ARGS__);		\
-	kore_buf_stringify(buf,NULL);			\
-	debug_printf("BUF => {%s}\n",buf->data);	\
-}
-
 ht connection_ht;
 
-amqp_table_entry_t *entry;
-amqp_table_t lazy_queue_table;
-
-char admin_apikey[33];
-amqp_connection_state_t	cached_admin_conn;
-
 bool is_success = false;
+char admin_apikey[33];
 
-int
+amqp_connection_state_t	cached_admin_conn;
+amqp_table_t 		lazy_queue_table;
+amqp_rpc_reply_t 	login_reply;
+amqp_rpc_reply_t 	rpc_reply;
+amqp_table_entry_t 	*entry;
+amqp_basic_properties_t	props;
+
 init (int state)
 {
 	int i;
@@ -212,9 +35,6 @@ init (int state)
 	// ignore the https worker
 	if (worker->id == 0)
 		return KORE_RESULT_OK;
-
-	amqp_rpc_reply_t 	login_reply;
-	amqp_rpc_reply_t 	rpc_reply;
 
 //////////////
 // lazy queues
@@ -280,10 +100,10 @@ retry:
 	login_reply = amqp_login
 #ifdef TEST
 		(cached_admin_conn, "/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN, "guest", "guest");
+		printf("using guest\n");
 #else
 		(cached_admin_conn, "/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN, "admin", admin_apikey);
 #endif
-
 	if (login_reply.reply_type != AMQP_RESPONSE_NORMAL)
 	{
 		fprintf(stderr,"invalid id or apikey\n");
@@ -335,6 +155,9 @@ retry:
 #else
 	kore_pgsql_register("db","host=postgres user=postgres password=postgres_pwd");
 #endif
+
+	memset(&props, 0, sizeof props);
+	props._flags = AMQP_BASIC_CONTENT_TYPE_FLAG | AMQP_BASIC_USER_ID_FLAG ;
 
 	return KORE_RESULT_OK;
 }
@@ -633,11 +456,6 @@ publish (struct http_request *req)
 	char exchange[129];
 	char topic_to_publish[129];
 
-	amqp_basic_properties_t props;
-
-	amqp_rpc_reply_t 	login_reply;
-	amqp_rpc_reply_t 	rpc_reply;
-
 	req->status = 403;
 
 	BAD_REQUEST_if
@@ -763,8 +581,6 @@ reconnect:
 		ht_insert (&connection_ht, id, cached_conn);
 	}
 
-	memset(&props, 0, sizeof props);
-	props._flags 		= AMQP_BASIC_CONTENT_TYPE_FLAG | AMQP_BASIC_USER_ID_FLAG ;
 	props.user_id 		= amqp_cstring_bytes(id);
 	props.content_type 	= amqp_cstring_bytes(content_type);
 
@@ -820,9 +636,6 @@ subscribe (struct http_request *req)
 	amqp_connection_state_t		connection;
 
 	bool connection_opened = false;
-
-	amqp_rpc_reply_t 	login_reply;
-	amqp_rpc_reply_t 	rpc_reply;
 
 	req->status = 403;
 
@@ -982,7 +795,7 @@ queue:	kore_buf_append(Q,"\0",1);
 		kore_buf_append(response,message.body.bytes, message.body.len);
 		kore_buf_append(response,"\"},",3);
 
-		// we waited for messages for atleast a second
+		// we waited for messages for at least a second
 		if (time_spent >= 1)
 			break;
 	}
@@ -1190,7 +1003,7 @@ deregister_entity (struct http_request *req)
 	// check if the entity exists
 	CREATE_STRING (
 		query,
-		"SELECT 1 FROM users WHERE from_id = '%s'",
+		"SELECT 1 FROM users WHERE id = '%s'",
 		entity
 	);
 	RUN_QUERY(query,"could no query entity");
@@ -2945,6 +2758,8 @@ done:
 char*
 sanitize (char *string)
 {
+	// string should not be NULL. let it crash if it is 
+
 	char *p = string;
 
 	while (*p)
@@ -2968,15 +2783,18 @@ sanitize (char *string)
 bool
 is_request_from_localhost (struct http_request *req)
 {
-	if (req->owner->addrtype == AF_INET)
+	switch (req->owner->addrtype)
 	{
-		if (req->owner->addr.ipv4.sin_addr.s_addr != htonl(INADDR_LOOPBACK))
-			return false;
-	}
-	else
-	{
-		return false; // ipv6 ?
+		case AF_INET:
+			if (req->owner->addr.ipv4.sin_addr.s_addr == htonl(INADDR_LOOPBACK))
+				return true;
+			break;
+
+		case AF_INET6:
+			if (req->owner->addr.ipv6.sin6_addr.s6_addr == htonl(in6addr_loopback.s6_addr))
+				return true;
+			break;
 	}
 
-	return true;
+	return false;
 }

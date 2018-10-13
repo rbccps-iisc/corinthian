@@ -104,9 +104,12 @@ for i in xrange(0,num_devices):
 			"from": app, "to":device, "validity":"2", "permission":perm,
 			"topic":"hello"})
 		
-
 	follow_id = r.json()["follow-id-"+perm]
 	check(r,202)
+
+	r = get("follow-requests", {"id":"owner-a", "apikey":owner_a_apikey})
+	check(r,200)
+	assert (r.json()[0]['follow-id'] == follow_id)
 
 	r = get("follow-status", {"id":"owner-b", "apikey":owner_b_apikey})
 	check(r,200)
