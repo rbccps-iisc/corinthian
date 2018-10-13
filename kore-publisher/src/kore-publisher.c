@@ -100,7 +100,6 @@ retry:
 	login_reply = amqp_login
 #ifdef TEST
 		(cached_admin_conn, "/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN, "guest", "guest");
-		printf("using guest\n");
 #else
 		(cached_admin_conn, "/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN, "admin", admin_apikey);
 #endif
@@ -306,7 +305,6 @@ gen_salt_password_and_apikey (const char *entity, char *salt, char *password_has
 {
 	int i;
 
-	// TODO security level
 	for (i = 0; i < 32; ++i)
 	{
 		salt	[i] 	= password_chars[arc4random_uniform(sizeof(password_chars) - 1)]; 
@@ -540,17 +538,9 @@ publish (struct http_request *req)
 	if ((n = ht_search(&connection_ht,id)) != NULL)
 	{
 		cached_conn = n->value;
-
-		if (cached_conn == NULL)
-		{
-			goto reconnect;
-		}
-
-		// TODO also check if connection is still open 
 	}
 	else
 	{
-reconnect:
 		cached_conn = malloc(sizeof(amqp_connection_state_t));
 
 		if (cached_conn == NULL)
@@ -820,8 +810,6 @@ done:
 	END();
 }
 
-// TODO we need one register with bulk
-
 int
 register_entity (struct http_request *req)
 {
@@ -1014,8 +1002,6 @@ deregister_entity (struct http_request *req)
 	// delete entries in to RabbitMQ
 	pthread_create(&thread,NULL,delete_exchanges_and_queues,(void *)entity); 
 	thread_started = true;
-
-	// TODO run select query and delete all exchanges and queues of entity
 
 	CREATE_STRING (
 		query,
@@ -1268,8 +1254,6 @@ deregister_owner(struct http_request *req)
 	pthread_t thread;
 	bool thread_started = false; 
 
-	pthread_t del_threads[5];
-
 	req->status = 403;
 
 	if (! is_request_from_localhost(req))
@@ -1306,8 +1290,6 @@ deregister_owner(struct http_request *req)
 
 /////////////////////////////////////////////////
 
-	// XXX TODO delete all entities of the owner
-
 	CREATE_STRING (query,
 			"SELECT id FROM users where id = '%s' or id like '%s/%%'",
 				owner,
@@ -1317,13 +1299,12 @@ deregister_owner(struct http_request *req)
 	RUN_QUERY (query,"could not get app/devices associated with owner");
 
 	uint32_t num_rows = kore_pgsql_ntuples(&sql);
-	char *entry;
+
 	for (int i = 0; i < num_rows; ++i)
 	{
-		entry = kore_pgsql_getvalue(&sql,i,0);
-		debug_printf("Deleting {%s}\n",entry);
-
-		delete_exchanges_and_queues((void *)entry); 
+		char *entity = kore_pgsql_getvalue(&sql,i,0);
+		debug_printf("Deleting {%s}\n",entity);
+		delete_exchanges_and_queues((void *)entity); 
 	}
 
 	// delete entries in to RabbitMQ
