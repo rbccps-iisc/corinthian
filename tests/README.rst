@@ -4,13 +4,13 @@ Test cases for Corinthian
 Functional test cases
 ---------------------
 
-Accesible only to admins
+Accessible only to admins
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
 * Register owner
 * Deregister owner
 
-Accesible only to owners
+Accessible only to owners
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
 * Register
