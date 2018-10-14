@@ -658,17 +658,13 @@ subscribe (struct http_request *req)
 		{
 			kore_buf_append (Q,".notification",sizeof(".notification") - 1);
 		}
-		else if (strcmp(message_type,"regular") == 0)
-		{
-			goto queue;
-		}
 		else
 		{
 			BAD_REQUEST("invalid message-type");
 		}
 	}
 
-queue:	kore_buf_append(Q,"\0",1);
+	kore_buf_append(Q,"\0",1);
 
 	int_num_messages = 1;
 	if (KORE_RESULT_OK == http_request_header(req, "num-messages", &num_messages))
