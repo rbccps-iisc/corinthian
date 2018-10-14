@@ -11,6 +11,7 @@ import time
 import warnings
 import requests
 import urllib3
+from requests.adapters import HTTPAdapter
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -38,6 +39,7 @@ device_keys = {}
 app_keys = {}
 
 s = requests.Session();
+s.mount('https://localhost:8888/', HTTPAdapter(pool_connections=1))
 
 class colour:
 	HEADER = '\033[95m'
@@ -592,10 +594,12 @@ def functional_test():
 	logger.info(colour.HEADER+"---------------> DEREGISTERING DEVICES AND APPS"+colour.ENDC)
 
 	for device in device_keys:
+		logger.info("DEREGISTERING DEVICE "+ device +colour.ENDC)
 		dereg = deregister("admin","admin",device)
 		assert(check(dereg,200))
  
 	for app in app_keys:
+		logger.info("DEREGISTERING APP "+ app +colour.ENDC)
 		dereg = deregister("admin1","admin1",app)
 		assert(check(dereg,200))
 		
