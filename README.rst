@@ -8,3 +8,22 @@ Corinthian
 An experimental IoT middleware developed using https://kore.io
 
 Developers: Arun Babu and Poorna Chandra Tejasvi
+
+Quickstart
+==========
+
+#. Clone the repository::
+
+    git clone https://github.com/rbccps-iisc/corinthian && cd corinthian
+    
+#. Install required dependencies (docker and docker-compose)::
+
+    ./tests/require.sh
+    
+#. Start the installation::
+
+    ./install
+
+#. Test the middleware using::
+
+    ./tests/test --random
