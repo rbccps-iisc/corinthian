@@ -19,16 +19,25 @@ logger = logging.getLogger(__name__)
 base_url = "https://localhost:8888"
 
 parser = argparse.ArgumentParser(description='Test cases for Corinthian')
-parser.add_argument('-d', action="store", dest="devices", type=int)
-parser.add_argument('-a', action="store", dest="apps", type=int)
+parser.add_argument('-d', '--devices', action="store", dest="devices", type=int, help="No. of devices to run the tests")
+parser.add_argument('-a', '--apps', action="store", dest="apps", type=int, help="No. of apps to run the tests")
+parser.add_argument('--random', action="store_true", help="Run tests with random devices and apps")
 
 results = parser.parse_args()
 
-devices = results.devices
-apps = results.apps
+if results.random:
+	devices = random.randint(10,20)
+	apps 	= random.randint(10,20)
+	print(devices)
+	print(apps)
+else:
+	devices = results.devices
+	apps = results.apps
 
 device_keys = {}
 app_keys = {}
+
+s = requests.Session();
 
 class colour:
 	HEADER = '\033[95m'
@@ -51,21 +60,21 @@ def register(ID, apikey, entity_id):
 	
 	url = base_url + "/register"
 	headers = {"id": ID, "apikey": apikey, "entity": entity_id}
-	r = requests.post(url=url, headers=headers, data="{\"test\":\"schema\"}", verify=False)
+	r = s.post(url=url, headers=headers, data="{\"test\":\"schema\"}", verify=False)
 	return r
 
 def deregister(ID, apikey, entity_id):
 
 	url = base_url + "/deregister"
 	headers = {"id": ID, "apikey": apikey, "entity": entity_id}
-	r = requests.get(url=url, headers=headers, verify=False)
+	r = s.get(url=url, headers=headers, verify=False)
 	return r
 
 def publish(ID, apikey, to, topic, message_type, data):
 
 	url = base_url + "/publish"
 	headers = {"id": ID, "apikey": apikey, "to": to, "topic": topic, "message-type": message_type}
-	r = requests.post(url=url,headers=headers,data=data,verify=False)
+	r = s.post(url=url,headers=headers,data=data,verify=False)
 	return r
 
 def follow(ID, apikey, to_id, permission, from_id=""):
@@ -83,7 +92,7 @@ def follow(ID, apikey, to_id, permission, from_id=""):
 	headers['validity'] = "24"
 	headers['permission'] = permission
 	
-	r = requests.get(url=url,headers=headers,verify=False)
+	r = s.get(url=url,headers=headers,verify=False)
 	return r
 
 def unfollow(ID, apikey, to, topic, permission, from_id=""):
@@ -100,14 +109,14 @@ def unfollow(ID, apikey, to, topic, permission, from_id=""):
 	headers['topic'] = "test"
 	headers['permission'] = permission
 	
-	r = requests.get(url=url,headers=headers,verify=False)
+	r = s.get(url=url,headers=headers,verify=False)
 	return r
 
 def share(ID, apikey, follow_id):
 
 	url =base_url + "/share"
 	headers = {"id": ID, "apikey": apikey, "follow-id": follow_id}
-	r = requests.get(url=url, headers=headers, verify=False)
+	r = s.get(url=url, headers=headers, verify=False)
 	return r
 
 def bind_unbind(ID, apikey, to, topic, req_type, from_id="", message_type=""):
@@ -131,7 +140,7 @@ def bind_unbind(ID, apikey, to, topic, req_type, from_id="", message_type=""):
 	headers['to'] = to
 	headers['topic'] = topic
 
-	r = requests.get(url=url, headers=headers, verify=False)
+	r = s.get(url=url, headers=headers, verify=False)
 	return r
 
 
@@ -149,7 +158,7 @@ def subscribe(ID, apikey, message_type="", num_messages=""):
 	headers['id'] = ID
 	headers['apikey'] = apikey
 
-	r = requests.get(url=url, headers=headers, verify=False)
+	r = s.get(url=url, headers=headers, verify=False)
 	return r
 
 def follow_requests(ID, apikey, request_type):
@@ -163,7 +172,7 @@ def follow_requests(ID, apikey, request_type):
 
 	headers = {"id": ID, "apikey": apikey}
 
-	r = requests.get(url=url, headers=headers, verify=False)
+	r = s.get(url=url, headers=headers, verify=False)
 	return r
 
 def dev_publish():
