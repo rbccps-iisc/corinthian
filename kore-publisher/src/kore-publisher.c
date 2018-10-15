@@ -357,7 +357,7 @@ login_success (const char *id, const char *apikey)
 	if (id == NULL || apikey == NULL || *id == '\0' || *apikey == '\0')
 		goto done;
 
-	if (strchr(id,'\'') != NULL)
+	if (strchr(id,'\'') || strchr(id,'\\'))
 		goto done;
 
 	CREATE_STRING (query,
@@ -976,7 +976,6 @@ deregister_entity (struct http_request *req)
 	if (! login_success(id,apikey))
 		FORBIDDEN("invalid id or apikey");
 
-	sanitize(id);
 	sanitize(entity);
 
 /////////////////////////////////////////////////
@@ -1392,6 +1391,18 @@ queue_bind (struct http_request *req)
 	if (! looks_like_a_valid_entity(to))
 		FORBIDDEN("'to' is not a valid entity");
 
+	if (
+		(strcmp(message_type,"public") != 0) &&
+		(strcmp(message_type,"private") != 0) &&
+		(strcmp(message_type,"protected") != 0) &&
+		(strcmp(message_type,"diagnostics") != 0)
+	)
+	{
+		BAD_REQUEST("message-type is invalid");
+	}
+
+	snprintf (exchange,128,"%s.%s", to,message_type); 
+
 /////////////////////////////////////////////////
 
 	if (! login_success(id,apikey))
@@ -1412,18 +1423,6 @@ queue_bind (struct http_request *req)
 			strlcat(queue,".priority",128);
 		}
 	}
-
-	if (
-		(strcmp(message_type,"public") != 0) &&
-		(strcmp(message_type,"private") != 0) &&
-		(strcmp(message_type,"protected") != 0) &&
-		(strcmp(message_type,"diagnostics") != 0)
-	)
-	{
-		BAD_REQUEST("message-type is invalid");
-	}
-
-	snprintf (exchange,128,"%s.%s", to,message_type); 
 
 	debug_printf("queue = %s",queue);
 	debug_printf("exchange = %s", exchange);
@@ -1664,10 +1663,8 @@ follow (struct http_request *req)
 
 	sanitize (from);
 	sanitize (to);
-	sanitize (permission);
 	sanitize (validity);
 	sanitize (topic);
-	sanitize (message_type);
 
 /////////////////////////////////////////////////
 
@@ -1888,9 +1885,9 @@ unfollow (struct http_request *req)
 	if (! login_success(id,apikey))
 		FORBIDDEN("invalid id or apikey");
 
-	sanitize(id);
 	sanitize(from);
 	sanitize(to);
+	sanitize(topic);
 
 /////////////////////////////////////////////////
 
@@ -2048,7 +2045,6 @@ share (struct http_request *req)
 	if (! login_success(id,apikey))
 		FORBIDDEN("invalid id or apikey");
 
-	sanitize(id);
 	sanitize(follow_id);
 
 /////////////////////////////////////////////////
@@ -2165,7 +2161,6 @@ reject_follow (struct http_request *req)
 	if (! login_success(id,apikey))
 		FORBIDDEN("invalid id or apikey");
 
-	sanitize(id);
 	sanitize(follow_id);
 
 /////////////////////////////////////////////////
@@ -2232,8 +2227,6 @@ get_follow_status (struct http_request *req)
 
 	if (! login_success(id,apikey))
 		FORBIDDEN("invalid id or apikey");
-
-	sanitize(id);
 
 //////////////////////////////////////////////////
 
@@ -2327,8 +2320,6 @@ get_follow_requests (struct http_request *req)
 
 	if (! login_success(id,apikey))
 		FORBIDDEN("invalid id or apikey");
-
-	sanitize (id);
 
 /////////////////////////////////////////////////
 
@@ -2539,6 +2530,8 @@ permissions (struct http_request *req)
 
 	if (! login_success(id,apikey))
 		BAD_REQUEST("invalid id or apikey");
+
+	sanitize(entity);
 
 /////////////////////////////////////////////////
 
@@ -2856,11 +2849,12 @@ sanitize (char *string)
 	{
 		/* replace single quotes with double quotes.
 
-		   underscores and % with spaces. ok ?
+		  backslash, underscores, and % with spaces.
 
 		  we will have problem with read only strings */
 
 			if (*p == '\'') *p = '\"';
+		else	if (*p == '\\') *p = ' ';
 		else 	if (*p == '_' ) *p = ' ';
 		else 	if (*p == '%' ) *p = ' ';
 
