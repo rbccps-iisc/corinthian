@@ -127,6 +127,9 @@ for i in xrange(0,num_devices):
 
 	check(r,200)
 
+	r = get("permissions", {"id":app, "apikey":app_apikey})
+	check(r,200)
+
 	if perm == "read":
 		#### BIND ####
 		r = get("bind",{"id":app,"apikey":app_apikey,"to":device,"topic":"hello","message-type":"protected"})
