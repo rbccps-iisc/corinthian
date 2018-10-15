@@ -2843,16 +2843,31 @@ sanitize (char *string)
 	// string should not be NULL. let it crash if it is 
 	char *p = (char *)string;
 
+	// assumption is that 'string' is in single quotes
+
 	while (*p)
 	{
-		/* wipe out anything that looks suspicious
-
-		  we will have problem with read only strings */
-
-		if (*p == '\'' || *p == '\\' || *p == '_' || *p == '%')
+		/* wipe out anything that looks suspicious */
+	
+		if (! isprint(*p))
 		{
 			*p = '\0';
-			return;
+			return 0;
+		}
+		
+		switch(*p)
+		{
+			case '\'':
+			case '\\':
+			case '_' :
+			case '%' :
+			case '(' :
+			case ')' :
+			case '|' :
+			case ';' :
+			case '&' :
+				*p = '\0';
+				return;
 		}
 
 		++p;
