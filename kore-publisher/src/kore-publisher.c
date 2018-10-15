@@ -3,7 +3,7 @@
 char password_chars[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-";
 
 // variables for exchanges and queues
-char *_e[] = {".public",".private",".protected",".notification",".publish",NULL};
+char *_e[] = {".public",".private",".protected",".notification",".publish",".diagnostics",NULL};
 char *_q[] = {"\0", ".private", ".priority", ".command", ".notification", NULL};
 
 struct kore_pgsql sql;
@@ -1365,6 +1365,8 @@ queue_bind (struct http_request *req)
 		KORE_RESULT_OK != http_request_header(req, "to", &to)
 				||
 		KORE_RESULT_OK != http_request_header(req, "topic", &topic)
+				||
+		KORE_RESULT_OK != http_request_header(req, "message-type", &message_type)
 			,
 		"inputs missing in headers"
 	);
@@ -1411,30 +1413,43 @@ queue_bind (struct http_request *req)
 		}
 	}
 
-	snprintf (exchange,128,"%s.protected", to); 
+	if (
+		(strcmp(message_type,"public") != 0) &&
+		(strcmp(message_type,"private") != 0) &&
+		(strcmp(message_type,"protected") != 0) &&
+		(strcmp(message_type,"diagnostics") != 0)
+	)
+	{
+		BAD_REQUEST("message-type is invalid");
+	}
+
+	snprintf (exchange,128,"%s.%s", to,message_type); 
 
 	debug_printf("queue = %s",queue);
 	debug_printf("exchange = %s", exchange);
 
-	// if he is not the owner, he needs an entry in acl
-	if(! is_owner(id,to))
+	if(strcmp(message_type,"public") != 0)
 	{
-		CREATE_STRING (
-			query,
-			"SELECT 1 FROM acl WHERE "
-			"from_id = '%s' "
-			"AND exchange = '%s' "
-			"AND permission = 'read' "
-			"AND valid_till > now() AND topic = '%s'",
-			from,
-			exchange,
-			topic
-		);
+		// if he is not the owner, he needs an entry in acl
+		if (! is_owner(id,to))
+		{ 
+			CREATE_STRING (
+				query,
+				"SELECT 1 FROM acl WHERE "
+				"from_id = '%s' "
+				"AND exchange = '%s' "
+				"AND permission = 'read' "
+				"AND valid_till > now() AND topic = '%s'",
+				from,
+				exchange,
+				topic
+			);
 
-		RUN_QUERY(query,"failed to query for permission");
+			RUN_QUERY(query,"failed to query for permission");
 
-		if (kore_pgsql_ntuples(&sql) != 1)
-			FORBIDDEN("unauthorized");
+			if (kore_pgsql_ntuples(&sql) != 1)
+				FORBIDDEN("unauthorized");
+		}
 	}
 
 	if (! amqp_queue_bind (
@@ -1586,6 +1601,8 @@ follow (struct http_request *req)
 
 	const char *validity; // in hours 
 
+	const char *message_type;
+
 	char *status = "pending";
 
 	req->status = 403;
@@ -1606,6 +1623,18 @@ follow (struct http_request *req)
 			,
 		"inputs missing in headers"
 	);
+
+	if (http_request_header(req, "message-type", &message_type) == KORE_RESULT_OK)
+	{
+		if (strcmp(message_type,"protected") != 0 && strcmp(message_type,"diagnostics") != 0)
+		{
+			BAD_REQUEST("invalid message-type");	
+		}
+	}
+	else
+	{
+		message_type = "protected";
+	}
 
 	if (looks_like_a_valid_owner(id))
 	{
@@ -1638,6 +1667,7 @@ follow (struct http_request *req)
 	sanitize (permission);
 	sanitize (validity);
 	sanitize (topic);
+	sanitize (message_type);
 
 /////////////////////////////////////////////////
 
@@ -1660,10 +1690,11 @@ follow (struct http_request *req)
 		CREATE_STRING (query, 
 			"INSERT INTO follow "
 			"(follow_id,requested_by,from_id,exchange,time,permission,topic,validity,status) "
-			"values(DEFAULT,'%s','%s','%s.protected',now(),'read','%s','%s','%s')",
+			"values(DEFAULT,'%s','%s','%s.%s',now(),'read','%s','%s','%s')",
 				id,
 				from,
 				to,	// .protected is appended to it
+				message_type,
 				topic,
 				validity,
 				status
@@ -1710,9 +1741,10 @@ follow (struct http_request *req)
 			CREATE_STRING (query,
 			"INSERT INTO acl "
 			"(acl_id,from_id,exchange,follow_id,permission,topic,valid_till) "
-			"values(DEFAULT,'%s','%s.protected','%s','%s', '%s', now() + interval '%s  hours')",
+			"values(DEFAULT,'%s','%s.%s','%s','%s', '%s', now() + interval '%s  hours')",
 			        	from,
-					to,		// .protected is appended to it
+					to,		// .message_type is appended to it
+					message_type,
 					read_follow_id,
 					"read",
 					topic,
@@ -1729,7 +1761,7 @@ follow (struct http_request *req)
 			char write_topic	[129];
 
 			snprintf(write_exchange,129,"%s.publish",from);
-			snprintf(command_queue,129,"%s.command",to);	// XXX use message_type instead of command
+			snprintf(command_queue,129,"%s.command",to);
 			snprintf(write_topic,129,"%s.command.%s",to,topic);
 
 			if (! amqp_queue_bind (
@@ -1799,6 +1831,7 @@ unfollow (struct http_request *req)
 	const char *to;
 	const char *topic;
 	const char *permission;
+	const char *message_type;
 
 	char *acl_id;
 	char *follow_id;
@@ -1815,6 +1848,8 @@ unfollow (struct http_request *req)
 		KORE_RESULT_OK != http_request_header(req, "topic", &topic)
 				||
 		KORE_RESULT_OK != http_request_header(req, "permission", &permission)
+				||
+		KORE_RESULT_OK != http_request_header(req, "message-type", &message_type)
 			,
 		"inputs missing in headers"
 	);
@@ -1924,7 +1959,7 @@ unfollow (struct http_request *req)
 			"WHERE "
 			"from_id = '%s' "
 				"AND "
-			"exchange = '%s.protected' "
+			"exchange = '%s.%s' "
 				"AND "
 			"topic = '%s' "
 				"AND "
@@ -1932,6 +1967,7 @@ unfollow (struct http_request *req)
 
 				from,
 				to,
+				message_type,
 				topic
 	);
 
@@ -2615,8 +2651,8 @@ create_exchanges_and_queues (void *v)
 			}
 			debug_printf("[entity] DONE creating queue {%s}\n",queue);
 
-			// bind all except null and .priority and .command
-			if (_q[i][0] && strcmp(_q[i],".priority") != 0 && strcmp(_q[i],".command") != 0)
+			// bind .private and .notification 
+			if (strcmp(_q[i],".private") == 0 || strcmp(_q[i],".notification") == 0)
 			{
 				snprintf(exchange,129,"%s%s",id,_q[i]);
 				debug_printf("[entity] binding {%s} -> {%s}\n",queue,exchange);

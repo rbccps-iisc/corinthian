@@ -129,13 +129,13 @@ for i in xrange(0,num_devices):
 
 	if perm == "read":
 		#### BIND ####
-		r = get("bind",{"id":app,"apikey":app_apikey,"to":device,"topic":"hello"})
+		r = get("bind",{"id":app,"apikey":app_apikey,"to":device,"topic":"hello","message-type":"protected"})
 		check(r,200)
 
 		r = get("unbind",{"id":app,"apikey":app_apikey,"to":device,"topic":"hello"})
 		check(r,200)
 
-		r = get("unfollow",{"id":app,"apikey":app_apikey,"from":app,"to":device,"permission":perm,"topic":"hello"})
+		r = get("unfollow",{"id":app,"apikey":app_apikey,"from":app,"to":device,"permission":perm,"topic":"hello","message-type":"protected"})
 		check(r,200)
 
 t_dregister = time.time()
