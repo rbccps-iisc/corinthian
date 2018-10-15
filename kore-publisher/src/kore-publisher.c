@@ -357,8 +357,7 @@ login_success (const char *id, const char *apikey)
 	if (id == NULL || apikey == NULL || *id == '\0' || *apikey == '\0')
 		goto done;
 
-	if (strchr(id,'\'') || strchr(id,'\\'))
-		goto done;
+	sanitize(id);
 
 	CREATE_STRING (query,
 			"SELECT salt,password_hash FROM users WHERE id='%s' and blocked='f'",
@@ -861,7 +860,6 @@ register_entity (struct http_request *req)
 	if (! login_success(id,apikey))
 		FORBIDDEN("invalid id or apikey");
 
-	sanitize(id);
 	sanitize(entity);
 
 	if (body)
@@ -1410,7 +1408,6 @@ queue_bind (struct http_request *req)
 	if (! login_success(id,apikey))
 		FORBIDDEN("invalid id or apikey");
 
-	sanitize(id);
 	sanitize(from);
 	sanitize(to);
 	sanitize(topic);
@@ -1527,7 +1524,6 @@ queue_unbind (struct http_request *req)
 	if (! login_success(id,apikey))
 		FORBIDDEN("invalid id or apikey");
 
-	sanitize(id);
 	sanitize(from);
 	sanitize(to);
 	sanitize(topic);
