@@ -75,7 +75,7 @@ bool is_owner		(const char *, const char *);
 void *create_exchanges_and_queues (void *);
 void *delete_exchanges_and_queues (void *);
 
-char *sanitize (char *string);
+void sanitize (char *string);
 
 bool is_request_from_localhost (struct http_request *);
 

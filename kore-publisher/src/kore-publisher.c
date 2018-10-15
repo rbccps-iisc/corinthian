@@ -1048,9 +1048,11 @@ cat (struct http_request *req)
 		if (! looks_like_a_valid_entity(entity))
 			FORBIDDEN("id is not a valid entity");
 
+		sanitize(entity);
+
 		CREATE_STRING (query,
 				"SELECT schema FROM users WHERE schema is NOT NULL AND id='%s'",
-					sanitize(entity)
+					entity
 		);
 	}
 	else
@@ -2839,7 +2841,7 @@ done:
 	return NULL;
 }
 
-char*
+void
 sanitize (char *string)
 {
 	// string should not be NULL. let it crash if it is 
@@ -2847,21 +2849,18 @@ sanitize (char *string)
 
 	while (*p)
 	{
-		/* replace single quotes with double quotes.
-
-		  backslash, underscores, and % with spaces.
+		/* wipe out anything that looks suspicious
 
 		  we will have problem with read only strings */
 
-			if (*p == '\'') *p = '\"';
-		else	if (*p == '\\') *p = ' ';
-		else 	if (*p == '_' ) *p = ' ';
-		else 	if (*p == '%' ) *p = ' ';
+		if (*p == '\'' || *p == '\\' || *p == '_' || *p == '%')
+		{
+			*p = '\0';
+			return;
+		}
 
 		++p;
 	}
-
-	return string;
 }
 
 bool
