@@ -48,7 +48,7 @@ bool looks_like_a_valid_entity(const char *);
 
 bool login_success (const char *, const char *);
 
-char *sanitize (char *string);
+void sanitize (char *string);
 
 char 	string_to_be_hashed 	[256];
 uint8_t	binary_hash 		[SHA256_DIGEST_LENGTH];
@@ -154,12 +154,11 @@ login_success (const char *id, const char *apikey)
 	if (id == NULL || apikey == NULL || *id == '\0' || *apikey == '\0')
 		goto done;
 
-	if (strchr(id,'\'') != NULL)
-		goto done;
+	sanitize(id);
 
 	CREATE_STRING (query,
 			"SELECT salt,password_hash FROM users WHERE id='%s' and blocked='f'",
-				sanitize(id)
+				id
 	);
 
 	debug_printf("login query = {%s}\n",query->data);
@@ -322,10 +321,12 @@ auth_resource(struct http_request *req)
 	if (looks_like_a_valid_owner(name))
 		DENY()
 
+	sanitize (username);
+
 	// XXX do we need this query ?
 	CREATE_STRING (query,
 			"SELECT 1 FROM users WHERE id='%s' AND blocked='f'",
-				sanitize(username)
+				username
 	);
 
 	debug_printf("Query = {%s}\n",query->data);
@@ -437,19 +438,39 @@ done:
 	return (KORE_RESULT_OK);
 }
 
-char*
+void
 sanitize (char *string)
 {
-	char *p = string;
+	// string should not be NULL. let it crash if it is 
+	char *p = (char *)string;
+
+	// assumption is that 'string' is in single quotes
+
 	while (*p)
 	{
-		/* replace ' with " 
-		  we will have problem with read only strings */
-		if (*p == '\'')
-			*p = '\"';
+		/* wipe out anything that looks suspicious */
+	
+		if (! isprint(*p))
+		{
+			*p = '\0';
+			return 0;
+		}
+		
+		switch(*p)
+		{
+			case '\'':
+			case '\\':
+			case '_' :
+			case '%' :
+			case '(' :
+			case ')' :
+			case '|' :
+			case ';' :
+			case '&' :
+				*p = '\0';
+				return;
+		}
 
 		++p;
 	}
-	
-	return string;
 }
