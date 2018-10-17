@@ -1364,6 +1364,7 @@ queue_bind (struct http_request *req)
 
         const char *topic;
 	const char *message_type;
+	const char *is_priority;
 
 	char queue 	[129];
 	char exchange	[129];
@@ -1430,9 +1431,9 @@ queue_bind (struct http_request *req)
 /////////////////////////////////////////////////
 
 	strlcpy(queue,from,128);
-	if (KORE_RESULT_OK == http_request_header(req, "message-type", &message_type))
+	if (KORE_RESULT_OK == http_request_header(req, "is-priority", &is_priority))
 	{
-		if (strcmp(message_type,"priority") == 0)
+		if (strcmp(message_type,"true") == 0)
 		{
 			strlcat(queue,".priority",128);
 		}
