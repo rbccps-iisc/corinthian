@@ -97,7 +97,7 @@ def follow(ID, apikey, to_id, permission, from_id=""):
 	r = s.get(url=url,headers=headers,verify=False)
 	return r
 
-def unfollow(ID, apikey, to, topic, permission, from_id=""):
+def unfollow(ID, apikey, to, topic, permission, message_type, from_id=""):
 
 	url = base_url + "/unfollow"
 	headers = {}
@@ -110,6 +110,7 @@ def unfollow(ID, apikey, to, topic, permission, from_id=""):
 	headers['to'] = to
 	headers['topic'] = "test"
 	headers['permission'] = permission
+	headers['message-type'] = message_type 
 	
 	r = s.get(url=url,headers=headers,verify=False)
 	return r
@@ -121,7 +122,7 @@ def share(ID, apikey, follow_id):
 	r = s.get(url=url, headers=headers, verify=False)
 	return r
 
-def bind_unbind(ID, apikey, to, topic, req_type, from_id="", message_type=""):
+def bind_unbind(ID, apikey, to, topic, req_type, message_type, from_id=""):
 
 	url = base_url
 	headers = {}
@@ -134,8 +135,7 @@ def bind_unbind(ID, apikey, to, topic, req_type, from_id="", message_type=""):
 	if from_id:
 		headers['from'] = from_id
 
-	if message_type:
-		headers['message-type'] = message_type
+	headers['message-type'] = message_type
 
 	headers['id'] = ID
 	headers['apikey'] = apikey
@@ -205,7 +205,7 @@ def bind_unbind_dev(as_admin="", req_type="", expected=devices):
 		for app, apikey in app_keys.items():
 			for device in device_keys:
 				logger.info("APP " + app + " (UN)BINDING FROM DEVICE " + device)
-				bind_req = bind_unbind(app, apikey, device, "test", req_type)
+				bind_req = bind_unbind(app, apikey, device, "test", req_type, "protected")
 				bind_status = check(bind_req, 200)
 				assert (bind_status)
 
@@ -232,7 +232,7 @@ def bind_unbind_dev(as_admin="", req_type="", expected=devices):
 		for app in app_keys:
 			for device in device_keys:
 				logger.info("APP " + app + " BINDING TO DEVICE " + device)
-				bind_req = bind_unbind("admin1", "admin1", device, "test", req_type, from_id=app)
+				bind_req = bind_unbind("admin1", "admin1", device, "test", req_type, "protected", from_id=app)
 				bind_status = check(bind_req, 200)
 				assert (bind_status)
 
@@ -243,7 +243,7 @@ def bind_unbind_without_follow(as_admin="", req_type=""):
 			for app, apikey in app_keys.items():
 					for device in device_keys:
 						logger.info("APP " + app + " (UN)BINDING FROM DEVICE " + device)
-						bind_req = bind_unbind(app, apikey, device, "test", req_type)
+						bind_req = bind_unbind(app, apikey, device, "test", req_type, "protected")
 						bind_status = check(bind_req, 403)
 						assert (bind_status)
 
@@ -251,7 +251,7 @@ def bind_unbind_without_follow(as_admin="", req_type=""):
 		for app in app_keys:
 			for device in device_keys:
 				logger.info("APP " + app + " BINDING TO DEVICE " + device)
-				bind_req = bind_unbind("admin1", "admin1", device, "test", req_type, from_id=app)
+				bind_req = bind_unbind("admin1", "admin1", device, "test", req_type, "protected", from_id=app)
 				bind_status = check(bind_req, 403)
 				assert (bind_status)
 
@@ -296,11 +296,12 @@ def follow_dev(as_admin="", permission=""):
 
 
 def unfollow_dev(as_admin="", permission=""):
+
 	if as_admin == True:
 		for app in app_keys:
 			for device in device_keys:
 				logger.info("UNFOLLOW REQUEST FROM APP " + app + " TO DEVICE " + device)
-				r = unfollow("admin1", "admin1", device, "test", permission, from_id=app)
+				r = unfollow("admin1", "admin1", device, "test", permission, "protected", from_id=app)
 				follow_status = check(r, 200)
 				assert (follow_status)
 
@@ -308,7 +309,7 @@ def unfollow_dev(as_admin="", permission=""):
 		for app, apikey in app_keys.items():
 			for device in device_keys:
 				logger.info("UNFOLLOW REQUEST FROM APP " + app + " TO DEVICE " + device)
-				r = unfollow(app, apikey, device, "test", permission)
+				r = unfollow(app, apikey, device, "test", permission, "protected")
 				follow_status = check(r, 200)
 				assert (follow_status)
 
