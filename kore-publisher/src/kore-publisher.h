@@ -179,7 +179,6 @@ bool is_request_from_localhost (struct http_request *);
 	kore_buf_reset(buf);				\
 	kore_buf_appendf(buf,__VA_ARGS__);		\
 	kore_buf_stringify(buf,NULL);			\
-	debug_printf("BUF => {%s}\n",buf->data);	\
 }
 
 #endif /* __KORE_PUBLISHER_H */

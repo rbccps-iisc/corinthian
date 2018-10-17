@@ -862,6 +862,7 @@ register_entity (struct http_request *req)
 
 	sanitize(entity);
 
+	// TODO maybe body needs a different sanitizer
 	if (body)
 		sanitize(body);
 
@@ -889,15 +890,29 @@ register_entity (struct http_request *req)
 
 	if (body)
 	{
+		// use parameterized query for inserting json
+
 		CREATE_STRING (query,
 			"INSERT INTO users (id,password_hash,schema,salt,blocked,is_autonomous) "
-			"values('%s','%s','%s','%s','f','%s')",
+			"values('%s','%s',$1,'%s','f','%s')",	// $1 is the schema (in body) 
 			entity_name,
 			password_hash,
-			body,		// schema
 			salt,
 			is_autonomous ? "t" : "f"
 		);
+
+		kore_pgsql_cleanup(&sql);
+		kore_pgsql_init(&sql);
+		if (! kore_pgsql_setup(&sql,"db",KORE_PGSQL_SYNC))
+		{
+			kore_pgsql_logerror(&sql);
+			ERROR("DB error while setup");
+		}
+		if (! kore_pgsql_query_params (&sql,query->data,0,1,body,req->http_body_length,0))
+		{
+			kore_pgsql_logerror(&sql);
+			ERROR("failed to create the entity with schema");
+		}
 	}
 	else
 	{
@@ -909,9 +924,9 @@ register_entity (struct http_request *req)
 			salt,
 			is_autonomous ? "t" : "f"
 		);
-	}
 
-	RUN_QUERY (query,"failed to create the entity");
+		RUN_QUERY (query,"failed to create the entity");
+	}
 
 	// generate response
 	kore_buf_reset(response);
@@ -1688,7 +1703,7 @@ follow (struct http_request *req)
 			"values(DEFAULT,'%s','%s','%s.%s',now(),'read','%s','%s','%s')",
 				id,
 				from,
-				to,	// .protected is appended to it
+				to,	// .message_type is appended to it
 				message_type,
 				topic,
 				validity,
