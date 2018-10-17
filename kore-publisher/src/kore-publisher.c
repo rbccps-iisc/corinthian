@@ -2867,7 +2867,7 @@ sanitize (char *string)
 		if (! isprint(*p))
 		{
 			*p = '\0';
-			return 0;
+			return;
 		}
 		
 		switch(*p)
