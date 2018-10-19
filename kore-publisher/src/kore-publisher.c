@@ -1016,8 +1016,10 @@ deregister_entity (struct http_request *req)
 		BAD_REQUEST("invalid entity");
 
 	// delete entries in to RabbitMQ
-	pthread_create(&thread,NULL,delete_exchanges_and_queues,(void *)entity); 
-	thread_started = true;
+	if (0 == pthread_create(&thread,NULL,delete_exchanges_and_queues,(void *)entity))
+		thread_started = true;
+	else
+		delete_exchanges_and_queues(entity);
 
 	CREATE_STRING (query,
 		"DELETE FROM acl WHERE from_id = '%s' or exchange LIKE '%s.%%'",
