@@ -526,6 +526,11 @@ publish (struct http_request *req)
 	if (! login_success(id,apikey))
 		BAD_REQUEST("invalid id or apikey");
 
+	/* Not required !
+	sanitize(to);
+	sanitize(topic);
+	*/
+
 /////////////////////////////////////////////////
 
 	amqp_socket_t *socket = NULL;
@@ -871,8 +876,11 @@ register_entity (struct http_request *req)
 	snprintf(entity_name,66,"%s/%s",id,entity);
 
 	// create entries in to RabbitMQ
-	pthread_create(&thread,NULL,create_exchanges_and_queues,(void *)&entity_name); 
-	thread_started = true;
+
+	if (0 == pthread_create(&thread,NULL,create_exchanges_and_queues,(void *)&entity_name)) 
+		thread_started = true;
+	else
+		create_exchanges_and_queues(&entity_name);
 
 	// conflict if entity_name already exist
 
