@@ -1223,8 +1223,10 @@ register_owner(struct http_request *req)
 	if(kore_pgsql_ntuples(&sql) > 0)
 		CONFLICT("id already used");
 
-	pthread_create(&thread,NULL,create_exchanges_and_queues,(void *)owner); 
-	thread_started = true;
+	if (0 == pthread_create(&thread,NULL,create_exchanges_and_queues,(void *)owner))
+		thread_started = true;
+	else
+		create_exchanges_and_queues(owner);
 
 	gen_salt_password_and_apikey (owner, salt, password_hash, owner_apikey);
 
