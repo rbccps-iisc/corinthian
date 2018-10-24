@@ -1,6 +1,7 @@
 #include <kore/kore.h>
 #include <kore/http.h>
 #include <kore/pgsql.h>
+#include <fcntl.h>
 
 #include <openssl/sha.h>
 
@@ -57,6 +58,8 @@ char 	hash_string		[SHA256_DIGEST_LENGTH*2 + 1];
 struct kore_buf *query = NULL;
 struct kore_pgsql sql;
 
+char postgres_pwd[33];
+
 size_t i;
 
 int
@@ -64,9 +67,39 @@ init (int state)
 {
 	if (query == NULL)
 		query = kore_buf_alloc(512);
+	
+	int f = open("postgres_pwd",O_RDONLY);
+	if (f < 0)
+	{
+		fprintf(stderr,"could not open postgres_pwd\n");
+		exit(-1);
+	}
+
+	if (! read(f,postgres_pwd,32))
+	{
+		fprintf(stderr,"could not read from postgres_pwd\n");
+		exit(-1);
+	}
+
+	postgres_pwd[32] = '\0';
+	int strlen_postgres_pwd = strlen(postgres_pwd);
+
+	for (i = 0; i < strlen_postgres_pwd; ++i)
+	{
+		if (isspace(postgres_pwd[i]))
+		{
+			postgres_pwd[i] = '\0';
+			break;
+		}
+	}
+
+	close (f);
 
 	// XXX this user must only have read permissions on DB
-	kore_pgsql_register("db","host=postgres user=postgres password=postgres_pwd");
+
+	char conn_str[129];
+        snprintf(conn_str,129,"host = postgres user = postgres password = %s",postgres_pwd);
+        kore_pgsql_register("db",conn_str);
 
 	return KORE_RESULT_OK;
 }
