@@ -7,11 +7,11 @@ admin_pwd="$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w ${1:-32} | head -n 
 salt="$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w ${1:-32} | head -n 1)"
 
 string=$admin_pwd$salt"admin"
-hash=`echo -n $string | sha256sum`
+hash=`echo -n $string | sha256sum | cut -d ' ' -f 1`
 
 
-echo "postgres:$postgres_pwd" > postgres_pwd
-echo "admin:$admin_pwd" > admin_pwd
+echo $postgres_pwd > postgres_pwd
+echo $admin_pwd > admin_pwd
 
 su postgres -c "postgres -D /var/lib/postgresql > /var/lib/postgresql/logfile 2>&1 &"
 

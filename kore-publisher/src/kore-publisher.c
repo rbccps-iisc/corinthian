@@ -20,6 +20,7 @@ ht connection_ht;
 
 bool is_success = false;
 char admin_apikey[33];
+char postgres_pwd[33];
 
 amqp_connection_state_t	cached_admin_conn;
 amqp_table_t 		lazy_queue_table;
@@ -53,16 +54,16 @@ init (int state)
 
 //////////////
 
-	int fd = open("admin.apikey",O_RDONLY);
+	int fd = open("admin_pwd",O_RDONLY);
 	if (fd < 0)
 	{
-		fprintf(stderr,"could not open admin.apikey\n");
+		fprintf(stderr,"could not open admin_pwd file\n");
 		exit(-1);
 	}
 
 	if (! read(fd,admin_apikey,32))
 	{
-		fprintf(stderr,"could not read from admin.apikey\n");
+		fprintf(stderr,"could not read from admin_pwd file\n");
 		exit(-1);
 	}
 
@@ -79,6 +80,33 @@ init (int state)
 	}
 
 	close (fd);
+
+	int f = open("postgres_pwd",O_RDONLY);
+	if (f < 0)
+	{
+		fprintf(stderr,"could not open postgres_pwd\n");
+		exit(-1);
+	}
+
+	if (! read(f,postgres_pwd,32))
+	{
+		fprintf(stderr,"could not read from postgres_pwd\n");
+		exit(-1);
+	}
+
+	postgres_pwd[32] = '\0';
+	int strlen_postgres_pwd = strlen(postgres_pwd);
+
+	for (i = 0; i < strlen_postgres_pwd; ++i)
+	{
+		if (isspace(postgres_pwd[i]))
+		{
+			postgres_pwd[i] = '\0';
+			break;
+		}
+	}
+
+	close (f);
 
 	cached_admin_conn = amqp_new_connection();
 	amqp_socket_t *socket = amqp_tcp_socket_new(cached_admin_conn);
@@ -152,7 +180,9 @@ retry:
 #ifdef TEST
 	kore_pgsql_register("db","user=postgres password=password");
 #else
-	kore_pgsql_register("db","host=postgres user=postgres password=postgres_pwd");
+	char conn_str[129];
+        snprintf(conn_str,129,"host = postgres user = postgres password = %s",postgres_pwd);
+	kore_pgsql_register("db",conn_str);
 #endif
 
 	memset(&props, 0, sizeof props);

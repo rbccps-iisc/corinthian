@@ -40,7 +40,7 @@ app_keys = {}
 s = requests.Session();
 s.mount('https://localhost:8888/', HTTPAdapter(pool_connections=1))
 
-f = open("./kore-publisher/admin.apikey", "r")
+f = open("./vars/admin_pwd", "r")
 admin_key = str(f.read())[:-1]
 
 cmd = """ docker exec postgres psql -U postgres -c "insert into users values('admin1','fa8d4b8fe10794af430f04b7af55388be9f676361c49849daff827918b6bd2f3',NULL,'salt','f')" """
