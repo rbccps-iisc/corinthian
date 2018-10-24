@@ -4,6 +4,11 @@ networks:
   kore-net:
     driver: bridge
 
+volumes:
+  pgsql-data:
+  broker-data:
+
+
 services:
 
   kore:
@@ -32,6 +37,8 @@ services:
       - kore-net
     cap_add:
       - ALL
+    volumes:
+      - broker-data:/var/lib/rabbitmq
   
   postgres:
     image: ideam/postgres
@@ -42,3 +49,5 @@ services:
       - kore-net
     cap_add:
       - ALL
+    volumes:
+      - pgsql-data:/var/lib/postgresql
