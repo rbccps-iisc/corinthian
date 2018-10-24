@@ -630,10 +630,10 @@ def start_tests():
 	deregistrations()
 	dereg_time = time.time() - dereg_time 
 
-	print("\n\n"+colour.OKGREEN+colour.BOLD+"===============All tests have passed==============="+colour.ENDC)
-	print(colour.OKGREEN+"Registrations took    : "+str(reg_time)+"s"+colour.ENDC)
-	print(colour.OKGREEN+"Test cases took       : "+str(test_time)+"s"+colour.ENDC)
-	print(colour.OKGREEN+"Deregistrations took  : "+str(dereg_time)+"s"+colour.ENDC)
+	print("\n\n"+colour.OKGREEN+colour.BOLD+"====================All tests have passed===================="+colour.ENDC)
+	print(colour.OKGREEN+"Registrations    : "+str(reg_time)+"s"+colour.ENDC)
+	print(colour.OKGREEN+"Test cases       : "+str(test_time)+"s"+colour.ENDC)
+	print(colour.OKGREEN+"Deregistrations  : "+str(dereg_time)+"s"+colour.ENDC)
 
 if __name__ == '__main__':
 
