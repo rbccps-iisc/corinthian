@@ -2,9 +2,16 @@
 
 set -e 
 
-pwd="$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w ${1:-32} | head -n 1)"
+postgres_pwd="$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w ${1:-32} | head -n 1)"
+admin_pwd="$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w ${1:-32} | head -n 1)"
+salt="$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w ${1:-32} | head -n 1)"
 
-echo "postgres:$pwd" > postgres_pwd
+string=$admin_pwd$salt"admin"
+hash=`echo -n $string | sha256sum`
+
+
+echo "postgres:$postgres_pwd" > postgres_pwd
+echo "admin:$admin_pwd" > admin_pwd
 
 su postgres -c "postgres -D /var/lib/postgresql > /var/lib/postgresql/logfile 2>&1 &"
 
@@ -13,7 +20,6 @@ do
 sleep 0.1
 done
 
-psql -U postgres -c "alter user postgres with password '$pwd'" > /dev/null 2>&1 
-psql -U postgres -c "insert into users values('admin','8896dc08ba1e17556f336edc11a56e9244bba853a4ae9ccbe54c7e51f683ce62',NULL,'salt','f')" > /dev/null 2>&1
-psql -U postgres -c "insert into users values('admin1','fa8d4b8fe10794af430f04b7af55388be9f676361c49849daff827918b6bd2f3',NULL,'salt','f')" > /dev/null 2>&1
+psql -U postgres -c "alter user postgres with password '$postgres_pwd'" > /dev/null 2>&1 
+psql -U postgres -c "insert into users values('admin','$hash',NULL,'$salt','f')" > /dev/null 2>&1
 

@@ -9,11 +9,15 @@ docker cp setup/postgres.sh postgres:/
 docker exec postgres chmod +x postgres.sh
 docker exec postgres ./postgres.sh
 docker cp postgres:/postgres_pwd .
+docker cp postgres:/admin_pwd .
 
-pwd=`cat postgres_pwd | cut -d ":" -f 2`
+postgres_pwd=`cat postgres_pwd | cut -d ":" -f 2`
+admin_pwd=`cat admin_pwd | cut -d ":" -f 2`
 
-sed 's/postgres_pwd/'$pwd'/g' authenticator/src/authenticator.c > authenticator/src/authenticator_new.c
-sed 's/postgres_pwd/'$pwd'/g' kore-publisher/src/kore-publisher.c > kore-publisher/src/kore-publisher_new.c
+sed 's/postgres_pwd/'$postgres_pwd'/g' authenticator/src/authenticator.c > authenticator/src/authenticator_new.c
+sed 's/postgres_pwd/'$postgres_pwd'/g' kore-publisher/src/kore-publisher.c > kore-publisher/src/kore-publisher_new.c
+
+echo $admin_pwd > kore-publisher/admin.apikey
 
 docker cp authenticator/ broker:/
 docker cp setup/broker.sh broker:/

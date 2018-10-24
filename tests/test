@@ -11,6 +11,7 @@ import time
 import warnings
 import requests
 import urllib3
+import subprocess
 from requests.adapters import HTTPAdapter
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -29,8 +30,6 @@ results = parser.parse_args()
 if results.random:
 	devices = random.randint(10,20)
 	apps 	= random.randint(10,20)
-	print(devices)
-	print(apps)
 else:
 	devices = results.devices
 	apps = results.apps
@@ -40,6 +39,16 @@ app_keys = {}
 
 s = requests.Session();
 s.mount('https://localhost:8888/', HTTPAdapter(pool_connections=1))
+
+f = open("./kore-publisher/admin.apikey", "r")
+admin_key = str(f.read())[:-1]
+
+cmd = """ docker exec postgres psql -U postgres -c "insert into users values('admin1','fa8d4b8fe10794af430f04b7af55388be9f676361c49849daff827918b6bd2f3',NULL,'salt','f')" """
+
+try:
+	p = subprocess.check_output(cmd, shell=True)
+except Exception as e:
+	pass
 
 class colour:
 	HEADER = '\033[95m'
@@ -315,7 +324,7 @@ def unfollow_dev(as_admin="", permission=""):
 
 def share_dev(expected):
 
-	r = follow_requests("admin", "admin", "requests")
+	r = follow_requests("admin", admin_key, "requests")
 	response = r.json() 
 	count = 0
 
@@ -324,7 +333,7 @@ def share_dev(expected):
 	for follow_req in response:
 		count = count + 1
 		logger.info("SHARE FROM DEVICE " + str(follow_req['to']).split(".")[0] + " TO APP " + str(follow_req['from']))
-		share_req = share("admin", "admin", str(follow_req['follow-id']))
+		share_req = share("admin", admin_key, str(follow_req['follow-id']))
 		share_status = check(share_req, 200)
 		assert (share_status)
 
@@ -360,9 +369,8 @@ def dev_subscribe(expected):
 		actual = 0
 		logger.info("DEVICE " + device + " HAS RECEIVED " + str(expected) + " COMMAND MESSAGES")
 
-
-def functional_test():
-
+def registrations():
+	
 	# Device regsitration
 	logger.info(colour.HEADER + "---------------> REGISTERING DEVICES " + colour.ENDC)
 
@@ -370,7 +378,7 @@ def functional_test():
 		logger.info("REGISTERING DEVICE " + str(i))
 		dev_name = "dev" + ''.join(
 		random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(16))
-		r = register('admin', 'admin', dev_name)
+		r = register('admin', admin_key, dev_name)
 		response = r.json()
 		logger.info(json.dumps(response))
 		reg_status = check(r, 200)
@@ -394,7 +402,23 @@ def functional_test():
 		assert (reg_status)
 
 		app_keys[response['id']] = response['apikey']
+def deregistrations():
 
+	#Deregister all apps and devices
+	logger.info(colour.HEADER+"---------------> DEREGISTERING DEVICES AND APPS"+colour.ENDC)
+
+	for device in device_keys:
+		logger.info("DEREGISTERING DEVICE "+ device +colour.ENDC)
+		dereg = deregister("admin",admin_key,device)
+		assert(check(dereg,200))
+ 
+	for app in app_keys:
+		logger.info("DEREGISTERING APP "+ app +colour.ENDC)
+		dereg = deregister("admin1","admin1",app)
+		assert(check(dereg,200))
+
+def functional_tests():
+	
 	# Follow requests from apps to devices using apps' respective apikeys
 	logger.info(colour.HEADER + "---------------> FOLLOW REQUESTS WITH READ PERMISSION " + colour.ENDC)
 	follow_dev(as_admin=False, permission="read")
@@ -590,24 +614,32 @@ def functional_test():
 	# Apps unfollow with read permissions
 	logger.info(colour.HEADER + "---------------> APPS UNFOLLOW DEVICES WITH READ-WRITE ACCESS" + colour.ENDC)
 	unfollow_dev(as_admin=True, permission="read-write")
+	
 
-	#Deregister all apps and devices
-	logger.info(colour.HEADER+"---------------> DEREGISTERING DEVICES AND APPS"+colour.ENDC)
+def start_tests():
+	
+	reg_time = time.time()
+	registrations()
+	reg_time = time.time() - reg_time
 
-	for device in device_keys:
-		logger.info("DEREGISTERING DEVICE "+ device +colour.ENDC)
-		dereg = deregister("admin","admin",device)
-		assert(check(dereg,200))
- 
-	for app in app_keys:
-		logger.info("DEREGISTERING APP "+ app +colour.ENDC)
-		dereg = deregister("admin1","admin1",app)
-		assert(check(dereg,200))
-		
+	test_time = time.time()
+	functional_tests()
+	test_time = time.time() - test_time
+
+	dereg_time = time.time()
+	deregistrations()
+	dereg_time = time.time() - dereg_time 
+
+	print("\n\n"+colour.OKGREEN+colour.BOLD+"===============All tests have passed==============="+colour.ENDC)
+	print(colour.OKGREEN+"Registrations took    : "+str(reg_time)+"s"+colour.ENDC)
+	print(colour.OKGREEN+"Test cases took       : "+str(test_time)+"s"+colour.ENDC)
+	print(colour.OKGREEN+"Deregistrations took  : "+str(dereg_time)+"s"+colour.ENDC)
+
 if __name__ == '__main__':
 
 	logging.basicConfig(format='%(asctime)s %(levelname)-6s %(message)s', level=logging.DEBUG,
 						datefmt='%Y-%m-%d %H:%M:%S')
 	logging.getLogger("requests").setLevel(logging.WARNING)
 	logging.getLogger("urllib3").setLevel(logging.WARNING)
-	functional_test()
+
+	start_tests()
