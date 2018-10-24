@@ -18,11 +18,11 @@ Quickstart
     
 #. Install required dependencies (docker and docker-compose)::
 
-    ./tests/require.sh
+    ./tests/require-docker.sh
     
 #. Start the installation::
 
-    ./install
+    ./install.docker
 
 #. Test the middleware using::
 
