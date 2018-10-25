@@ -68,7 +68,7 @@ init (int state)
 	if (query == NULL)
 		query = kore_buf_alloc(512);
 	
-	int f = open("postgres_pwd",O_RDONLY);
+	int f = open("/vars/postgres_pwd",O_RDONLY);
 	if (f < 0)
 	{
 		fprintf(stderr,"could not open postgres_pwd\n");

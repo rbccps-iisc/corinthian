@@ -5,21 +5,6 @@ set -e
 docker-compose down -v 
 docker-compose up -d 
 
-docker cp setup/pgsql_install.sh postgres:/
-docker exec postgres chmod +x pgsql_install.sh
-docker exec postgres ./pgsql_install.sh
-docker cp postgres:/postgres_pwd vars/
-docker cp postgres:/admin_pwd vars/
-
-docker cp authenticator/ broker:/
-docker cp vars/postgres_pwd broker:/authenticator/
-docker cp setup/broker_install.sh broker:/
-docker exec broker chmod +x broker_install.sh
-docker exec broker ./broker_install.sh 
-
-docker cp kore-publisher/ kore:/
-docker cp vars/admin_pwd kore:/kore-publisher/
-docker cp vars/postgres_pwd kore:/kore-publisher/
-docker cp setup/kore_install.sh kore:/
-docker exec kore chmod +x kore_install.sh
-docker exec kore ./kore_install.sh 
+docker exec postgres ./scripts/pgsql_install.sh
+docker exec broker ./scripts/broker_install.sh 
+docker exec kore ./scripts/kore_install.sh 
