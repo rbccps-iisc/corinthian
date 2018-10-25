@@ -41,7 +41,7 @@ services:
     cap_add:
       - ALL
     volumes:
-      - broker-data:/var/lib/rabbitmq
+      - broker-data:/var/lib/rabbitmq/
       - ./authenticator:/authenticator/
       - ./rabbitmq:/etc/rabbitmq/
       - ./setup/broker:/scripts/

@@ -4,6 +4,6 @@ before_install:
   - ./tests/require.sh
 language: python
 install:
-  - ./install
+  - ./corinthian install
 script:
   - ./tests/test --random 
