@@ -54,7 +54,7 @@ init (int state)
 
 //////////////
 
-	int fd = open("admin_pwd",O_RDONLY);
+	int fd = open("/vars/admin_pwd",O_RDONLY);
 	if (fd < 0)
 	{
 		fprintf(stderr,"could not open admin_pwd file\n");
@@ -81,7 +81,7 @@ init (int state)
 
 	close (fd);
 
-	int f = open("postgres_pwd",O_RDONLY);
+	int f = open("/vars/postgres_pwd",O_RDONLY);
 	if (f < 0)
 	{
 		fprintf(stderr,"could not open postgres_pwd\n");

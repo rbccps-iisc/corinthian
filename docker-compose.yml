@@ -8,7 +8,6 @@ volumes:
   pgsql-data:
   broker-data:
 
-
 services:
 
   kore:
@@ -23,6 +22,10 @@ services:
       - kore-net
     cap_add:
       - ALL
+    volumes:
+      - ./kore-publisher:/kore-publisher/
+      - ./setup/kore:/scripts/
+      - ./vars/:/vars/
 
   broker:
     image: ideam/kore-broker
@@ -30,7 +33,7 @@ services:
     restart: always
     hostname: broker
     ports:
-      - "5672:5672"
+      - "5671:5671"
       - "1883:1883"
       - "15672:15672"
     networks:
@@ -39,6 +42,10 @@ services:
       - ALL
     volumes:
       - broker-data:/var/lib/rabbitmq
+      - ./authenticator:/authenticator/
+      - ./rabbitmq:/etc/rabbitmq/
+      - ./setup/broker:/scripts/
+      - ./vars/:/vars/
   
   postgres:
     image: ideam/postgres
@@ -51,3 +58,5 @@ services:
       - ALL
     volumes:
       - pgsql-data:/var/lib/postgresql
+      - ./setup/pgsql:/scripts/
+      - ./vars/:/vars/

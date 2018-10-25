@@ -10,8 +10,8 @@ string=$admin_pwd$salt"admin"
 hash=`echo -n $string | sha256sum | cut -d ' ' -f 1`
 
 
-echo $postgres_pwd > postgres_pwd
-echo $admin_pwd > admin_pwd
+echo $postgres_pwd > /vars/postgres_pwd
+echo $admin_pwd > /vars/admin_pwd
 
 su postgres -c "postgres -D /var/lib/postgresql > /var/lib/postgresql/logfile 2>&1 &"
 
