@@ -1,0 +1,6 @@
+#!/bin/bash
+
+docker exec postgres psql -U postgres -c "delete from acl; delete from follow; delete from users where id not like 'admin'"
+docker exec broker rabbitmqctl stop_app
+docker exec broker rabbitmqctl reset
+docker exec broker rabbitmqctl start_app
