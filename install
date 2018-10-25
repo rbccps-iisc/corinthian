@@ -1,0 +1,8 @@
+#!/bin/bash
+
+docker-compose down -v
+docker-compose up -d
+
+docker exec postgres ./scripts/pgsql_install.sh
+docker exec broker ./scripts/broker_install.sh
+docker exec kore ./scripts/kore_install.sh docker-compose up -d

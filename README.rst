@@ -16,13 +16,24 @@ Quickstart
 
     git clone https://github.com/rbccps-iisc/corinthian && cd corinthian
     
-#. Install required dependencies (docker and docker-compose)::
+#. Install required dependencies (If you are running Ubuntu)::
 
     ./tests/require-docker.sh
+
+#. If the host machine is not Ubuntu then install the following dependencies manually
+	
+	#. docker
+	#. docker-compose
+	#. python
+	#. python-pip
+	
+   If you want to run the test script then also install the following python libraries
+	#. requests
+	#. urllib3
     
 #. Start the installation::
 
-    ./install.docker
+    ./install
 
 #. Test the middleware using::
 
