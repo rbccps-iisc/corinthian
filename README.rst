@@ -33,7 +33,8 @@ Quickstart
     
 #. Start the installation::
 
-    ./docker/install
+    cd docker
+    ./install
 
 #. Test the middleware using::
 
