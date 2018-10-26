@@ -68,14 +68,14 @@ init (int state)
 	if (query == NULL)
 		query = kore_buf_alloc(512);
 	
-	int f = open("/vars/postgres_pwd",O_RDONLY);
-	if (f < 0)
+	int fd = open("/vars/postgres_pwd",O_RDONLY);
+	if (fd < 0)
 	{
 		fprintf(stderr,"could not open postgres_pwd\n");
 		exit(-1);
 	}
 
-	if (! read(f,postgres_pwd,32))
+	if (! read(fd,postgres_pwd,32))
 	{
 		fprintf(stderr,"could not read from postgres_pwd\n");
 		exit(-1);
@@ -93,7 +93,7 @@ init (int state)
 		}
 	}
 
-	close (f);
+	close (fd);
 
 	// XXX this user must only have read permissions on DB
 
@@ -262,7 +262,6 @@ login_success (const char *id, const char *apikey)
 	}
 
 done:
-	kore_buf_reset(query);
 	kore_pgsql_cleanup(&sql);
 
 	return login_result;
@@ -279,7 +278,8 @@ auth_user(struct http_request *req)
 	http_populate_get(req);
 
 	GET_MANDATORY_FIELD(username);
-printf("Got username = {%s}\n",username);
+	debug_printf("Got username = {%s}\n",username);
+
 	GET_MANDATORY_FIELD(password);
 
 	if (strlen(username) > 65) 
@@ -298,9 +298,7 @@ done:
 	else
 		http_response(req, req->status, "deny", 4);
 
-	kore_buf_reset(query);
-
-	kore_pgsql_cleanup(&sql);				\
+	kore_pgsql_cleanup(&sql);
 
 	return (KORE_RESULT_OK);
 }
@@ -316,7 +314,9 @@ auth_vhost(struct http_request *req)
 int
 auth_topic(struct http_request *req)
 {
-	return 1;
+	// dont worry about topic 
+	http_response(req, 200, "allow", 5);
+	return (KORE_RESULT_OK);
 }
 
 int
@@ -398,16 +398,14 @@ auth_resource(struct http_request *req)
 		}
 		else
 		{
-			// allow in queues = username, username.priority and username.priority 
-			if (strcmp(name,username) == 0)
-			{
-				OK();
-			}
-			else if (strcmp(name + strlen_username ,".priority") == 0)
-			{
-				OK();
-			}
-			else if (strcmp(name + strlen_username ,".command") == 0)
+			// else allow in queues = username, username.priority and username.priority 
+			if (
+				(strcmp(name,username) == 0)
+					||
+				(strcmp(name + strlen_username ,".priority") == 0)
+					||
+				(strcmp(name + strlen_username ,".command") == 0)
+			)
 			{
 				OK();
 			}
@@ -464,9 +462,7 @@ done:
 	else
 		http_response(req, req->status, "deny", 4);
 
-	kore_buf_reset(query);
-
-	kore_pgsql_cleanup(&sql);				\
+	kore_pgsql_cleanup(&sql);
 
 	return (KORE_RESULT_OK);
 }
@@ -486,7 +482,7 @@ sanitize (char *string)
 		if (! isprint(*p))
 		{
 			*p = '\0';
-			return 0;
+			return;
 		}
 		
 		switch(*p)
