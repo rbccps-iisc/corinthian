@@ -1,1 +1,13 @@
-kore-publisher/src/kore-publisher
+kore-publisher/.objs/
+kore-publisher/hosts
+kore-publisher/hostname
+kore-publisher/kore.pid
+kore-publisher/kore-publisher.so
+kore-publisher/resolv.conf
+authenticator/.objs/
+authenticator/hosts
+authenticator/hostname
+authenticator/kore.pid
+authenticator/authenticator.so
+authenticator/resolv.conf
+vars/

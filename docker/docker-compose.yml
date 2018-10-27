@@ -23,9 +23,9 @@ services:
     cap_add:
       - ALL
     volumes:
-      - ./kore-publisher:/kore-publisher/
-      - ./setup/kore:/scripts/
-      - ./vars/:/vars/
+      - ../kore-publisher:/kore-publisher/
+      - ../setup/kore:/scripts/
+      - ../vars/:/vars/
 
   broker:
     image: ideam/kore-broker
@@ -42,10 +42,10 @@ services:
       - ALL
     volumes:
       - broker-data:/var/lib/rabbitmq/
-      - ./authenticator:/authenticator/
-      - ./rabbitmq:/etc/rabbitmq/
-      - ./setup/broker:/scripts/
-      - ./vars/:/vars/
+      - ../authenticator:/authenticator/
+      - ../rabbitmq:/etc/rabbitmq/
+      - ../setup/broker:/scripts/
+      - ../vars/:/vars/
   
   postgres:
     image: ideam/postgres
@@ -58,5 +58,5 @@ services:
       - ALL
     volumes:
       - pgsql-data:/var/lib/postgresql
-      - ./setup/pgsql:/scripts/
-      - ./vars/:/vars/
+      - ../setup/pgsql:/scripts/
+      - ../vars/:/vars/
