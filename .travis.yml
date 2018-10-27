@@ -12,4 +12,5 @@ install:
   - ./install
 
 script:
+  - cd ..
   - ./tests/test --random 
