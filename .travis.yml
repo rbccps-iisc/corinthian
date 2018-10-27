@@ -1,9 +1,15 @@
 sudo: required
+
 dist: xenial
+
 before_install:
   - ./tests/require.sh
+
 language: python
+
 install:
+  - cd docker
   - ./install
+
 script:
   - ./tests/test --random 
