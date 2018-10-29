@@ -37,6 +37,9 @@ init (int state)
 	if (worker->id == 0)
 		return KORE_RESULT_OK;
 
+	// mask server name 
+	http_server_version(" ");
+
 //////////////
 // lazy queues
 //////////////
@@ -569,7 +572,11 @@ publish (struct http_request *req)
 
 	amqp_connection_state_t	*cached_conn = NULL;
 
-	if ((n = ht_search(&connection_ht,id)) != NULL)
+	char key[65];
+	strlcpy(key,id,32);
+	strlcat(key,apikey,64);
+
+	if ((n = ht_search(&connection_ht,key)) != NULL)
 	{
 		cached_conn = n->value;
 	}
@@ -602,7 +609,7 @@ publish (struct http_request *req)
 		if (rpc_reply.reply_type != AMQP_RESPONSE_NORMAL)
 			ERROR("did not receive expected response from the broker");
 
-		ht_insert (&connection_ht, id, cached_conn);
+		ht_insert (&connection_ht, key, cached_conn);
 	}
 
 	props.user_id 		= amqp_cstring_bytes(id);
