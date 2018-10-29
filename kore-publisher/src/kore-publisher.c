@@ -38,7 +38,7 @@ init (int state)
 		return KORE_RESULT_OK;
 
 	// mask server name 
-	http_server_version(" ");
+	http_server_version("x");
 
 //////////////
 // lazy queues
@@ -84,14 +84,14 @@ init (int state)
 
 	close (fd);
 
-	int f = open("/vars/postgres_pwd",O_RDONLY);
-	if (f < 0)
+	fd = open("/vars/postgres_pwd",O_RDONLY);
+	if (fd < 0)
 	{
 		fprintf(stderr,"could not open postgres_pwd\n");
 		exit(-1);
 	}
 
-	if (! read(f,postgres_pwd,32))
+	if (! read(fd,postgres_pwd,32))
 	{
 		fprintf(stderr,"could not read from postgres_pwd\n");
 		exit(-1);
@@ -109,7 +109,7 @@ init (int state)
 		}
 	}
 
-	close (f);
+	close (fd);
 
 	cached_admin_conn = amqp_new_connection();
 	amqp_socket_t *socket = amqp_tcp_socket_new(cached_admin_conn);
@@ -190,6 +190,14 @@ retry:
 
 	memset(&props, 0, sizeof props);
 	props._flags = AMQP_BASIC_CONTENT_TYPE_FLAG | AMQP_BASIC_USER_ID_FLAG ;
+
+///// chroot and drop priv /////
+
+	chroot("./jail");	
+	setgid(65534);
+	setuid(65534);
+
+//////////////////
 
 	return KORE_RESULT_OK;
 }
