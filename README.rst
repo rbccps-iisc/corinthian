@@ -21,7 +21,6 @@ Quickstart
     ./tests/require-docker.sh
 
 #. If the host machine is not Ubuntu then install the following dependencies manually
-	
 	#. docker
 	#. docker-compose
 	#. python
