@@ -13,4 +13,4 @@ install:
 
 script:
   - cd ..
-  - ./tests/test --random 
+  - ./tests/test fxnl --random 

@@ -556,8 +556,8 @@ publish (struct http_request *req)
 
 /////////////////////////////////////////////////
 
-	if (! login_success(id,apikey))
-		BAD_REQUEST("invalid id or apikey");
+	//if (! login_success(id,apikey))
+	//	BAD_REQUEST("invalid id or apikey");
 
 	/* Not required !
 	sanitize(to);
@@ -565,6 +565,8 @@ publish (struct http_request *req)
 	*/
 
 /////////////////////////////////////////////////
+
+	snprintf(token, 129, "%s:%s", id, apikey);
 
 	amqp_socket_t *socket = NULL;
 
@@ -721,7 +723,7 @@ subscribe (struct http_request *req)
 /////////////////////////////////////////////////
 
 	if (! login_success(id,apikey))
-		BAD_REQUEST("invalid id or apikey");
+		FORBIDDEN("invalid id or apikey");
 
 /////////////////////////////////////////////////
 
@@ -2592,7 +2594,7 @@ permissions (struct http_request *req)
 /////////////////////////////////////////////////
 
 	if (! login_success(id,apikey))
-		BAD_REQUEST("invalid id or apikey");
+		FORBIDDEN("invalid id or apikey");
 
 	sanitize(entity);
 

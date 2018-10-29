@@ -20,30 +20,13 @@ logger = logging.getLogger(__name__)
 
 base_url = "https://localhost:8888"
 
-parser = argparse.ArgumentParser(description='Test cases for Corinthian')
-parser.add_argument('-d', '--devices', action="store", dest="devices", type=int, help="No. of devices to run the tests")
-parser.add_argument('-a', '--apps', action="store", dest="apps", type=int, help="No. of apps to run the tests")
-parser.add_argument('--random', action="store_true", help="Run tests with random devices and apps")
-
-results = parser.parse_args()
-
-if results.random:
-	devices = random.randint(10,20)
-	apps 	= random.randint(10,20)
-else:
-	devices = results.devices
-	apps = results.apps
-
-device_keys = {}
-app_keys = {}
-
 s = requests.Session();
 s.mount('https://localhost:8888/', HTTPAdapter(pool_connections=1))
 
 f = open("./vars/admin_pwd", "r")
 admin_key = str(f.read())[:-1]
 
-cmd = """ docker exec postgres psql -U postgres -c "insert into users values('admin1','fa8d4b8fe10794af430f04b7af55388be9f676361c49849daff827918b6bd2f3',NULL,'salt','f')" """
+cmd = """ docker exec postgres psql -U postgres -c "insert into users values('admin1','fa8d4b8fe10794af430f04b7af55388be9f676361c49849daff827918b6bd2f3',NULL,'salt','f') ON CONFLICT DO NOTHING" """
 
 try:
 	p = subprocess.check_output(cmd, shell=True)
@@ -67,6 +50,13 @@ def check(response, code):
 	else:
 		return False
 
+def register_owner(ID, apikey, owner):
+	
+	url = base_url + "/register-owner"
+	headers = {"id": ID, "apikey": apikey, "owner": owner}
+	r = s.post(url=url, headers=headers, verify=False)
+	return r
+
 def register(ID, apikey, entity_id):
 	
 	url = base_url + "/register"
@@ -78,6 +68,34 @@ def deregister(ID, apikey, entity_id):
 
 	url = base_url + "/deregister"
 	headers = {"id": ID, "apikey": apikey, "entity": entity_id}
+	r = s.get(url=url, headers=headers, verify=False)
+	return r
+
+def block_unblock(ID, apikey, entity_id, req_type):
+	
+	url = base_url 
+	
+	if req_type == "block":
+		url = url + "/block"
+	elif req_type == "unblock":
+		url = url + "/unblock"
+
+	headers = {"id": ID, "apikey": apikey, "entity": entity_id}
+	r = s.get(url=url, headers=headers, verify=False)
+	return r
+
+def permissions(ID, apikey, entity_id=""):
+
+	url = base_url + "/permissions"
+
+	headers = {}
+
+	if entity_id:
+		headers['entity'] = entity_id
+
+	headers ['id'] 		= ID
+	headers	['apikey'] 	= apikey
+
 	r = s.get(url=url, headers=headers, verify=False)
 	return r
 
@@ -105,6 +123,14 @@ def follow(ID, apikey, to_id, permission, from_id=""):
 	
 	r = s.get(url=url,headers=headers,verify=False)
 	return r
+
+def reject_follow(ID, apikey, follow_id):
+	
+	url =base_url + "/reject-follow"
+	headers = {"id": ID, "apikey": apikey, "follow-id": follow_id}
+	r = s.get(url=url, headers=headers, verify=False)
+	return r
+	
 
 def unfollow(ID, apikey, to, topic, permission, message_type, from_id=""):
 
@@ -186,7 +212,8 @@ def follow_requests(ID, apikey, request_type):
 	r = s.get(url=url, headers=headers, verify=False)
 	return r
 
-def dev_publish():
+def dev_publish(device_keys):
+
 	for device, apikey in device_keys.items():
 		logger.info("PUBLISHING MESSAGE FROM " + device)
 		pub_req = publish(device, apikey, device, "test", "protected", "test message from " + device)
@@ -194,10 +221,12 @@ def dev_publish():
 		assert (pub_status)
 
 
-def bind_unbind_dev(as_admin="", req_type="", expected=devices):
+def bind_unbind_dev(device_keys, app_keys, expected=0, as_admin="", req_type=""):
 
 	if as_admin == False:
+
 		approved = 0
+
 		for app, apikey in app_keys.items():
 			logger.info("APP " + app + " CHECKING APPROVAL STATUS OF FOLLOW REQUESTS BEFORE BINDING")
 			follow_status = follow_requests(app, apikey, "status")
@@ -211,6 +240,7 @@ def bind_unbind_dev(as_admin="", req_type="", expected=devices):
 			assert (approved == expected)
 			logger.info("APP " + app + " HAS RECEIVED " + str(approved) + " APPROVALS")
 			approved = 0
+
 		for app, apikey in app_keys.items():
 			for device in device_keys:
 				logger.info("APP " + app + " (UN)BINDING FROM DEVICE " + device)
@@ -246,7 +276,7 @@ def bind_unbind_dev(as_admin="", req_type="", expected=devices):
 				assert (bind_status)
 
 
-def bind_unbind_without_follow(as_admin="", req_type=""):
+def bind_unbind_without_follow(device_keys, app_keys, as_admin="", req_type=""):
 
 	if as_admin == False:
 			for app, apikey in app_keys.items():
@@ -264,7 +294,7 @@ def bind_unbind_without_follow(as_admin="", req_type=""):
 				bind_status = check(bind_req, 403)
 				assert (bind_status)
 
-def app_subscribe(expected):
+def app_subscribe(devices, app_keys, expected):
 
 	count = math.ceil(devices / 10.0)
 
@@ -286,7 +316,8 @@ def app_subscribe(expected):
 		logger.info("APP " + app + " has successfully received " + str(expected) + " messages")
 
 
-def follow_dev(as_admin="", permission=""):
+def follow_dev(device_keys, app_keys, as_admin="", permission=""):
+
 	if as_admin == True:
 		for app in app_keys:
 			for device in device_keys:
@@ -304,7 +335,7 @@ def follow_dev(as_admin="", permission=""):
 				assert (follow_status)
 
 
-def unfollow_dev(as_admin="", permission=""):
+def unfollow_dev(device_keys, app_keys, as_admin="", permission=""):
 
 	if as_admin == True:
 		for app in app_keys:
@@ -339,7 +370,7 @@ def share_dev(expected):
 
 	assert(count == expected)
 
-def app_publish(expected_code):
+def app_publish(device_keys, app_keys, expected_code):
 
 	for app, apikey in app_keys.items():
 		for device in device_keys:
@@ -348,7 +379,7 @@ def app_publish(expected_code):
 			assert(check(publish_req, expected_code))
 
 
-def dev_subscribe(expected):
+def dev_subscribe(apps, device_keys, expected):
 
 	count = math.ceil(apps / 10.0)
 
@@ -369,8 +400,11 @@ def dev_subscribe(expected):
 		actual = 0
 		logger.info("DEVICE " + device + " HAS RECEIVED " + str(expected) + " COMMAND MESSAGES")
 
-def registrations():
+def registrations(devices, apps):
 	
+	device_keys = {}
+	app_keys = {}
+
 	# Device regsitration
 	logger.info(colour.HEADER + "---------------> REGISTERING DEVICES " + colour.ENDC)
 
@@ -402,7 +436,10 @@ def registrations():
 		assert (reg_status)
 
 		app_keys[response['id']] = response['apikey']
-def deregistrations():
+
+	return device_keys, app_keys
+
+def deregistrations(device_keys, app_keys):
 
 	#Deregister all apps and devices
 	logger.info(colour.HEADER+"---------------> DEREGISTERING DEVICES AND APPS"+colour.ENDC)
@@ -417,11 +454,485 @@ def deregistrations():
 		dereg = deregister("admin1","admin1",app)
 		assert(check(dereg,200))
 
-def functional_tests():
+def security_tests():
+
+	print("\n\n")
+	logger.info(colour.OKGREEN + colour.BOLD + "========================= SECURITY TESTS =========================\n\n"+colour.ENDC)
 	
+	dummy_key = ''.join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(32))
+	dummy_id = ''.join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(16))
+
+	devices = random.randint(1,5)
+	apps 	= random.randint(1,5)
+
+	device_keys, app_keys = registrations(devices,apps)	
+
+	#Trying to register an owner from outside the localhost
+	
+	#logger.info(colour.HEADER + "---------------> OWNER REGISTRATION FROM OUTSIDE LOCALHOST " + colour.ENDC)
+
+	#r = register_owner("admin", admin_key, "owner"+dummy_id)
+	#assert(check(r,403))
+	#logger.info("Received 403: OK")
+
+
+	#=========================================Invalid API key===============================================
+	print("\n\n")
+	logger.info(colour.OKGREEN+"------------------------- INVALID APIKEY -------------------------\n\n"+colour.ENDC)
+
+	#Owner registration ( should not go through with the right apikey anyway ) 
+	
+	#logger.info(colour.HEADER + "---------------> OWNER REGISTRATION USING INVALID APIKEY " + colour.ENDC)
+	#r = register_owner("admin", dummy_key, "owner"+dummy_id)
+	#assert(check(r,403))
+	#logger.info("Received 403: OK")
+
+	#Registration
+	logger.info(colour.HEADER + "---------------> REGISTRATION USING INVALID APIKEY" + colour.ENDC)
+	
+	r = register("admin", dummy_key, "dev"+dummy_id)
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+
+	#Publish
+	logger.info(colour.HEADER + "---------------> PUBLISH USING INVALID APIKEY" + colour.ENDC)
+	
+	dev_name = random.choice(device_keys.keys())
+	r = publish(dev_name, dummy_key, dev_name, "test", "protected", "hello")
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+
+	logger.info(colour.HEADER + "---------------> PUBLISH USING VALID APIKEY TO ESTABLISH CONNECTION" + colour.ENDC)
+	
+	dev_name = random.choice(device_keys.keys())
+	r = publish(dev_name, str(device_keys[dev_name]), dev_name, "test", "protected", "hello")
+	assert(check(r,202))
+	logger.info("Received 202: OK")
+
+	logger.info(colour.HEADER + "---------------> PUBLISH USING INVALID APIKEY ONCE CONNECTION HAS BEEN ESTABLISHED" + colour.ENDC)
+	
+	dev_name = random.choice(device_keys.keys())
+	r = publish(dev_name, dummy_key, dev_name, "test", "protected", "hello")
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+
+	#Subscribe
+	logger.info(colour.HEADER + "---------------> SUBSCRIBE USING INVALID APIKEY" + colour.ENDC)
+
+	dev_name = random.choice(device_keys.keys())
+	r = subscribe(dev_name, dummy_key)
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+
+	#Follow
+	logger.info(colour.HEADER + "---------------> FOLLOW USING INVALID APIKEY" + colour.ENDC)
+
+	app_name = random.choice(app_keys.keys())
+	r = follow(app_name, dummy_key, random.choice(device_keys.keys()), "read")
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+	
+	#Follow using invalid admin key
+	logger.info(colour.HEADER + "---------------> FOLLOW USING INVALID ADMIN APIKEY" + colour.ENDC)
+
+	app_name = random.choice(app_keys.keys())
+	r = follow("admin1", dummy_key, random.choice(device_keys.keys()), "read")
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+
+	#Share
+	logger.info(colour.HEADER + "---------------> SHARE USING INVALID APIKEY" + colour.ENDC)
+
+	dev_name = random.choice(device_keys.keys())
+	r = share(dev_name, dummy_key, str(random.randint(0,5)))
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+	
+	#Share using invalid admin key
+	logger.info(colour.HEADER + "---------------> SHARE USING INVALID ADMIN APIKEY" + colour.ENDC)
+
+	dev_name = random.choice(device_keys.keys())
+	r = share("admin", dummy_key, str(random.randint(0,5)))
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+
+	#Unfollow
+	logger.info(colour.HEADER + "---------------> UNFOLLOW USING INVALID APIKEY" + colour.ENDC)
+	
+	app_name = random.choice(app_keys.keys())
+	r = unfollow(app_name, dummy_key, str(random.choice(device_keys.keys())), "test", "read", "protected")
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+
+	#Unfollow using invalid admin apikey
+	logger.info(colour.HEADER + "---------------> UNFOLLOW USING INVALID ADMIN APIKEY" + colour.ENDC)
+	
+	app_name = random.choice(app_keys.keys())
+	r = unfollow("admin1", dummy_key, str(random.choice(device_keys.keys())), "test", "read", "protected", from_id=app_name)
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+
+	#Follow-requests
+	logger.info(colour.HEADER + "---------------> FOLLOW-REQUESTS USING INVALID APIKEY" + colour.ENDC)
+
+	r = follow_requests("admin", dummy_key, "requests")
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+	
+	#Follow-requests using invalid device apikey
+	logger.info(colour.HEADER + "---------------> FOLLOW-REQUESTS USING INVALID DEVICE APIKEY" + colour.ENDC)
+
+	dev_name = random.choice(device_keys.keys())
+	r = follow_requests(dev_name, dummy_key, "requests")
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+
+	#Follow-status
+	logger.info(colour.HEADER + "---------------> FOLLOW-STATUS USING INVALID APIKEY" + colour.ENDC)
+
+	r = follow_requests("admin", dummy_key, "status")
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+
+	#Follow-status using invalid device apikey
+	logger.info(colour.HEADER + "---------------> FOLLOW-STATUS USING INVALID DEVICE APIKEY" + colour.ENDC)
+
+	dev_name = random.choice(device_keys.keys())
+	r = follow_requests(dev_name, dummy_key, "status")
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+
+	#Reject follow using invalid admin key
+	logger.info(colour.HEADER + "---------------> REJECT-FOLLOW USING INVALID ADMIN APIKEY" + colour.ENDC)
+
+	r = reject_follow("admin", dummy_key, str(random.randint(1,5)))
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+		
+	#Reject follow using invalid device key
+	logger.info(colour.HEADER + "---------------> REJECT-FOLLOW USING INVALID DEVICE APIKEY" + colour.ENDC)
+
+	dev_name = random.choice(device_keys.keys())
+	r = reject_follow(dev_name, dummy_key, str(random.randint(1,5)))
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+
+	#Bind using invalid device apikey
+	logger.info(colour.HEADER + "---------------> BIND USING INVALID DEVICE APIKEY" + colour.ENDC)
+
+	app_name = random.choice(app_keys.keys())	
+	dev_name = random.choice(app_keys.keys())	
+	
+	r = bind_unbind(app_name, dummy_key, dev_name, "test", "bind", "protected")
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+	
+	#Bind using invalid admin apikey
+	logger.info(colour.HEADER + "---------------> BIND USING INVALID ADMIN APIKEY" + colour.ENDC)
+
+	app_name = random.choice(app_keys.keys())	
+	dev_name = random.choice(app_keys.keys())	
+	
+	r = bind_unbind("admin1", dummy_key, dev_name, "test", "bind", "protected", from_id = app_name)
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+
+	#Unbind using invalid device apikey
+	logger.info(colour.HEADER + "---------------> UNBIND USING INVALID DEVICE APIKEY" + colour.ENDC)
+
+	app_name = random.choice(app_keys.keys())	
+	dev_name = random.choice(device_keys.keys())	
+	
+	r = bind_unbind(app_name, dummy_key, dev_name, "test", "unbind", "protected")
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+	
+	#Bind using invalid admin apikey
+	logger.info(colour.HEADER + "---------------> UNBIND USING INVALID ADMIN APIKEY" + colour.ENDC)
+
+	app_name = random.choice(app_keys.keys())	
+	dev_name = random.choice(device_keys.keys())	
+	
+	r = bind_unbind("admin1", dummy_key, dev_name, "test", "unbind", "protected", from_id = app_name)
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+
+	#Block using invalid admin apikey	
+	logger.info(colour.HEADER + "---------------> BLOCK USING INVALID ADMIN APIKEY" + colour.ENDC)
+
+	r = block_unblock("admin", dummy_key, str(random.choice(app_keys.keys())), "block")
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+
+	#Unblock using invalid admin apikey	
+	logger.info(colour.HEADER + "---------------> UNBLOCK USING INVALID ADMIN APIKEY" + colour.ENDC)
+
+	r = block_unblock("admin", dummy_key, str(random.choice(app_keys.keys())), "unblock")
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+
+	#Permissions using invalid admin apikey
+	logger.info(colour.HEADER + "---------------> PERMISSIONS USING INVALID ADMIN APIKEY" + colour.ENDC)
+	
+	dev_name = random.choice(device_keys.keys())	
+
+	r = permissions("admin", dummy_key, entity_id = dev_name)
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+	
+	#Permissions using invalid device apikey
+	logger.info(colour.HEADER + "---------------> PERMISSIONS USING INVALID DEVICE APIKEY" + colour.ENDC)
+	
+	dev_name = random.choice(device_keys.keys())	
+
+	r = permissions(dev_name, dummy_key)
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+
+	#Deregister using invalid apikey
+	
+	logger.info(colour.HEADER + "---------------> DEREGISTRATION USING INVALID ADMIN APIKEY" + colour.ENDC)
+
+	dev_name = random.choice(device_keys.keys())	
+	r = deregister("admin", dummy_key, dev_name)
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+
+	#=========================================Invalid ID===============================================
+	
+	dummy_key = ''.join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(32))
+	dummy_id = "admin/"+''.join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(16))
+	dummy_admin_id = ''.join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(16))
+
+	print("\n\n")
+	logger.info(colour.OKGREEN+"------------------------- INVALID ID -------------------------\n\n"+colour.ENDC)
+
+	#Owner registration ( should not go through with the right apikey anyway ) 
+	
+	#logger.info(colour.HEADER + "---------------> OWNER REGISTRATION USING INVALID APIKEY " + colour.ENDC)
+	#r = register_owner("admin", dummy_key, "owner"+dummy_id)
+	#assert(check(r,403))
+	#logger.info("Received 403: OK")
+
+	#Registration
+	logger.info(colour.HEADER + "---------------> REGISTRATION USING INVALID ID" + colour.ENDC)
+	
+	r = register(dummy_id, admin_key, "dev"+dummy_id)
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+
+	#Publish
+	logger.info(colour.HEADER + "---------------> PUBLISH USING INVALID ID" + colour.ENDC)
+	
+	dev_name = random.choice(device_keys.keys())
+	r = publish(dummy_id, str(device_keys[dev_name]), dummy_id, "test", "protected", "hello")
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+
+	logger.info(colour.HEADER + "---------------> PUBLISH USING VALID APIKEY AND ID TO ESTABLISH CONNECTION" + colour.ENDC)
+	
+	dev_name = random.choice(device_keys.keys())
+	r = publish(dev_name, str(device_keys[dev_name]), dev_name, "test", "protected", "hello")
+	assert(check(r,202))
+	logger.info("Received 202: OK")
+
+	logger.info(colour.HEADER + "---------------> PUBLISH USING INVALID ID ONCE CONNECTION HAS BEEN ESTABLISHED" + colour.ENDC)
+	
+	dev_name = random.choice(device_keys.keys())
+	r = publish(dummy_id, str(device_keys[dev_name]), dummy_id , "test", "protected", "hello")
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+
+	#Subscribe
+	logger.info(colour.HEADER + "---------------> SUBSCRIBE USING INVALID ID" + colour.ENDC)
+
+	dev_name = random.choice(device_keys.keys())
+	r = subscribe(dummy_id, str(device_keys[dev_name]))
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+
+	#Follow
+	logger.info(colour.HEADER + "---------------> FOLLOW USING INVALID ID" + colour.ENDC)
+
+	app_name = random.choice(app_keys.keys())
+	r = follow(dummy_id, str(app_keys[app_name]), random.choice(device_keys.keys()), "read")
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+	
+	#Follow using invalid admin id
+	logger.info(colour.HEADER + "---------------> FOLLOW USING INVALID ADMIN ID" + colour.ENDC)
+
+	app_name = random.choice(app_keys.keys())
+	r = follow(dummy_id, "admin1", random.choice(device_keys.keys()), "read")
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+
+	#Share
+	logger.info(colour.HEADER + "---------------> SHARE USING INVALID ID" + colour.ENDC)
+
+	dev_name = random.choice(device_keys.keys())
+	r = share(dummy_id, str(device_keys[dev_name]), str(random.randint(0,5)))
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+	
+	#Share using invalid admin id
+	logger.info(colour.HEADER + "---------------> SHARE USING INVALID ADMIN ID" + colour.ENDC)
+
+	dev_name = random.choice(device_keys.keys())
+	r = share(dummy_id, admin_key, str(random.randint(0,5)))
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+
+	#Unfollow
+	logger.info(colour.HEADER + "---------------> UNFOLLOW USING INVALID ID" + colour.ENDC)
+	
+	app_name = random.choice(app_keys.keys())
+	r = unfollow(dummy_id, str(app_keys[app_name]), str(random.choice(device_keys.keys())), "test", "read", "protected")
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+
+	#Unfollow using invalid admin id
+	logger.info(colour.HEADER + "---------------> UNFOLLOW USING INVALID ADMIN ID" + colour.ENDC)
+	
+	app_name = random.choice(app_keys.keys())
+	r = unfollow(dummy_id, "admin1", str(random.choice(device_keys.keys())), "test", "read", "protected", from_id=app_name)
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+
+	#Follow-requests
+	logger.info(colour.HEADER + "---------------> FOLLOW-REQUESTS USING INVALID ID" + colour.ENDC)
+
+	r = follow_requests(dummy_id, admin_key, "requests")
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+	
+	#Follow-requests using invalid device id
+	logger.info(colour.HEADER + "---------------> FOLLOW-REQUESTS USING INVALID DEVICE ID" + colour.ENDC)
+
+	dev_name = random.choice(device_keys.keys())
+	r = follow_requests(dummy_id, str(device_keys[dev_name]), "requests")
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+
+	#Follow-status
+	logger.info(colour.HEADER + "---------------> FOLLOW-STATUS USING INVALID ID" + colour.ENDC)
+
+	r = follow_requests(dummy_id, admin_key , "status")
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+
+	#Follow-status using invalid device id
+	logger.info(colour.HEADER + "---------------> FOLLOW-STATUS USING INVALID DEVICE ID" + colour.ENDC)
+
+	dev_name = random.choice(device_keys.keys())
+	r = follow_requests(dummy_id, str(device_keys[dev_name]), "status")
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+
+	#Reject follow using invalid admin id
+	logger.info(colour.HEADER + "---------------> REJECT-FOLLOW USING INVALID ADMIN ID" + colour.ENDC)
+
+	r = reject_follow(dummy_id, admin_key, str(random.randint(1,5)))
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+		
+	#Reject follow using invalid device id
+	logger.info(colour.HEADER + "---------------> REJECT-FOLLOW USING INVALID DEVICE ID" + colour.ENDC)
+
+	dev_name = random.choice(device_keys.keys())
+	r = reject_follow(dummy_id, str(device_keys[dev_name]), str(random.randint(1,5)))
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+
+	#Bind using invalid device id
+	logger.info(colour.HEADER + "---------------> BIND USING INVALID DEVICE ID" + colour.ENDC)
+
+	app_name = random.choice(app_keys.keys())	
+	dev_name = random.choice(app_keys.keys())	
+	
+	r = bind_unbind(dummy_id, str(app_keys[app_name]), dev_name, "test", "bind", "protected")
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+	
+	#Bind using invalid admin id
+	logger.info(colour.HEADER + "---------------> BIND USING INVALID ADMIN ID" + colour.ENDC)
+
+	app_name = random.choice(app_keys.keys())	
+	dev_name = random.choice(app_keys.keys())	
+	
+	r = bind_unbind(dummy_id, "admin1", dev_name, "test", "bind", "protected", from_id = app_name)
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+
+	#Unbind using invalid device id
+	logger.info(colour.HEADER + "---------------> UNBIND USING INVALID DEVICE ID" + colour.ENDC)
+
+	app_name = random.choice(app_keys.keys())	
+	dev_name = random.choice(device_keys.keys())	
+	
+	r = bind_unbind(dummy_id, str(app_keys[app_name]), dev_name, "test", "unbind", "protected")
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+	
+	#Bind using invalid admin idy
+	logger.info(colour.HEADER + "---------------> UNBIND USING INVALID ADMIN ID" + colour.ENDC)
+
+	app_name = random.choice(app_keys.keys())	
+	dev_name = random.choice(device_keys.keys())	
+	
+	r = bind_unbind(dummy_id, "admin1", dev_name, "test", "unbind", "protected", from_id = app_name)
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+
+	#Block using invalid admin id	
+	logger.info(colour.HEADER + "---------------> BLOCK USING INVALID ADMIN ID" + colour.ENDC)
+
+	r = block_unblock(dummy_admin_id, admin_key, str(random.choice(device_keys.keys())), "block")
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+
+	#Unblock using invalid admin id	
+	logger.info(colour.HEADER + "---------------> UNBLOCK USING INVALID ADMIN ID" + colour.ENDC)
+
+	r = block_unblock(dummy_admin_id, admin_key, str(random.choice(device_keys.keys())), "unblock")
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+
+	#Permissions using invalid admin id
+	logger.info(colour.HEADER + "---------------> PERMISSIONS USING INVALID ADMIN ID" + colour.ENDC)
+	
+	dev_name = random.choice(device_keys.keys())	
+
+	r = permissions(dummy_admin_id, admin_key, entity_id = dev_name)
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+	
+	#Permissions using invalid device id
+	logger.info(colour.HEADER + "---------------> PERMISSIONS USING INVALID DEVICE ID" + colour.ENDC)
+	
+	dev_name = random.choice(device_keys.keys())	
+
+	r = permissions(dummy_id, str(device_keys[dev_name]))
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+
+	#Deregister using invalid id
+	
+	logger.info(colour.HEADER + "---------------> DEREGISTRATION USING INVALID ADMIN ID" + colour.ENDC)
+
+	dev_name = random.choice(device_keys.keys())	
+	r = deregister(dummy_id, admin_key, dev_name)
+	assert(check(r,403))
+	logger.info("Received 403: OK")
+
+def functional_tests(devices, apps):
+	
+	logger.info(colour.OKGREEN + colour.BOLD + "========================= FUNCTIONAL TESTS =========================\n\n"+colour.ENDC)
+	device_keys, app_keys = registrations(devices,apps)
+
 	# Follow requests from apps to devices using apps' respective apikeys
 	logger.info(colour.HEADER + "---------------> FOLLOW REQUESTS WITH READ PERMISSION " + colour.ENDC)
-	follow_dev(as_admin=False, permission="read")
+	follow_dev(device_keys, app_keys, as_admin=False, permission="read")
 
 	# Devices read all follow requests and share with apps
 	logger.info(colour.HEADER + "---------------> DEVICES READ FOLLOW REQUESTS AND ISSUE SHARE TO APPS" + colour.ENDC)
@@ -430,65 +941,65 @@ def functional_tests():
 
 	# Apps bind to devices' queues
 	logger.info(colour.HEADER + "---------------> APPS BIND TO DEVICES" + colour.ENDC)
-	bind_unbind_dev(as_admin=False, req_type="bind")
+	bind_unbind_dev(device_keys, app_keys, expected=devices, as_admin=False, req_type="bind")
 
 	# Devices publish data
 	logger.info(colour.HEADER + "---------------> DEVICES PUBLISH DATA" + colour.ENDC)
-	dev_publish()
+	dev_publish(device_keys)
 
 	# Apps subscribe to messages
 	logger.info(colour.HEADER + "---------------> APPS TRY TO READ PUBLISHED DATA" + colour.ENDC)
-	app_subscribe(devices)
+	app_subscribe(devices, app_keys, devices)
 
 	# Apps unbind from devices
 	logger.info(colour.HEADER + "---------------> APPS UNBIND FROM DEVICES" + colour.ENDC)
-	bind_unbind_dev(as_admin=False, req_type="unbind")
+	bind_unbind_dev(device_keys, app_keys, expected=devices, as_admin=False, req_type="unbind")
 
 	# Devices again publish messages
 	logger.info(colour.HEADER + "---------------> DEVICES PUBLISH DATA" + colour.ENDC)
-	dev_publish()
+	dev_publish(device_keys)
 
 	# Apps try to subscribe
 	logger.info(colour.HEADER + "---------------> APPS TRY TO READ PUBLISHED DATA" + colour.ENDC)
-	app_subscribe(0)
+	app_subscribe(devices, app_keys, 0)
 
 	# Apps bind to devices again but this time using admin apikey
 	logger.info(colour.HEADER + "---------------> APPS BIND TO DEVICES USING ADMIN APIKEY" + colour.ENDC)
 
-	bind_unbind_dev(as_admin=True, req_type="bind", expected=(devices*apps))
+	bind_unbind_dev(device_keys, app_keys, expected=devices*apps, as_admin=True, req_type="bind")
 
 	# Devices publish again
 	logger.info(colour.HEADER + "---------------> DEVICES PUBLISH DATA" + colour.ENDC)
-	dev_publish()
+	dev_publish(device_keys)
 
 	# Apps subscribe to messages
 	logger.info(colour.HEADER + "---------------> APPS TRY TO READ PUBLISHED DATA" + colour.ENDC)
-	app_subscribe(devices)
+	app_subscribe(devices, app_keys, devices)
 
 	# Unbind from devices as admin
 	logger.info(colour.HEADER + "---------------> APPS UNBIND FROM DEVICES USING ADMIN APIKEY" + colour.ENDC)
 
-	bind_unbind_dev(as_admin=True, req_type="unbind", expected=(devices*apps))
+	bind_unbind_dev(device_keys, app_keys, expected=(devices*apps), as_admin=True, req_type="unbind")
 
 	# Devices now publish data
 	logger.info(colour.HEADER + "---------------> DEVICES PUBLISH DATA" + colour.ENDC)
-	dev_publish()
+	dev_publish(device_keys)
 
 	# Apps try to subscribe but get 0 messages
 	logger.info(colour.HEADER + "---------------> APPS TRY TO READ PUBLISHED DATA" + colour.ENDC)
-	app_subscribe(0)
+	app_subscribe(devices, app_keys, 0)
 
 	# Apps unfollow all devices
 	logger.info(colour.HEADER + "---------------> APPS UNFOLLOW ALL DEVICES USING THEIR RESPECTIVE APIKEYS" + colour.ENDC)
-	unfollow_dev(as_admin=False, permission="read")
+	unfollow_dev(device_keys, app_keys, as_admin=False, permission="read")
 
 	# Apps try to bind to unfollowed devices
 	logger.info(colour.HEADER + "---------------> APPS TRY TO BIND TO UNFOLLOWED DEVICES" + colour.ENDC)
-	bind_unbind_without_follow(as_admin=False, req_type="bind")
+	bind_unbind_without_follow(device_keys, app_keys, as_admin=False, req_type="bind")
 
 	#Follow requests as admin	
 	logger.info(colour.HEADER + "---------------> FOLLOW REQUESTS WITH READ PERMISSION AS ADMIN" + colour.ENDC)
-	follow_dev(as_admin=True, permission="read")
+	follow_dev(device_keys, app_keys, as_admin=True, permission="read")
 
 	#Devices share with apps
 	logger.info(colour.HEADER + "---------------> DEVICES READ FOLLOW REQUESTS AND ISSUE SHARE TO APPS" + colour.ENDC)
@@ -497,27 +1008,27 @@ def functional_tests():
 
 	# Apps bind to devices' queues
 	logger.info(colour.HEADER + "---------------> APPS BIND TO DEVICES" + colour.ENDC)
-	bind_unbind_dev(as_admin=False, req_type="bind")
+	bind_unbind_dev(device_keys, app_keys, expected=devices, as_admin=False, req_type="bind")
 
 	# Devices publish data
 	logger.info(colour.HEADER + "---------------> DEVICES PUBLISH DATA" + colour.ENDC)
-	dev_publish()
+	dev_publish(device_keys)
 
 	# Apps subscribe to messages
 	logger.info(colour.HEADER + "---------------> APPS TRY TO READ PUBLISHED DATA" + colour.ENDC)
-	app_subscribe(devices)
+	app_subscribe(devices, app_keys, devices)
 
 	# Apps unfollow all devices
 	logger.info(colour.HEADER + "---------------> APPS UNFOLLOW ALL DEVICES USING THEIR ADMIN APIKEYS" + colour.ENDC)
-	unfollow_dev(as_admin=True, permission="read")
+	unfollow_dev(device_keys, app_keys, as_admin=True, permission="read")
 
 	# Apps try to bind to unfollowed devices
 	logger.info(colour.HEADER + "---------------> APPS TRY TO BIND TO UNFOLLOWED DEVICES" + colour.ENDC)
-	bind_unbind_without_follow(as_admin=False, req_type="bind")
+	bind_unbind_without_follow(device_keys, app_keys, as_admin=False, req_type="bind")
 
 	#Follow requests for write	
 	logger.info(colour.HEADER + "---------------> FOLLOW REQUESTS WITH WRITE PERMISSIONS" + colour.ENDC)
-	follow_dev(as_admin=False, permission="write")
+	follow_dev(device_keys, app_keys, as_admin=False, permission="write")
 
 	#Devices share with apps with write access
 	logger.info(colour.HEADER + "---------------> DEVICES READ FOLLOW REQUESTS AND ISSUE SHARE TO APPS" + colour.ENDC)
@@ -525,23 +1036,23 @@ def functional_tests():
 
 	#Apps publish to command queue of devices
 	logger.info(colour.HEADER+"---------------> APPS PUBLISH TO COMMAND EXCHANGE OF DEVICES"+colour.ENDC)
-	app_publish(202)
+	app_publish(device_keys, app_keys, 202)
 
 	#Devices subscribe to their command queue
 	logger.info(colour.HEADER+"---------------> DEVICES SUBSCRIBE TO THEIR COMMAND QUEUES"+colour.ENDC)
-	dev_subscribe(apps)
+	dev_subscribe(apps, device_keys, apps)
 
 	#Follow requests for write	
 	logger.info(colour.HEADER+"---------------> APPS WITH WRITE ACCESS UNFOLLOW DEVICES" + colour.ENDC)
-	unfollow_dev(as_admin=False, permission="write")
+	unfollow_dev(device_keys, app_keys, as_admin=False, permission="write")
 
 	#Apps publish to command queue of devices
 	logger.info(colour.HEADER+"---------------> APPS TRY TO PUBLISH TO COMMAND EXCHANGE OF UNFOLLOWED DEVICES"+colour.ENDC)
-	app_publish(202)
+	app_publish(device_keys, app_keys, 202)
 
 	#Apps request follow with read-write permissions
 	logger.info(colour.HEADER+"---------------> APPS REQUEST FOLLOW WITH READ-WRITE PERMISSIONS"+colour.ENDC)
-	follow_dev(as_admin=False, permission="read-write")
+	follow_dev(device_keys, app_keys, as_admin=False, permission="read-write")
 
 	#Devices approve issue share to apps
 	logger.info(colour.HEADER+"---------------> DEVICES APPROVE READ-WRITE FOLLOW REQUESTS WITH SHARE"+colour.ENDC)
@@ -549,51 +1060,51 @@ def functional_tests():
 
 	#Apps publish to command queue of devices
 	logger.info(colour.HEADER+"---------------> APPS PUBLISH TO COMMAND EXCHANGE OF DEVICES"+colour.ENDC)
-	app_publish(202)
+	app_publish(device_keys, app_keys, 202)
 
 	#Devices subscribe to their command queue
 	logger.info(colour.HEADER+"---------------> DEVICES SUBSCRIBE TO THEIR COMMAND QUEUES"+colour.ENDC)
-	dev_subscribe(apps)
+	dev_subscribe(apps, device_keys, apps)
 	
 	# Apps bind to devices' queues
 	logger.info(colour.HEADER + "---------------> APPS BIND TO DEVICES" + colour.ENDC)
-	bind_unbind_dev(as_admin=False, req_type="bind", expected=(2*devices))
+	bind_unbind_dev(device_keys, app_keys, expected=(2*devices), as_admin=False, req_type="bind")
 
 	# Devices publish again
 	logger.info(colour.HEADER + "---------------> DEVICES PUBLISH DATA" + colour.ENDC)
-	dev_publish()
+	dev_publish(device_keys)
 
 	# Apps subscribe to messages
 	logger.info(colour.HEADER + "---------------> APPS TRY TO READ PUBLISHED DATA" + colour.ENDC)
-	app_subscribe(devices)
+	app_subscribe(devices, app_keys, devices)
 
 	#Apps relinquish write permission
 	logger.info(colour.HEADER+"---------------> APPS WITH WRITE ACCESS UNFOLLOW DEVICES" + colour.ENDC)
-	unfollow_dev(as_admin=False, permission="write")
+	unfollow_dev(device_keys, app_keys, as_admin=False, permission="write")
 
 	#Apps publish to command queue of devices
 	logger.info(colour.HEADER+"---------------> APPS TRY TO PUBLISH TO COMMAND EXCHANGE OF UNFOLLOWED DEVICES"+colour.ENDC)
-	app_publish(202)
+	app_publish(device_keys, app_keys, 202)
 
 	# Devices publish again
 	logger.info(colour.HEADER + "---------------> DEVICES PUBLISH DATA AFTER WRITE UNFOLLOW" + colour.ENDC)
-	dev_publish()
+	dev_publish(device_keys)
 
 	# Apps subscribe to messages
 	logger.info(colour.HEADER + "---------------> APPS TRY TO READ PUBLISHED DATA AFTER WRITE UNFOLLOW" + colour.ENDC)
-	app_subscribe(devices)
+	app_subscribe(devices, app_keys, devices)
 
 	# Apps unfollow with read permissions
 	logger.info(colour.HEADER + "---------------> APPS UNFOLLOW DEVICES WITH READ ACCESS" + colour.ENDC)
-	unfollow_dev(as_admin=True, permission="read")
+	unfollow_dev(device_keys, app_keys, as_admin=True, permission="read")
 
 	# Apps try to bind to unfollowed devices
 	logger.info(colour.HEADER + "---------------> APPS TRY TO BIND TO UNFOLLOWED DEVICES" + colour.ENDC)
-	bind_unbind_without_follow(as_admin=False, req_type="bind")
+	bind_unbind_without_follow(device_keys, app_keys, as_admin=False, req_type="bind")
 
 	#Apps obtain read-write follow
 	logger.info(colour.HEADER+"---------------> APPS FOLLOW WITH READ-WRITE PERMISSIONS"+colour.ENDC)
-	follow_dev(as_admin=False, permission="read-write")
+	follow_dev(device_keys, app_keys, as_admin=False, permission="read-write")
 
 	#Devices approve issue share to apps
 	logger.info(colour.HEADER+"---------------> DEVICES APPROVE READ-WRITE FOLLOW REQUESTS WITH SHARE"+colour.ENDC)
@@ -601,45 +1112,97 @@ def functional_tests():
 
 	# Apps bind to devices' queues
 	logger.info(colour.HEADER + "---------------> APPS BIND TO DEVICES WITH ADMIN APIKEY" + colour.ENDC)
-	bind_unbind_dev(as_admin=True, req_type="bind", expected=(2*devices*apps))
+	bind_unbind_dev(device_keys, app_keys, expected=(2*devices*apps), as_admin=True, req_type="bind")
 
 	# Devices publish again
 	logger.info(colour.HEADER + "---------------> DEVICES PUBLISH DATA" + colour.ENDC)
-	dev_publish()
+	dev_publish(device_keys)
 
 	# Apps subscribe to messages
 	logger.info(colour.HEADER + "---------------> APPS TRY TO READ PUBLISHED DATA" + colour.ENDC)
-	app_subscribe(devices)
+	app_subscribe(devices, app_keys, devices)
 
 	# Apps unfollow with read permissions
 	logger.info(colour.HEADER + "---------------> APPS UNFOLLOW DEVICES WITH READ-WRITE ACCESS" + colour.ENDC)
-	unfollow_dev(as_admin=True, permission="read-write")
+	unfollow_dev(device_keys, app_keys, as_admin=True, permission="read-write")
+
+	deregistrations(device_keys, app_keys)
 	
 
-def start_tests():
+def start_tests(devices, apps, args):
 	
-	reg_time = time.time()
-	registrations()
-	reg_time = time.time() - reg_time
+	if args.choice == "fxnl":
+		
+		test_time = time.time()
+		functional_tests(devices, apps)
+		test_time = time.time() - test_time
+	
+	elif args.choice == "sec":
+		
+		test_time = time.time()
+		security_tests()
+		test_time = time.time() - test_time
 
-	test_time = time.time()
-	functional_tests()
-	test_time = time.time() - test_time
+	elif args.choice == "concr":
+		
+		test_time = time.time()
+		concurrency_tests(devices, apps)
+		test_time = time.time() - test_time
 
-	dereg_time = time.time()
-	deregistrations()
-	dereg_time = time.time() - dereg_time 
+	elif args.choice == "all":
+		
+		test_time = time.time()
+		all_tests(devices, apps)
+		test_time = time.time() - test_time
+	
 
 	print("\n\n"+colour.OKGREEN+colour.BOLD+"====================All tests have passed===================="+colour.ENDC)
-	print(colour.OKGREEN+"Registrations    : "+str(reg_time)+"s"+colour.ENDC)
+	#print(colour.OKGREEN+"Registrations    : "+str(reg_time)+"s"+colour.ENDC)
 	print(colour.OKGREEN+"Test cases       : "+str(test_time)+"s"+colour.ENDC)
-	print(colour.OKGREEN+"Deregistrations  : "+str(dereg_time)+"s"+colour.ENDC)
+	#print(colour.OKGREEN+"Deregistrations  : "+str(dereg_time)+"s"+colour.ENDC)
 
 if __name__ == '__main__':
 
+	parser = argparse.ArgumentParser(description='Test cases for Corinthian')
+	subparser = parser.add_subparsers(dest="choice")
+
+	func_parser = subparser.add_parser("fxnl", help="Performs functional tests")
+
+	func_parser.add_argument('-d', '--devices', action="store", dest="devices", type=int, help="No. of devices to run the tests")
+	func_parser.add_argument('-a', '--apps', action="store", dest="apps", type=int, help="No. of apps to run the tests")
+	func_parser.add_argument('--random', action="store_true", help="Run tests with random devices and apps")
+
+	sec_parser = subparser.add_parser("sec", help="Performs security tests")
+
+	conc_parser = subparser.add_parser("concr", help="Performs concurrency tests")
+
+	conc_parser.add_argument('-d', '--devices', action="store", dest="devices", type=int, help="No. of devices to run the tests")
+	conc_parser.add_argument('-a', '--apps', action="store", dest="apps", type=int, help="No. of apps to run the tests")
+	conc_parser.add_argument('--random', action="store_true", help="Run tests with random devices and apps")
+	
+	all_parser = subparser.add_parser("all", help="Performs all of the above tests")
+
+	all_parser.add_argument('-d', '--devices', action="store", dest="devices", type=int, help="No. of devices to run the tests")
+	all_parser.add_argument('-a', '--apps', action="store", dest="apps", type=int, help="No. of apps to run the tests")
+	all_parser.add_argument('--random', action="store_true", help="Run tests with random devices and apps")
+	
+	args = parser.parse_args()
+
+	devices = 0
+	apps 	= 0					
+
+	if args.choice <> "sec":
+
+		if args.random:
+			devices = random.randint(10,20)
+			apps 	= random.randint(10,20)
+		else:
+			devices = args.devices
+			apps = args.apps
+		
 	logging.basicConfig(format='%(asctime)s %(levelname)-6s %(message)s', level=logging.DEBUG,
 						datefmt='%Y-%m-%d %H:%M:%S')
 	logging.getLogger("requests").setLevel(logging.WARNING)
 	logging.getLogger("urllib3").setLevel(logging.WARNING)
 
-	start_tests()
+	start_tests(devices, apps, args)
