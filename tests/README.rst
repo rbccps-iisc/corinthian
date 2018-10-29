@@ -54,15 +54,15 @@ Publish
 * Without authorisation
 * To another device's exchange
 * To ``amq.topic`` ``amq.direct`` ``amq.headers`` and ``amq.fanout``
-* "Subscribe only" devices trying to publish
-* Without a schema
+* "Subscribe only" devices trying to publish - ?
+* Without a schema - ?
 
 Subscribe
 ^^^^^^^^^
 
 * With invalid message type
 * With invalid num-messages
-* After validity has expired
+* After validity has expired - ?
 
 Bind
 ^^^^
