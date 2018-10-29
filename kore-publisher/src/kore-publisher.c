@@ -22,12 +22,40 @@ bool is_success = false;
 char admin_apikey[33];
 char postgres_pwd[33];
 
+char broker_ip	[100];
+char pgsql_ip	[100];
+
 amqp_connection_state_t	cached_admin_conn;
 amqp_table_t 		lazy_queue_table;
 amqp_rpc_reply_t 	login_reply;
 amqp_rpc_reply_t 	rpc_reply;
 amqp_table_entry_t 	*entry;
 amqp_basic_properties_t	props;
+
+int hostname_to_ip(char * hostname , char* ip)
+{
+    struct hostent *he;
+    struct in_addr **addr_list;
+    int i;
+         
+    if ( (he = gethostbyname( hostname ) ) == NULL) 
+    {
+        // get the host info
+        herror("gethostbyname");
+        return 1;
+    }
+ 
+    addr_list = (struct in_addr **) he->h_addr_list;
+     
+    for(i = 0; addr_list[i] != NULL; i++) 
+    {
+        //Return the first one;
+        strcpy(ip , inet_ntoa(*addr_list[i]) );
+        return 0;
+    }
+     
+    return 1;
+}
 
 init (int state)
 {
@@ -39,6 +67,9 @@ init (int state)
 
 	// mask server name 
 	http_server_version("x");
+
+	hostname_to_ip("broker", broker_ip);
+	hostname_to_ip("postgres", pgsql_ip);
 
 //////////////
 // lazy queues
@@ -121,7 +152,7 @@ init (int state)
 	}
 
 retry:
-	if (amqp_socket_open(socket, "broker", 5672))
+	if (amqp_socket_open(socket, broker_ip, 5672))
 	{
 		fprintf(stderr,"Could not connect to broker\n");
 		sleep(1);
@@ -184,7 +215,7 @@ retry:
 	kore_pgsql_register("db","user=postgres password=password");
 #else
 	char conn_str[129];
-        snprintf(conn_str,129,"host = postgres user = postgres password = %s",postgres_pwd);
+        snprintf(conn_str,129,"host = %s user = postgres password = %s",pgsql_ip, postgres_pwd);
 	kore_pgsql_register("db",conn_str);
 #endif
 
@@ -193,11 +224,16 @@ retry:
 
 ///// chroot and drop priv /////
 
-	chroot("./jail");	
-	setgid(65534);
-	setuid(65534);
+	if (chroot("./jail") < 0)
+		perror("chroot ");
+	
+	if (setgid(65534) < 0)
+		perror("setgid ");
 
-//////////////////
+	if (setuid(65534) < 0)
+		perror("setuid ");
+
+/////////////////////////////////
 
 	return KORE_RESULT_OK;
 }
@@ -601,7 +637,7 @@ publish (struct http_request *req)
 		if (socket == NULL)
 			ERROR("could not create a new socket");
 
-		if (amqp_socket_open(socket, "broker", 5672))
+		if (amqp_socket_open(socket, broker_ip , 5672))
 			ERROR("could not open a socket");
 
 		login_reply = amqp_login(*cached_conn, 
@@ -651,8 +687,10 @@ done:
 			amqp_channel_close	(*cached_conn, 1, AMQP_REPLY_SUCCESS);
 			amqp_connection_close	(*cached_conn,    AMQP_REPLY_SUCCESS);
 			amqp_destroy_connection	(*cached_conn);
+	
+			free(cached_conn);
 
-			ht_delete(&connection_ht,id);
+			ht_delete(&connection_ht,key);
 		}
 	}
 
@@ -715,7 +753,7 @@ subscribe (struct http_request *req)
 
 	kore_buf_append(Q,"\0",1);
 
-	int_num_messages = 1;
+	int_num_messages = 10;
 	if (KORE_RESULT_OK == http_request_header(req, "num-messages", &num_messages))
 	{
 		int_num_messages = atoi(num_messages);
@@ -723,7 +761,7 @@ subscribe (struct http_request *req)
 		if (int_num_messages > 10 )
 			int_num_messages = 10;
 		else if (int_num_messages < 1 )
-			int_num_messages = 1;
+			int_num_messages = 10;
 	}
 
 /////////////////////////////////////////////////
@@ -741,7 +779,7 @@ subscribe (struct http_request *req)
 	if (socket == NULL)
 		ERROR("could not create a new socket");
 
-	if (amqp_socket_open(socket, "broker", 5672))
+	if (amqp_socket_open(socket, broker_ip, 5672))
 		ERROR("could not open a socket");
 
 	login_reply = amqp_login(connection, 

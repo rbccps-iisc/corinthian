@@ -12,6 +12,10 @@
 #include <bsd/stdlib.h>
 
 #include <ctype.h>
+#include<arpa/inet.h>
+#include<netdb.h>
+#include<sys/socket.h>
+#include<errno.h>
 
 #if 0
 	#define debug_printf(...)
@@ -59,12 +63,43 @@ struct kore_buf *query = NULL;
 struct kore_pgsql sql;
 
 char postgres_pwd[33];
+char broker_ip	[100];
+char pgsql_ip	[100];
 
 size_t i;
+
+int hostname_to_ip(char * hostname , char* ip)
+{
+    struct hostent *he;
+    struct in_addr **addr_list;
+    int i;
+         
+    if ( (he = gethostbyname( hostname ) ) == NULL) 
+    {
+        // get the host info
+        herror("gethostbyname");
+        return 1;
+    }
+ 
+    addr_list = (struct in_addr **) he->h_addr_list;
+     
+    for(i = 0; addr_list[i] != NULL; i++) 
+    {
+        //Return the first one;
+        strcpy(ip , inet_ntoa(*addr_list[i]) );
+        return 0;
+    }
+     
+    return 1;
+}
 
 int
 init (int state)
 {
+	
+	hostname_to_ip("broker", broker_ip);
+	hostname_to_ip("postgres", pgsql_ip);
+
 	if (query == NULL)
 		query = kore_buf_alloc(512);
 	
@@ -98,8 +133,17 @@ init (int state)
 	// XXX this user must only have read permissions on DB
 
 	char conn_str[129];
-        snprintf(conn_str,129,"host = postgres user = postgres password = %s",postgres_pwd);
+        snprintf(conn_str,129,"host = %s user = postgres password = %s", pgsql_ip, postgres_pwd);
         kore_pgsql_register("db",conn_str);
+
+	if (chroot("./jail") < 0)
+		perror("Chroot ");
+	
+	if (setgid(65534) < 0)
+		perror("Setgid ");
+
+	if (setuid(65534) < 0)
+		perror("Setuid ");
 
 	return KORE_RESULT_OK;
 }

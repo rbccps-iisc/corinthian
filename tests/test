@@ -50,6 +50,11 @@ def check(response, code):
 	else:
 		return False
 
+def gen_rand(size, prefix=""):
+
+	rand_str = prefix + ''.join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(size))
+	return rand_str
+
 def register_owner(ID, apikey, owner):
 	
 	url = base_url + "/register-owner"
@@ -459,8 +464,8 @@ def security_tests():
 	print("\n\n")
 	logger.info(colour.OKGREEN + colour.BOLD + "========================= SECURITY TESTS =========================\n\n"+colour.ENDC)
 	
-	dummy_key = ''.join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(32))
-	dummy_id = ''.join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(16))
+	dummy_key = gen_rand(32) 
+	dummy_id  = gen_rand(16) 
 
 	devices = random.randint(1,5)
 	apps 	= random.randint(1,5)
@@ -700,9 +705,9 @@ def security_tests():
 
 	#=========================================Invalid ID===============================================
 	
-	dummy_key = ''.join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(32))
-	dummy_id = "admin/"+''.join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(16))
-	dummy_admin_id = ''.join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(16))
+	dummy_key = gen_rand(32) 
+	dummy_id  = gen_rand(16, prefix="admin/") 
+	dummy_admin_id = gen_rand(16) 
 
 	print("\n\n")
 	logger.info(colour.OKGREEN+"------------------------- INVALID ID -------------------------\n\n"+colour.ENDC)
@@ -924,6 +929,67 @@ def security_tests():
 	r = deregister(dummy_id, admin_key, dev_name)
 	assert(check(r,403))
 	logger.info("Received 403: OK")
+
+	print("\n\n")
+	logger.info(colour.OKGREEN+"------------------------- PUBLISH -------------------------\n\n"+colour.ENDC)
+
+	#Publish to non-existent exchange
+	logger.info(colour.HEADER + "---------------> PUBLISH TO NON-EXISTENT EXCHANGE" + colour.ENDC)
+
+	dev_name = str(random.choice(device_keys.keys()))
+	dev_key  = str(device_keys[dev_name])
+	
+	dummy_exchange = gen_rand(8, prefix = gen_rand(8)+"/") 
+	print(dummy_exchange)
+	r = publish(dev_name, dev_key, dummy_exchange, "test", "command", "hello") 
+	assert(check(r,202))
+	logger.info("Received 202: OK")
+
+	#Publish without authroisation
+	logger.info(colour.HEADER + "---------------> PUBLISH WITHOUT AUTHORISATION" + colour.ENDC)
+
+	app_name = str(random.choice(app_keys.keys()))
+	dev_name = str(random.choice(device_keys.keys()))
+
+	r = publish(app_name, str(app_keys[app_name]), dev_name, "test", "command", "hello") 
+	assert(check(r,202))
+	logger.info("Received 202: OK")
+
+	#Publish to amq.topic
+	logger.info(colour.HEADER + "---------------> PUBLISH TO amq.topic" + colour.ENDC)
+
+	dev_name = str(random.choice(device_keys.keys()))
+
+	r = publish(dev_name, str(device_keys[dev_name]), "amq.topic", "test", "command", "hello") 
+	assert(check(r,202))
+	logger.info("Received 202: OK")
+
+	#Publish to amq.direct
+	logger.info(colour.HEADER + "---------------> PUBLISH TO amq.direct" + colour.ENDC)
+
+	dev_name = str(random.choice(device_keys.keys()))
+
+	r = publish(dev_name, str(device_keys[dev_name]), "amq.direct", "test", "command", "hello") 
+	assert(check(r,202))
+	logger.info("Received 202: OK")
+
+	#Publish to amq.headers
+	logger.info(colour.HEADER + "---------------> PUBLISH TO amq.headers" + colour.ENDC)
+	
+	dev_name = str(random.choice(device_keys.keys()))
+
+	r = publish(dev_name, str(device_keys[dev_name]), "amq.headers", "test", "command", "hello") 
+	assert(check(r,202))
+	logger.info("Received 202: OK")
+
+	#Publish to amq.fanout
+	logger.info(colour.HEADER + "---------------> PUBLISH TO amq.fanout" + colour.ENDC)
+
+	dev_name = str(random.choice(device_keys.keys()))
+
+	r = publish(dev_name, str(device_keys[dev_name]), "amq.fanout", "test", "command", "hello") 
+	assert(check(r,202))
+	logger.info("Received 202: OK")
 
 def functional_tests(devices, apps):
 	
