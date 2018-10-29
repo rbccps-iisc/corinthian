@@ -566,8 +566,6 @@ publish (struct http_request *req)
 
 /////////////////////////////////////////////////
 
-	snprintf(token, 129, "%s:%s", id, apikey);
-
 	amqp_socket_t *socket = NULL;
 
 	node *n = NULL;
