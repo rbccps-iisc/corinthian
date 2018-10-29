@@ -69,7 +69,7 @@ Bind
 
 * To unauthorised exchange 
 * To non-existsent exchange 
-* To non-existsent queue 
+* To non-existent queue 
 * With a different topic from what was requested in follow
 * Using owner's apikey
 * After the authorised validity has expired

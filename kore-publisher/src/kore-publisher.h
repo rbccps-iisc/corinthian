@@ -24,6 +24,10 @@
 #include <pthread.h>
 
 #include "ht.h"
+#include<arpa/inet.h>
+#include<netdb.h>
+#include<sys/socket.h>
+#include<errno.h>
 
 //#define TEST (1)
 
