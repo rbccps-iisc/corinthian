@@ -482,6 +482,7 @@ publish (struct http_request *req)
 
 	char exchange[129];
 	char topic_to_publish[129];
+	char token[129];
 
 	req->status = 403;
 
@@ -553,8 +554,8 @@ publish (struct http_request *req)
 
 /////////////////////////////////////////////////
 
-	if (! login_success(id,apikey))
-		BAD_REQUEST("invalid id or apikey");
+	//if (! login_success(id,apikey))
+	//	BAD_REQUEST("invalid id or apikey");
 
 	/* Not required !
 	sanitize(to);
@@ -563,13 +564,15 @@ publish (struct http_request *req)
 
 /////////////////////////////////////////////////
 
+	snprintf(token, 129, "%s:%s", id, apikey);
+
 	amqp_socket_t *socket = NULL;
 
 	node *n = NULL;
 
 	amqp_connection_state_t	*cached_conn = NULL;
 
-	if ((n = ht_search(&connection_ht,id)) != NULL)
+	if ((n = ht_search(&connection_ht, token)) != NULL)
 	{
 		cached_conn = n->value;
 	}
@@ -602,7 +605,7 @@ publish (struct http_request *req)
 		if (rpc_reply.reply_type != AMQP_RESPONSE_NORMAL)
 			ERROR("did not receive expected response from the broker");
 
-		ht_insert (&connection_ht, id, cached_conn);
+		ht_insert (&connection_ht, token, cached_conn);
 	}
 
 	props.user_id 		= amqp_cstring_bytes(id);
@@ -714,7 +717,7 @@ subscribe (struct http_request *req)
 /////////////////////////////////////////////////
 
 	if (! login_success(id,apikey))
-		BAD_REQUEST("invalid id or apikey");
+		FORBIDDEN("invalid id or apikey");
 
 /////////////////////////////////////////////////
 
@@ -2585,7 +2588,7 @@ permissions (struct http_request *req)
 /////////////////////////////////////////////////
 
 	if (! login_success(id,apikey))
-		BAD_REQUEST("invalid id or apikey");
+		FORBIDDEN("invalid id or apikey");
 
 	sanitize(entity);
 
