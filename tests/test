@@ -27,7 +27,9 @@ s.mount('https://localhost/', HTTPAdapter(pool_connections=1))
 f = open("./vars/admin.passwd", "r")
 admin_key = str(f.read())[:-1]
 
-cmd = """ docker exec postgres psql -U postgres -c "insert into users values('admin1','fa8d4b8fe10794af430f04b7af55388be9f676361c49849daff827918b6bd2f3',NULL,'salt','f') ON CONFLICT DO NOTHING" """
+cmd = """ docker exec postgres psql -U postgres -c "insert into users
+values('admin1','fa8d4b8fe10794af430f04b7af55388be9f676361c49849daff827918b6bd2f3',NULL,'salt','f',
+'t') ON CONFLICT DO NOTHING" """
 
 try:
 	p = subprocess.check_output(cmd, shell=True)
