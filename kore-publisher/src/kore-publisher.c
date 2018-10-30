@@ -424,7 +424,7 @@ gen_salt_password_and_apikey (const char *entity, char *salt, char *password_has
 }
 
 bool
-login_success (const char *id, const char *apikey)
+login_success (const char *id, const char *apikey, bool *is_autonomous)
 {
 	char *salt;
 	char *password_hash;
@@ -437,7 +437,7 @@ login_success (const char *id, const char *apikey)
 	sanitize(id);
 
 	CREATE_STRING (query,
-			"SELECT salt,password_hash FROM users WHERE id='%s' and blocked='f'",
+			"SELECT salt,password_hash,is_autonomous FROM users WHERE id='%s' and blocked='f'",
 				id
 	);
 
@@ -459,12 +459,19 @@ login_success (const char *id, const char *apikey)
 	if (kore_pgsql_ntuples(&sql) == 0)
 		goto done;
 
-	salt 	 	= kore_pgsql_getvalue(&sql,0,0);
-	password_hash	= kore_pgsql_getvalue(&sql,0,1);
+	salt 	 		= kore_pgsql_getvalue(&sql,0,0);
+	password_hash		= kore_pgsql_getvalue(&sql,0,1);
+	str_is_autonomous 	= kore_pgsql_getvalue(&sql,0,2);
+
+	if (is_autonomous)
+		*is_autonomous = false; 
 
 	// there is no salt or password hash in db ?
 	if (salt[0] == '\0' || password_hash[0] == '\0')
 		goto done;
+
+	if (is_autonomous)
+		*is_autonomous = str_is_autonomous[0] == 't'; 
 
 	debug_printf("strlen of salt = %d (%s)\n",strlen(salt),salt);
 	debug_printf("strlen of apikey = %d (%s)\n",strlen(apikey),apikey);
@@ -475,7 +482,7 @@ login_success (const char *id, const char *apikey)
 
 	SHA256((const uint8_t*)string_to_be_hashed,strlen(string_to_be_hashed),binary_hash);
 
-	debug_printf("login_success STRING TO BE HASHED = {%s}\n",string_to_be_hashed);
+	debug_printf("login success STRING TO BE HASHED = {%s}\n",string_to_be_hashed);
 
 	snprintf
 	(
@@ -766,7 +773,7 @@ subscribe (struct http_request *req)
 
 /////////////////////////////////////////////////
 
-	if (! login_success(id,apikey))
+	if (! login_success(id,apikey,NULL))
 		FORBIDDEN("invalid id or apikey");
 
 /////////////////////////////////////////////////
@@ -945,7 +952,7 @@ register_entity (struct http_request *req)
 
 /////////////////////////////////////////////////
 
-	if (! login_success(id,apikey))
+	if (! login_success(id,apikey,NULL))
 		FORBIDDEN("invalid id or apikey");
 
 	sanitize(entity);
@@ -1077,7 +1084,7 @@ deregister_entity (struct http_request *req)
 
 /////////////////////////////////////////////////
 
-	if (! login_success(id,apikey))
+	if (! login_success(id,apikey,NULL))
 		FORBIDDEN("invalid id or apikey");
 
 	sanitize(entity);
@@ -1232,8 +1239,8 @@ db_cleanup (struct http_request *req)
 
 /////////////////////////////////////////////////
 
-	if (! login_success("admin",apikey))
-		FORBIDDEN("wrong apikey");
+	if (! login_success("admin",apikey,NULL))
+		FORBIDDEN("invalid id or apikey");
 
 /////////////////////////////////////////////////
 
@@ -1289,8 +1296,8 @@ register_owner(struct http_request *req)
 
 /////////////////////////////////////////////////
 
-	if (! login_success("admin",apikey))
-		FORBIDDEN("wrong apikey");
+	if (! login_success("admin",apikey,NULL))
+		FORBIDDEN("invalid id or apikey");
 
 	sanitize(owner);
 
@@ -1387,8 +1394,8 @@ deregister_owner(struct http_request *req)
 
 /////////////////////////////////////////////////
 
-	if (! login_success("admin",apikey))
-		FORBIDDEN("wrong apikey");
+	if (! login_success("admin",apikey,NULL))
+		FORBIDDEN("invalid id or apikey");
 
 	sanitize(owner);
 
@@ -1516,8 +1523,13 @@ queue_bind (struct http_request *req)
 
 /////////////////////////////////////////////////
 
-	if (! login_success(id,apikey))
+	bool is_autonomous = false;
+
+	if (! login_success(id,apikey,&is_autonomous))
 		FORBIDDEN("invalid id or apikey");
+
+	if (! is_autonomous)
+		FORBIDDEN("unauthorized");
 
 	sanitize(from);
 	sanitize(to);
@@ -1632,8 +1644,13 @@ queue_unbind (struct http_request *req)
 
 /////////////////////////////////////////////////
 
-	if (! login_success(id,apikey))
+	bool is_autonomous = false;
+
+	if (! login_success(id,apikey, &is_autonomous))
 		FORBIDDEN("invalid id or apikey");
+
+	if (! is_autonomous)
+		FORBIDDEN("unauthorized");
 
 	sanitize(from);
 	sanitize(to);
@@ -1767,8 +1784,13 @@ follow (struct http_request *req)
 
 /////////////////////////////////////////////////
 
-	if (! login_success(id,apikey))
+	bool is_autonomous = false;
+
+	if (! login_success(id,apikey,&is_autonomous))
 		FORBIDDEN("invalid id or apikey");
+
+	if (! is_autonomous)
+		FORBIDDEN("unauthorized");
 
 	sanitize (from);
 	sanitize (to);
@@ -1991,8 +2013,13 @@ unfollow (struct http_request *req)
 
 /////////////////////////////////////////////////
 
-	if (! login_success(id,apikey))
+	bool is_autonomous = false;
+
+	if (! login_success(id,apikey,&is_autonomous))
 		FORBIDDEN("invalid id or apikey");
+
+	if (! is_autonomous)
+		FORBIDDEN("unauthorized");
 
 	sanitize(from);
 	sanitize(to);
@@ -2151,8 +2178,13 @@ share (struct http_request *req)
 
 /////////////////////////////////////////////////
 
-	if (! login_success(id,apikey))
+	bool is_autonomous = false;
+
+	if (! login_success(id,apikey,&is_autonomous))
 		FORBIDDEN("invalid id or apikey");
+
+	if (! is_autonomous)
+		FORBIDDEN("unauthorized");
 
 	sanitize(follow_id);
 
@@ -2267,8 +2299,13 @@ reject_follow (struct http_request *req)
 
 /////////////////////////////////////////////////
 
-	if (! login_success(id,apikey))
+	bool is_autonomous = false;
+
+	if (! login_success(id,apikey,&is_autonomous))
 		FORBIDDEN("invalid id or apikey");
+
+	if (! is_autonomous)
+		FORBIDDEN("unauthorized");
 
 	sanitize(follow_id);
 
@@ -2334,8 +2371,13 @@ get_follow_status (struct http_request *req)
 
 /////////////////////////////////////////////////
 
-	if (! login_success(id,apikey))
+	bool is_autonomous = false;
+
+	if (! login_success(id,apikey,&is_autonomous))
 		FORBIDDEN("invalid id or apikey");
+
+	if (! is_autonomous)
+		FORBIDDEN("unauthorized");
 
 //////////////////////////////////////////////////
 
@@ -2427,8 +2469,13 @@ get_follow_requests (struct http_request *req)
 
 /////////////////////////////////////////////////
 
-	if (! login_success(id,apikey))
+	bool is_autonomous = false;
+
+	if (! login_success(id,apikey,&is_autonomous))
 		FORBIDDEN("invalid id or apikey");
+
+	if (! is_autonomous)
+		FORBIDDEN("unauthorized");
 
 /////////////////////////////////////////////////
 
@@ -2530,7 +2577,7 @@ block (struct http_request *req)
 
 /////////////////////////////////////////////////
 
-	if (! login_success(id,apikey))
+	if (! login_success(id,apikey,NULL))
 		FORBIDDEN("invalid id or apikey");
 
 	sanitize (entity);
@@ -2584,7 +2631,7 @@ unblock (struct http_request *req)
 
 /////////////////////////////////////////////////
 
-	if (! login_success(id,apikey))
+	if (! login_success(id,apikey,NULL))
 		FORBIDDEN("invalid id or apikey");
 
 	sanitize(entity);
@@ -2637,7 +2684,7 @@ permissions (struct http_request *req)
 
 /////////////////////////////////////////////////
 
-	if (! login_success(id,apikey))
+	if (! login_success(id,apikey,NULL))
 		FORBIDDEN("invalid id or apikey");
 
 	sanitize(entity);

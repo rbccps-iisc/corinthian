@@ -67,7 +67,7 @@ int init (int);
 
 void gen_salt_password_and_apikey (const char *, char *, char *, char *);
 
-bool login_success (const char *, const char *);
+bool login_success (const char *, const char *, bool *);
 bool check_acl(const char *id, const char *exchange, const char *permission);
 
 bool looks_like_a_valid_owner	(const char *str);
