@@ -17,7 +17,7 @@ services:
     restart: always
     hostname: kore
     ports:
-      - "8888:8888"
+      - "443:8888"
     networks:
       - kore-net
     cap_add:

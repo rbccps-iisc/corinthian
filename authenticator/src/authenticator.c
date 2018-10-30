@@ -103,16 +103,16 @@ init (int state)
 	if (query == NULL)
 		query = kore_buf_alloc(512);
 	
-	int fd = open("/vars/postgres_pwd",O_RDONLY);
+	int fd = open("/vars/postgres.passwd",O_RDONLY);
 	if (fd < 0)
 	{
-		fprintf(stderr,"could not open postgres_pwd\n");
+		fprintf(stderr,"could not open postgres.passwd\n");
 		exit(-1);
 	}
 
 	if (! read(fd,postgres_pwd,32))
 	{
-		fprintf(stderr,"could not read from postgres_pwd\n");
+		fprintf(stderr,"could not read from postgres.passwd\n");
 		exit(-1);
 	}
 
