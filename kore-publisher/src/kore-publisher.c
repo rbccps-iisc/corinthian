@@ -66,7 +66,7 @@ init (int state)
 		return KORE_RESULT_OK;
 
 	// mask server name 
-	http_server_version("x");
+	http_server_version("");
 
 	hostname_to_ip("broker", broker_ip);
 	hostname_to_ip("postgres", pgsql_ip);
@@ -88,16 +88,16 @@ init (int state)
 
 //////////////
 
-	int fd = open("/vars/admin_pwd",O_RDONLY);
+	int fd = open("/vars/admin.passwd",O_RDONLY);
 	if (fd < 0)
 	{
-		fprintf(stderr,"could not open admin_pwd file\n");
+		fprintf(stderr,"could not open admin.passwd file\n");
 		exit(-1);
 	}
 
 	if (! read(fd,admin_apikey,32))
 	{
-		fprintf(stderr,"could not read from admin_pwd file\n");
+		fprintf(stderr,"could not read from admin.passwd file\n");
 		exit(-1);
 	}
 
@@ -115,16 +115,16 @@ init (int state)
 
 	close (fd);
 
-	fd = open("/vars/postgres_pwd",O_RDONLY);
+	fd = open("/vars/postgres.passwd",O_RDONLY);
 	if (fd < 0)
 	{
-		fprintf(stderr,"could not open postgres_pwd\n");
+		fprintf(stderr,"could not open postgres.passwd\n");
 		exit(-1);
 	}
 
 	if (! read(fd,postgres_pwd,32))
 	{
-		fprintf(stderr,"could not read from postgres_pwd\n");
+		fprintf(stderr,"could not read from postgres.passwd\n");
 		exit(-1);
 	}
 
@@ -528,7 +528,7 @@ publish (struct http_request *req)
 	const char *id;
 	const char *apikey;
 	const char *to;
-	const char *topic;
+	const char *subject;
 	const char *message;
 	const char *message_type;
 
@@ -547,7 +547,7 @@ publish (struct http_request *req)
 				||
 		KORE_RESULT_OK != http_request_header(req, "to", &to)
 				||
-		KORE_RESULT_OK != http_request_header(req, "topic", &topic)
+		KORE_RESULT_OK != http_request_header(req, "subject", &subject)
 				||
 		KORE_RESULT_OK != http_request_header(req, "message-type", &message_type)
 			,
@@ -574,7 +574,7 @@ publish (struct http_request *req)
 		}
 
 		snprintf(exchange,129,"%s.%s",to,message_type);
-		strlcpy(topic_to_publish,topic,129);
+		strlcpy(topic_to_publish,subject,129);
 
 		debug_printf("------------------> exchange = %s\n",exchange);
 		debug_printf("------------------> topic = %s\n",topic_to_publish);
@@ -586,7 +586,7 @@ publish (struct http_request *req)
 			BAD_REQUEST("message-type can only be command");		
 		}
 
-		snprintf(topic_to_publish,129,"%s.%s.%s",to,message_type,topic);
+		snprintf(topic_to_publish,129,"%s.%s.%s",to,message_type,subject);
 		snprintf(exchange,129,"%s.publish",id);
 
 		debug_printf("------------------> exchange = %s\n",exchange);
@@ -605,17 +605,6 @@ publish (struct http_request *req)
 		content_type = "";
 	}
 
-/////////////////////////////////////////////////
-
-	//if (! login_success(id,apikey))
-	//	BAD_REQUEST("invalid id or apikey");
-
-	/* Not required !
-	sanitize(to);
-	sanitize(topic);
-	*/
-
-/////////////////////////////////////////////////
 
 	amqp_socket_t *socket = NULL;
 
@@ -633,6 +622,9 @@ publish (struct http_request *req)
 	}
 	else
 	{
+		if (! login_success(id,apikey))
+			FORBIDDEN("invalid id or apikey");
+		
 		cached_conn = malloc(sizeof(amqp_connection_state_t));
 
 		if (cached_conn == NULL)
@@ -695,8 +687,6 @@ done:
 			amqp_connection_close	(*cached_conn,    AMQP_REPLY_SUCCESS);
 			amqp_destroy_connection	(*cached_conn);
 	
-			free(cached_conn);
-
 			ht_delete(&connection_ht,key);
 		}
 	}
@@ -1859,7 +1849,7 @@ follow (struct http_request *req)
 	}
 
 	if (! valid_permission)
-		FORBIDDEN("invalid permission");
+		BAD_REQUEST("invalid permission");
 
 	if (strcmp(status,"approved") == 0)
 	{

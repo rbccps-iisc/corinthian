@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import copy
 import json
 import math
 import argparse
@@ -18,12 +19,12 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 logger = logging.getLogger(__name__)
 
-base_url = "https://localhost:8888"
+base_url = "https://localhost"
 
 s = requests.Session();
-s.mount('https://localhost:8888/', HTTPAdapter(pool_connections=1))
+s.mount('https://localhost/', HTTPAdapter(pool_connections=1))
 
-f = open("./vars/admin_pwd", "r")
+f = open("./vars/admin.passwd", "r")
 admin_key = str(f.read())[:-1]
 
 cmd = """ docker exec postgres psql -U postgres -c "insert into users values('admin1','fa8d4b8fe10794af430f04b7af55388be9f676361c49849daff827918b6bd2f3',NULL,'salt','f') ON CONFLICT DO NOTHING" """
@@ -61,6 +62,17 @@ def gen_rand(size, prefix=""):
 	rand_str = prefix + ''.join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(size))
 	return rand_str
 
+def get_entity(device_keys, app_keys, entity_type=""):
+
+    if entity_type == "dev":
+	    name = random.choice(device_keys.keys())
+	    key = str(device_keys[name])
+    elif entity_type == "app":
+	    name = random.choice(app_keys.keys())
+	    key = str(app_keys[name])
+	    
+    return name, key
+
 def register_owner(ID, apikey, owner):
 	
 	url = base_url + "/register-owner"
@@ -71,7 +83,7 @@ def register_owner(ID, apikey, owner):
 def register(ID, apikey, entity_id):
 	
 	url = base_url + "/register"
-	headers = {"id": ID, "apikey": apikey, "entity": entity_id}
+	headers = {"id": ID, "apikey": apikey, "entity": entity_id, "is-autonomous": "true"}
 	r = s.post(url=url, headers=headers, data="{\"test\":\"schema\"}", verify=False)
 	return r
 
@@ -113,11 +125,11 @@ def permissions(ID, apikey, entity_id=""):
 def publish(ID, apikey, to, topic, message_type, data):
 
 	url = base_url + "/publish"
-	headers = {"id": ID, "apikey": apikey, "to": to, "topic": topic, "message-type": message_type}
+	headers = {"id": ID, "apikey": apikey, "to": to, "subject": topic, "message-type": message_type}
 	r = s.post(url=url,headers=headers,data=data,verify=False)
 	return r
 
-def follow(ID, apikey, to_id, permission, from_id=""):
+def follow(ID, apikey, to_id, permission, from_id="", topic ="", validity = "", message_type=""):
 
 	url = base_url + "/follow"
 	headers = {}
@@ -128,8 +140,20 @@ def follow(ID, apikey, to_id, permission, from_id=""):
 	headers['id'] = ID
 	headers['apikey'] = apikey
 	headers['to'] = to_id
-	headers['topic'] = "test"
-	headers['validity'] = "24"
+
+	if topic:
+	    headers['topic'] = topic
+	else:
+	    headers['topic'] = "test"
+
+	if validity:
+	    headers['validity'] = validity
+	else:
+	    headers['validity'] = "24"
+
+	if message_type:
+	    headers['message-type'] = message_type
+
 	headers['permission'] = permission
 	
 	r = s.get(url=url,headers=headers,verify=False)
@@ -456,8 +480,8 @@ def security_tests():
 	dummy_key = gen_rand(32) 
 	dummy_id  = gen_rand(16) 
 
-	devices = random.randint(1,5)
-	apps 	= random.randint(1,5)
+	devices = random.randint(2,5)
+	apps 	= random.randint(2,5)
 
 	device_keys, app_keys = registrations(devices,apps)	
 
@@ -491,21 +515,24 @@ def security_tests():
 	#Publish
 	log("---------------> PUBLISH USING INVALID APIKEY", 'HEADER')
 	
-	dev_name = random.choice(device_keys.keys())
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
 	r = publish(dev_name, dummy_key, dev_name, "test", "protected", "hello")
 	check(r,403)
 	log("Received 403: OK",'')
 
 	log("---------------> PUBLISH USING VALID APIKEY TO ESTABLISH CONNECTION", 'HEADER')
 	
-	dev_name = random.choice(device_keys.keys())
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
 	r = publish(dev_name, str(device_keys[dev_name]), dev_name, "test", "protected", "hello")
 	check(r,202)
 	log("Received 202: OK",'')
 
 	log("---------------> PUBLISH USING INVALID APIKEY ONCE CONNECTION HAS BEEN ESTABLISHED", 'HEADER')
 	
-	dev_name = random.choice(device_keys.keys())
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
 	r = publish(dev_name, dummy_key, dev_name, "test", "protected", "hello")
 	check(r,403)
 	log("Received 403: OK",'')
@@ -513,7 +540,8 @@ def security_tests():
 	#Subscribe
 	log("---------------> SUBSCRIBE USING INVALID APIKEY", 'HEADER')
 
-	dev_name = random.choice(device_keys.keys())
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
 	r = subscribe(dev_name, dummy_key)
 	check(r,403)
 	log("Received 403: OK",'')
@@ -521,7 +549,7 @@ def security_tests():
 	#Follow
 	log("---------------> FOLLOW USING INVALID APIKEY", 'HEADER')
 
-	app_name = random.choice(app_keys.keys())
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
 	r = follow(app_name, dummy_key, random.choice(device_keys.keys()), "read")
 	check(r,403)
 	log("Received 403: OK",'')
@@ -529,7 +557,8 @@ def security_tests():
 	#Follow using invalid admin key
 	log("---------------> FOLLOW USING INVALID ADMIN APIKEY", 'HEADER')
 
-	app_name = random.choice(app_keys.keys())
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+
 	r = follow("admin1", dummy_key, random.choice(device_keys.keys()), "read")
 	check(r,403)
 	log("Received 403: OK",'')
@@ -537,7 +566,8 @@ def security_tests():
 	#Share
 	log("---------------> SHARE USING INVALID APIKEY", 'HEADER')
 
-	dev_name = random.choice(device_keys.keys())
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
 	r = share(dev_name, dummy_key, str(random.randint(0,5)))
 	check(r,403)
 	log("Received 403: OK",'')
@@ -545,7 +575,8 @@ def security_tests():
 	#Share using invalid admin key
 	log("---------------> SHARE USING INVALID ADMIN APIKEY", 'HEADER')
 
-	dev_name = random.choice(device_keys.keys())
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
 	r = share("admin", dummy_key, str(random.randint(0,5)))
 	check(r,403)
 	log("Received 403: OK",'')
@@ -553,7 +584,8 @@ def security_tests():
 	#Unfollow
 	log("---------------> UNFOLLOW USING INVALID APIKEY", 'HEADER')
 	
-	app_name = random.choice(app_keys.keys())
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+
 	r = unfollow(app_name, dummy_key, str(random.choice(device_keys.keys())), "test", "read", "protected")
 	check(r,403)
 	log("Received 403: OK",'')
@@ -561,7 +593,8 @@ def security_tests():
 	#Unfollow using invalid admin apikey
 	log("---------------> UNFOLLOW USING INVALID ADMIN APIKEY", 'HEADER')
 	
-	app_name = random.choice(app_keys.keys())
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+
 	r = unfollow("admin1", dummy_key, str(random.choice(device_keys.keys())), "test", "read", "protected", from_id=app_name)
 	check(r,403)
 	log("Received 403: OK",'')
@@ -576,7 +609,8 @@ def security_tests():
 	#Follow-requests using invalid device apikey
 	log("---------------> FOLLOW-REQUESTS USING INVALID DEVICE APIKEY", 'HEADER')
 
-	dev_name = random.choice(device_keys.keys())
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
 	r = follow_requests(dev_name, dummy_key, "requests")
 	check(r,403)
 	log("Received 403: OK",'')
@@ -591,7 +625,8 @@ def security_tests():
 	#Follow-status using invalid device apikey
 	log("---------------> FOLLOW-STATUS USING INVALID DEVICE APIKEY", 'HEADER')
 
-	dev_name = random.choice(device_keys.keys())
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
 	r = follow_requests(dev_name, dummy_key, "status")
 	check(r,403)
 	log("Received 403: OK",'')
@@ -606,7 +641,8 @@ def security_tests():
 	#Reject follow using invalid device key
 	log("---------------> REJECT-FOLLOW USING INVALID DEVICE APIKEY", 'HEADER')
 
-	dev_name = random.choice(device_keys.keys())
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
 	r = reject_follow(dev_name, dummy_key, str(random.randint(1,5)))
 	check(r,403)
 	log("Received 403: OK",'')
@@ -614,9 +650,10 @@ def security_tests():
 	#Bind using invalid device apikey
 	log("---------------> BIND USING INVALID DEVICE APIKEY", 'HEADER')
 
-	app_name = random.choice(app_keys.keys())	
-	dev_name = random.choice(app_keys.keys())	
 	
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+
 	r = bind_unbind(app_name, dummy_key, dev_name, "test", "bind", "protected")
 	check(r,403)
 	log("Received 403: OK",'')
@@ -624,9 +661,10 @@ def security_tests():
 	#Bind using invalid admin apikey
 	log("---------------> BIND USING INVALID ADMIN APIKEY", 'HEADER')
 
-	app_name = random.choice(app_keys.keys())	
-	dev_name = random.choice(app_keys.keys())	
 	
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
 	r = bind_unbind("admin1", dummy_key, dev_name, "test", "bind", "protected", from_id = app_name)
 	check(r,403)
 	log("Received 403: OK",'')
@@ -634,9 +672,10 @@ def security_tests():
 	#Unbind using invalid device apikey
 	log("---------------> UNBIND USING INVALID DEVICE APIKEY", 'HEADER')
 
-	app_name = random.choice(app_keys.keys())	
-	dev_name = random.choice(device_keys.keys())	
 	
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+
 	r = bind_unbind(app_name, dummy_key, dev_name, "test", "unbind", "protected")
 	check(r,403)
 	log("Received 403: OK",'')
@@ -644,9 +683,10 @@ def security_tests():
 	#Bind using invalid admin apikey
 	log("---------------> UNBIND USING INVALID ADMIN APIKEY", 'HEADER')
 
-	app_name = random.choice(app_keys.keys())	
-	dev_name = random.choice(device_keys.keys())	
 	
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+
 	r = bind_unbind("admin1", dummy_key, dev_name, "test", "unbind", "protected", from_id = app_name)
 	check(r,403)
 	log("Received 403: OK",'')
@@ -668,7 +708,7 @@ def security_tests():
 	#Permissions using invalid admin apikey
 	log("---------------> PERMISSIONS USING INVALID ADMIN APIKEY", 'HEADER')
 	
-	dev_name = random.choice(device_keys.keys())	
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
 
 	r = permissions("admin", dummy_key, entity_id = dev_name)
 	check(r,403)
@@ -677,7 +717,7 @@ def security_tests():
 	#Permissions using invalid device apikey
 	log("---------------> PERMISSIONS USING INVALID DEVICE APIKEY", 'HEADER')
 	
-	dev_name = random.choice(device_keys.keys())	
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
 
 	r = permissions(dev_name, dummy_key)
 	check(r,403)
@@ -687,7 +727,8 @@ def security_tests():
 	
 	log("---------------> DEREGISTRATION USING INVALID ADMIN APIKEY", 'HEADER')
 
-	dev_name = random.choice(device_keys.keys())	
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
 	r = deregister("admin", dummy_key, dev_name)
 	check(r,403)
 	log("Received 403: OK",'')
@@ -718,21 +759,24 @@ def security_tests():
 	#Publish
 	log("---------------> PUBLISH USING INVALID ID", 'HEADER')
 	
-	dev_name = random.choice(device_keys.keys())
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
 	r = publish(dummy_id, str(device_keys[dev_name]), dummy_id, "test", "protected", "hello")
 	check(r,403)
 	log("Received 403: OK",'')
 
 	log("---------------> PUBLISH USING VALID APIKEY AND ID TO ESTABLISH CONNECTION", 'HEADER')
 	
-	dev_name = random.choice(device_keys.keys())
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
 	r = publish(dev_name, str(device_keys[dev_name]), dev_name, "test", "protected", "hello")
 	check(r,202)
 	log("Received 202: OK",'')
 
 	log("---------------> PUBLISH USING INVALID ID ONCE CONNECTION HAS BEEN ESTABLISHED", 'HEADER')
 	
-	dev_name = random.choice(device_keys.keys())
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
 	r = publish(dummy_id, str(device_keys[dev_name]), dummy_id , "test", "protected", "hello")
 	check(r,403)
 	log("Received 403: OK",'')
@@ -740,7 +784,8 @@ def security_tests():
 	#Subscribe
 	log("---------------> SUBSCRIBE USING INVALID ID", 'HEADER')
 
-	dev_name = random.choice(device_keys.keys())
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
 	r = subscribe(dummy_id, str(device_keys[dev_name]))
 	check(r,403)
 	log("Received 403: OK",'')
@@ -748,7 +793,8 @@ def security_tests():
 	#Follow
 	log("---------------> FOLLOW USING INVALID ID", 'HEADER')
 
-	app_name = random.choice(app_keys.keys())
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+
 	r = follow(dummy_id, str(app_keys[app_name]), random.choice(device_keys.keys()), "read")
 	check(r,403)
 	log("Received 403: OK",'')
@@ -756,7 +802,8 @@ def security_tests():
 	#Follow using invalid admin id
 	log("---------------> FOLLOW USING INVALID ADMIN ID", 'HEADER')
 
-	app_name = random.choice(app_keys.keys())
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+
 	r = follow(dummy_id, "admin1", random.choice(device_keys.keys()), "read")
 	check(r,403)
 	log("Received 403: OK",'')
@@ -764,7 +811,8 @@ def security_tests():
 	#Share
 	log("---------------> SHARE USING INVALID ID", 'HEADER')
 
-	dev_name = random.choice(device_keys.keys())
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
 	r = share(dummy_id, str(device_keys[dev_name]), str(random.randint(0,5)))
 	check(r,403)
 	log("Received 403: OK",'')
@@ -772,7 +820,8 @@ def security_tests():
 	#Share using invalid admin id
 	log("---------------> SHARE USING INVALID ADMIN ID", 'HEADER')
 
-	dev_name = random.choice(device_keys.keys())
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
 	r = share(dummy_id, admin_key, str(random.randint(0,5)))
 	check(r,403)
 	log("Received 403: OK",'')
@@ -780,7 +829,8 @@ def security_tests():
 	#Unfollow
 	log("---------------> UNFOLLOW USING INVALID ID", 'HEADER')
 	
-	app_name = random.choice(app_keys.keys())
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+
 	r = unfollow(dummy_id, str(app_keys[app_name]), str(random.choice(device_keys.keys())), "test", "read", "protected")
 	check(r,403)
 	log("Received 403: OK",'')
@@ -788,7 +838,8 @@ def security_tests():
 	#Unfollow using invalid admin id
 	log("---------------> UNFOLLOW USING INVALID ADMIN ID", 'HEADER')
 	
-	app_name = random.choice(app_keys.keys())
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+
 	r = unfollow(dummy_id, "admin1", str(random.choice(device_keys.keys())), "test", "read", "protected", from_id=app_name)
 	check(r,403)
 	log("Received 403: OK",'')
@@ -803,7 +854,8 @@ def security_tests():
 	#Follow-requests using invalid device id
 	log("---------------> FOLLOW-REQUESTS USING INVALID DEVICE ID", 'HEADER')
 
-	dev_name = random.choice(device_keys.keys())
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
 	r = follow_requests(dummy_id, str(device_keys[dev_name]), "requests")
 	check(r,403)
 	log("Received 403: OK",'')
@@ -818,7 +870,8 @@ def security_tests():
 	#Follow-status using invalid device id
 	log("---------------> FOLLOW-STATUS USING INVALID DEVICE ID", 'HEADER')
 
-	dev_name = random.choice(device_keys.keys())
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
 	r = follow_requests(dummy_id, str(device_keys[dev_name]), "status")
 	check(r,403)
 	log("Received 403: OK",'')
@@ -833,7 +886,8 @@ def security_tests():
 	#Reject follow using invalid device id
 	log("---------------> REJECT-FOLLOW USING INVALID DEVICE ID", 'HEADER')
 
-	dev_name = random.choice(device_keys.keys())
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
 	r = reject_follow(dummy_id, str(device_keys[dev_name]), str(random.randint(1,5)))
 	check(r,403)
 	log("Received 403: OK",'')
@@ -841,9 +895,10 @@ def security_tests():
 	#Bind using invalid device id
 	log("---------------> BIND USING INVALID DEVICE ID", 'HEADER')
 
-	app_name = random.choice(app_keys.keys())	
-	dev_name = random.choice(app_keys.keys())	
 	
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+
 	r = bind_unbind(dummy_id, str(app_keys[app_name]), dev_name, "test", "bind", "protected")
 	check(r,403)
 	log("Received 403: OK",'')
@@ -851,9 +906,10 @@ def security_tests():
 	#Bind using invalid admin id
 	log("---------------> BIND USING INVALID ADMIN ID", 'HEADER')
 
-	app_name = random.choice(app_keys.keys())	
-	dev_name = random.choice(app_keys.keys())	
 	
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+
 	r = bind_unbind(dummy_id, "admin1", dev_name, "test", "bind", "protected", from_id = app_name)
 	check(r,403)
 	log("Received 403: OK",'')
@@ -861,9 +917,10 @@ def security_tests():
 	#Unbind using invalid device id
 	log("---------------> UNBIND USING INVALID DEVICE ID", 'HEADER')
 
-	app_name = random.choice(app_keys.keys())	
-	dev_name = random.choice(device_keys.keys())	
 	
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
 	r = bind_unbind(dummy_id, str(app_keys[app_name]), dev_name, "test", "unbind", "protected")
 	check(r,403)
 	log("Received 403: OK",'')
@@ -871,9 +928,10 @@ def security_tests():
 	#Bind using invalid admin idy
 	log("---------------> UNBIND USING INVALID ADMIN ID", 'HEADER')
 
-	app_name = random.choice(app_keys.keys())	
-	dev_name = random.choice(device_keys.keys())	
 	
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
 	r = bind_unbind(dummy_id, "admin1", dev_name, "test", "unbind", "protected", from_id = app_name)
 	check(r,403)
 	log("Received 403: OK",'')
@@ -895,7 +953,7 @@ def security_tests():
 	#Permissions using invalid admin id
 	log("---------------> PERMISSIONS USING INVALID ADMIN ID", 'HEADER')
 	
-	dev_name = random.choice(device_keys.keys())	
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
 
 	r = permissions(dummy_admin_id, admin_key, entity_id = dev_name)
 	check(r,403)
@@ -904,7 +962,7 @@ def security_tests():
 	#Permissions using invalid device id
 	log("---------------> PERMISSIONS USING INVALID DEVICE ID", 'HEADER')
 	
-	dev_name = random.choice(device_keys.keys())	
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
 
 	r = permissions(dummy_id, str(device_keys[dev_name]))
 	check(r,403)
@@ -914,7 +972,8 @@ def security_tests():
 	
 	log("---------------> DEREGISTRATION USING INVALID ADMIN ID", 'HEADER')
 
-	dev_name = random.choice(device_keys.keys())	
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
 	r = deregister(dummy_id, admin_key, dev_name)
 	check(r,403)
 	log("Received 403: OK",'')
@@ -925,9 +984,9 @@ def security_tests():
 	#Publish to non-existent exchange
 	log("---------------> PUBLISH TO NON-EXISTENT EXCHANGE", 'HEADER')
 
-	dev_name = str(random.choice(device_keys.keys()))
-	dev_key  = str(device_keys[dev_name])
 	
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
 	dummy_exchange = gen_rand(8, prefix = gen_rand(8)+"/") 
 	r = publish(dev_name, dev_key, dummy_exchange, "test", "command", "hello") 
 	check(r,202)
@@ -936,8 +995,9 @@ def security_tests():
 	#Publish without authroisation
 	log("---------------> PUBLISH WITHOUT AUTHORISATION", 'HEADER')
 
-	app_name = str(random.choice(app_keys.keys()))
-	dev_name = str(random.choice(device_keys.keys()))
+
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
 
 	r = publish(app_name, str(app_keys[app_name]), dev_name, "test", "command", "hello") 
 	check(r,202)
@@ -946,7 +1006,7 @@ def security_tests():
 	#Publish to amq.topic
 	log("---------------> PUBLISH TO amq.topic", 'HEADER')
 
-	dev_name = str(random.choice(device_keys.keys()))
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
 
 	r = publish(dev_name, str(device_keys[dev_name]), "amq.topic", "test", "command", "hello") 
 	check(r,400)
@@ -955,7 +1015,7 @@ def security_tests():
 	#Publish to amq.direct
 	log("---------------> PUBLISH TO amq.direct", 'HEADER')
 
-	dev_name = str(random.choice(device_keys.keys()))
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
 
 	r = publish(dev_name, str(device_keys[dev_name]), "amq.direct", "test", "command", "hello") 
 	check(r,400)
@@ -964,7 +1024,7 @@ def security_tests():
 	#Publish to amq.headers
 	log("---------------> PUBLISH TO amq.headers", 'HEADER')
 	
-	dev_name = str(random.choice(device_keys.keys()))
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
 
 	r = publish(dev_name, str(device_keys[dev_name]), "amq.headers", "test", "command", "hello") 
 	check(r,400)
@@ -973,9 +1033,16 @@ def security_tests():
 	#Publish to amq.fanout
 	log("---------------> PUBLISH TO amq.fanout", 'HEADER')
 
-	dev_name = str(random.choice(device_keys.keys()))
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
 
 	r = publish(dev_name, str(device_keys[dev_name]), "amq.fanout", "test", "command", "hello") 
+	check(r,400)
+	log("Received 400: OK",'')
+
+	#Publish with invalid message-type
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
+	r = publish(dev_name, str(device_keys[dev_name]), dev_name, "test", gen_rand(8), "hello") 
 	check(r,400)
 	log("Received 400: OK",'')
 
@@ -987,8 +1054,8 @@ def security_tests():
 	log("---------------> SUBSCRIBE WITH INVALID MESSAGE-TYPE", 'HEADER') 
 	dummy_mt = gen_rand(8)
 
-	app_name = random.choice(app_keys.keys())
-	app_key	 = app_keys[app_name]
+
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
 
 	r = subscribe(app_name, app_key, dummy_mt)
 	check(r,400)
@@ -999,13 +1066,690 @@ def security_tests():
 	log("---------------> SUBSCRIBE WITH INVALID NUM MESSSAGES", 'HEADER') 
 	dummy_nm = gen_rand(8)
 
-	app_name = random.choice(app_keys.keys())
-	app_key	 = app_keys[app_name]
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
 
 	r = subscribe(app_name, app_key, num_messages= dummy_nm)
-	print(r.text, r.status_code)
-	check(r,400)
+	check(r,200)
+	log("Received 200: OK ",'')
+
+	print("\n\n")
+	log("------------------------- BIND -------------------------\n\n", 'GREEN')
+
+	#Bind to unauthorised exchange
+	log("---------------> BIND TO UNAUTHORISED EXCHANGE", 'HEADER') 
+
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+
+	r = bind_unbind(app_name, str(app_keys[app_name]), dev_name, "test", "bind", "protected")
+	check(r, 403)
+	log("Received 403: OK",'')
+		
+	#Bind to non-existent exchange
+	log("---------------> BIND TO NON-EXISTENT EXCHANGE", 'HEADER') 
+
+	dummy_exchange = gen_rand(8, prefix= gen_rand(8))
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+
+	r = bind_unbind(app_name, str(app_keys[app_name]), dummy_exchange, "test", "bind", "protected")
+	check(r, 403)
+	log("Received 403: OK",'')
+	
+	#Bind using invalid message_type
+	log("---------------> BIND USING INVALID MESSAGE-TYPE", 'HEADER') 
+
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
+	r = follow(app_name, str(app_keys[app_name]), dev_name, "read")
+	follow_id = r.json()['follow-id-read']
+	check(r, 202)
+	
+	r = share(dev_name, str(device_keys[dev_name]), follow_id)
+	check(r, 200)
+
+	r = bind_unbind(app_name, str(app_keys[app_name]), dev_name, "test", "bind", gen_rand(8))
+	check(r, 400)
 	log("Received 400: OK",'')
+
+	r = unfollow(app_name, str(app_keys[app_name]), dev_name, "test", "read", "protected")
+	check(r, 200)
+	
+	cmd = """ docker exec postgres psql -U postgres -c "delete from follow" """
+
+	try:
+		p = subprocess.check_output(cmd, shell=True)
+	except Exception as e:
+		pass
+
+	#Bind with a different topic from what was requested in follow 
+	log("---------------> BIND USING UNAUTHORISED TOPIC", 'HEADER') 
+
+
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
+	r = follow(app_name, str(app_keys[app_name]), dev_name, "read")
+	follow_id = r.json()['follow-id-read']
+	check(r, 202)
+	
+	r = share(dev_name, str(device_keys[dev_name]), follow_id)
+	check(r, 200)
+
+	dummy_topic = gen_rand(8)
+	r = bind_unbind(app_name, str(app_keys[app_name]), dev_name, dummy_topic, "bind", "protected")
+	check(r, 403)
+	log("Received 403: OK",'')
+
+	r = unfollow(app_name, str(app_keys[app_name]), dev_name, "test", "read", "protected")
+	check(r, 200)
+	
+	cmd = """ docker exec postgres psql -U postgres -c "delete from follow" """
+
+	try:
+		p = subprocess.check_output(cmd, shell=True)
+	except Exception as e:
+		pass
+
+	#Cross-owner binding 
+	log("---------------> CROSS OWNER BINDING", 'HEADER') 
+	
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
+	r = follow(app_name, str(app_keys[app_name]), dev_name, "read")
+	follow_id = r.json()['follow-id-read']
+	check(r, 202)
+	
+	r = share(dev_name, str(device_keys[dev_name]), follow_id)
+	check(r, 200)
+
+	r = bind_unbind("admin", admin_key, dev_name, "test", "bind", "protected", from_id =
+	app_name)
+	check(r, 403)
+	log("Received 403: OK",'')
+
+	r = unfollow(app_name, str(app_keys[app_name]), dev_name, "test", "read", "protected")
+	check(r, 200)
+	
+	cmd = """ docker exec postgres psql -U postgres -c "delete from follow" """
+
+	try:
+		p = subprocess.check_output(cmd, shell=True)
+	except Exception as e:
+		pass
+
+	#Cross-device binding 
+	log("---------------> CROSS DEVICE BINDING", 'HEADER') 
+	
+
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
+	r = follow(app_name, str(app_keys[app_name]), dev_name, "read")
+	follow_id = r.json()['follow-id-read']
+	check(r, 202)
+	
+	r = share(dev_name, str(device_keys[dev_name]), follow_id)
+	check(r, 200)
+	
+
+	dummy_dev, dummy_dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
+	r = bind_unbind(dummy_dev, dummy_dev_key, dev_name, "test", "bind", "protected", from_id =
+	app_name)
+	check(r, 403)
+	log("Received 403: OK",'')
+
+	r = unfollow(app_name, str(app_keys[app_name]), dev_name, "test", "read", "protected")
+	check(r, 200)
+
+	cmd = """ docker exec postgres psql -U postgres -c "delete from follow" """
+
+	try:
+		p = subprocess.check_output(cmd, shell=True)
+	except Exception as e:
+		pass
+
+	print("\n\n")
+	log("------------------------- UNBIND -------------------------\n\n", 'GREEN')
+
+	#Unbind to unauthorised exchange
+	log("---------------> UNBIND FROM UNAUTHORISED EXCHANGE", 'HEADER') 
+
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
+	r = bind_unbind(app_name, str(app_keys[app_name]), dev_name, "test", "unbind", "protected")
+	check(r, 403)
+	log("Received 403: OK",'')
+		
+	#Unbind to non-existent exchange
+	log("---------------> UNBIND FROM NON-EXISTENT EXCHANGE", 'HEADER') 
+
+	dummy_exchange = gen_rand(8, prefix= gen_rand(8))
+
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+
+	r = bind_unbind(app_name, str(app_keys[app_name]), dummy_exchange, "test", "unbind", "protected")
+	check(r, 403)
+	log("Received 403: OK",'')
+
+	#Unbind using invalid message_type
+	log("---------------> UNBIND USING INVALID MESSAGE-TYPE", 'HEADER') 
+
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
+	r = follow(app_name, str(app_keys[app_name]), dev_name, "read")
+	follow_id = r.json()['follow-id-read']
+	check(r, 202)
+	
+	r = share(dev_name, dev_key, follow_id)
+	check(r, 200)
+
+	r = bind_unbind(app_name, app_key, dev_name, "test", "bind", "protected")
+	check(r, 200)
+	log("Received 200: OK",'')
+
+	r = bind_unbind(app_name, app_key, dev_name, "test", "unbind", gen_rand(8))
+	check(r, 200)
+	log("Received 200: OK",'')
+
+	r = unfollow(app_name, str(app_keys[app_name]), dev_name, "test", "read", "protected")
+	check(r, 200)
+	
+	cmd = """ docker exec postgres psql -U postgres -c "delete from follow" """
+
+	try:
+		p = subprocess.check_output(cmd, shell=True)
+	except Exception as e:
+		pass
+
+	#Unbind with a different topic from what was requested in follow 
+	log("---------------> UNBIND USING UNAUTHORISED TOPIC", 'HEADER') 
+
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
+	r = follow(app_name, str(app_keys[app_name]), dev_name, "read")
+	follow_id = r.json()['follow-id-read']
+	check(r, 202)
+	
+	r = share(dev_name, str(device_keys[dev_name]), follow_id)
+	check(r, 200)
+
+	r = bind_unbind(app_name, str(app_keys[app_name]), dev_name, "test", "bind", "protected")
+	check(r, 200)
+	log("Received 200: OK",'')
+
+	r = bind_unbind(app_name, str(app_keys[app_name]), dev_name, gen_rand(8), "unbind", "protected")
+	check(r, 403)
+	log("Received 403: OK",'')
+
+	r = unfollow(app_name, str(app_keys[app_name]), dev_name, "test", "read", "protected")
+	check(r, 200)
+
+	cmd = """ docker exec postgres psql -U postgres -c "delete from follow" """
+
+	try:
+		p = subprocess.check_output(cmd, shell=True)
+	except Exception as e:
+		pass
+
+	#Cross-owner Unbinding 
+	log("---------------> CROSS OWNER UNBINDING", 'HEADER') 
+
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
+	r = follow(app_name, str(app_keys[app_name]), dev_name, "read")
+	follow_id = r.json()['follow-id-read']
+	check(r, 202)
+	
+	r = share(dev_name, str(device_keys[dev_name]), follow_id)
+	check(r, 200)
+
+	r = bind_unbind(app_name, str(app_keys[app_name]), dev_name, "test", "bind", "protected")
+	check(r, 200)
+	log("Received 200: OK",'')
+
+	r = bind_unbind("admin", admin_key, dev_name, "test", "unbind", "protected", from_id =
+	app_name)
+	check(r, 403)
+	log("Received 403: OK",'')
+
+	r = unfollow(app_name, str(app_keys[app_name]), dev_name, "test", "read", "protected")
+	check(r, 200)
+
+	cmd = """ docker exec postgres psql -U postgres -c "delete from follow" """
+
+	try:
+		p = subprocess.check_output(cmd, shell=True)
+	except Exception as e:
+		pass
+
+	#Cross-device unbinding 
+	log("---------------> CROSS DEVICE UNBINDING", 'HEADER') 
+
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
+	r = follow(app_name, str(app_keys[app_name]), dev_name, "read")
+	follow_id = r.json()['follow-id-read']
+	check(r, 202)
+	
+	r = share(dev_name, str(device_keys[dev_name]), follow_id)
+	check(r, 200)
+
+	dummy_dev, dummy_dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
+	r = bind_unbind(app_name, str(app_keys[app_name]), dev_name, "test", "bind", "protected")
+	check(r, 200)
+	log("Received 200: OK",'')
+
+	r = bind_unbind(dummy_dev, dummy_dev_key, dev_name, "test", "unbind", "protected", from_id =
+	app_name)
+	check(r, 403)
+	log("Received 403: OK",'')
+
+	r = unfollow(app_name, str(app_keys[app_name]), dev_name, "test", "read", "protected")
+	check(r, 200)
+
+	cmd = """ docker exec postgres psql -U postgres -c "delete from follow" """
+
+	try:
+		p = subprocess.check_output(cmd, shell=True)
+	except Exception as e:
+		pass
+
+	print("\n\n")
+	log("------------------------- SHARE -------------------------\n\n", 'GREEN')
+
+	#Cross-device share / Share to self
+	log("---------------> SHARE TO SELF USING DEVICE APIKEY", 'HEADER') 
+
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
+	r = follow(app_name, app_key, dev_name, "read")
+	follow_id = r.json()['follow-id-read']
+	check(r, 202)
+
+	r = share(app_name, app_key, follow_id)
+	check(r, 400)
+	log("Received 400: OK",'')
+
+	cmd = """ docker exec postgres psql -U postgres -c "delete from follow" """
+
+	try:
+		p = subprocess.check_output(cmd, shell=True)
+	except Exception as e:
+		pass
+
+	#Cross-owner share / Share to self using owner's key
+	log("---------------> SHARE TO SELF USING OWNER APIKEY", 'HEADER') 
+
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
+	r = follow(app_name, app_key, dev_name, "read")
+	follow_id = r.json()['follow-id-read']
+	check(r, 202)
+
+	r = share("admin1", "admin1", follow_id)
+	check(r, 400)
+	log("Received 400: OK",'')
+
+	cmd = """ docker exec postgres psql -U postgres -c "delete from follow" """
+
+	try:
+		p = subprocess.check_output(cmd, shell=True)
+	except Exception as e:
+		pass
+
+	#Share on behalf of another device
+	log("---------------> SHARE BY ANOTHER DEVICE", 'HEADER') 
+
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
+	r = follow(app_name, app_key, dev_name, "read")
+	follow_id = r.json()['follow-id-read']
+	check(r, 202)
+
+	dev_copy = copy.deepcopy(device_keys)	
+	dev_copy.pop(dev_name, None)
+
+	dummy_dev = random.choice(dev_copy.keys())
+	dummy_dev_key = str(dev_copy[dummy_dev])
+
+	r = share(dummy_dev, dummy_dev_key, follow_id)
+	check(r, 400)
+	log("Received 400: OK",'')
+
+	cmd = """ docker exec postgres psql -U postgres -c "delete from follow" """
+
+	try:
+		p = subprocess.check_output(cmd, shell=True)
+	except Exception as e:
+		pass
+
+	#Share using invalid follow-id
+	log("---------------> SHARE USING INVALID FOLLOW-ID", 'HEADER') 
+
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
+	r = follow(app_name, app_key, dev_name, "read")
+	follow_id = r.json()['follow-id-read']
+	check(r, 202)
+
+	r = share(dev_name, dev_key, gen_rand(8))
+	check(r, 500)
+	log("Received 500: OK",'')
+
+	cmd = """ docker exec postgres psql -U postgres -c "delete from follow" """
+
+	try:
+		p = subprocess.check_output(cmd, shell=True)
+	except Exception as e:
+		pass
+
+	print("\n\n")
+	log("------------------------- FOLLOW -------------------------\n\n", 'GREEN')
+
+	#Invalid from
+	log("---------------> FOLLOW USING INVALID FROM-ID", 'HEADER') 
+
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
+	r = follow("admin1","admin1", dev_name, "read", from_id = gen_rand(8, prefix = gen_rand(8)))
+	check(r,403)
+	log("Received 403: OK",'')
+
+	#Invalid to-id
+	log("---------------> FOLLOW USING INVALID TO-ID", 'HEADER') 
+	
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+
+	r = follow(app_name, str(app_keys[app_name]), gen_rand(8, prefix = gen_rand(8)), "read")
+	check(r, 403)
+	log("Received 403: OK",'')
+
+	#Invalid validity period - large validity
+	log("---------------> FOLLOW USING INVALID VALIDITY PERIOD - LARGE VALIDITY", 'HEADER') 
+	
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
+	validity = random.randint(1000000, 100000000)
+	r = follow(app_name, app_key, dev_name, "read", validity=str(validity))
+	follow_id = r.json()['follow-id-read']
+
+	r = share(dev_name, dev_key, follow_id)
+	check(r, 200)
+	log("Received 200: OK",'')
+
+	r = unfollow(app_name, app_key, dev_name, "test", "read", "protected")
+	check(r, 200)
+
+	cmd = """ docker exec postgres psql -U postgres -c "delete from follow" """
+
+	try:
+		p = subprocess.check_output(cmd, shell=True)
+	except Exception as e:
+		pass
+
+	#Invalid validity period - non numeric validity
+	log("---------------> FOLLOW USING INVALID VALIDITY PERIOD - NON NUMERIC VALIDITY", 'HEADER') 
+	
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
+	validity = gen_rand(16) 
+	r = follow(app_name, app_key, dev_name, "read", validity=validity)
+	follow_id = r.json()['follow-id-read']
+
+	r = share(dev_name, dev_key, follow_id)
+	check(r, 500)
+	log("Received 500: OK",'')
+
+	cmd = """ docker exec postgres psql -U postgres -c "delete from follow" """
+
+	try:
+		p = subprocess.check_output(cmd, shell=True)
+	except Exception as e:
+		pass
+	
+	#Cross-owner follow
+	log("---------------> CROSS-OWNER FOLLOW", 'HEADER') 
+
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+	
+	r = follow("admin", admin_key, dev_name, "read", from_id = app_name)
+	check(r, 403)
+	log("Received 403: OK",'')
+
+	#Cross-device follow
+	log("---------------> CROSS-DEVICE FOLLOW", 'HEADER') 
+
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+	
+	r = follow(dev_name, dev_key, dev_name, "read", from_id = app_name)
+	check(r, 202)
+	log("Received 202: OK",'')
+
+	cmd = """ docker exec postgres psql -U postgres -c "delete from follow" """
+
+	try:
+		p = subprocess.check_output(cmd, shell=True)
+	except Exception as e:
+		pass
+
+	#Invalid permission
+	log("---------------> FOLLOW USING INVALID PERMISSION", 'HEADER') 
+
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
+	permission = gen_rand(16)
+
+	r = follow(app_name, app_key, dev_name, permission)
+	check(r, 400)
+	log("Received 400: OK",'')
+
+	#Invalid message-type 
+	log("---------------> FOLLOW USING INVALID MESSAGE-TYPE", 'HEADER') 
+
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
+	r = follow(app_name, app_key, dev_name, "read", message_type=gen_rand(8))
+	check(r, 400)
+	log("Received 400: OK",'')
+
+	print("\n\n")
+	log("------------------------- UNFOLLOW -------------------------\n\n", 'GREEN')
+
+	#Invalid to-id
+	log("---------------> UNFOLLOW USING INVALID TO-ID", 'HEADER') 
+	
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
+	r = follow(app_name, app_key, dev_name, "read")
+	follow_id = r.json()['follow-id-read']
+	check(r, 202)
+	
+	r = share(dev_name, dev_key, follow_id)
+	check(r, 200)
+
+	r = bind_unbind(app_name, str(app_keys[app_name]), dev_name, "test", "bind", "protected")
+	check(r, 200)
+	log("Received 200: OK",'')
+	
+	r = unfollow(app_name, app_key, gen_rand(8, prefix = gen_rand(8)), "test",
+	"read", "protected")
+	check(r, 403)
+	log("Received 403: OK",'')
+
+	r = unfollow(app_name, app_key, dev_name, "test", "read", "protected")
+	check(r, 200)
+
+	cmd = """ docker exec postgres psql -U postgres -c "delete from follow" """
+
+	try:
+		p = subprocess.check_output(cmd, shell=True)
+	except Exception as e:
+		pass
+
+	#Invalid permission
+	log("---------------> UNFOLLOW USING INVALID PERMISSION", 'HEADER') 
+
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
+	r = follow(app_name, app_key, dev_name, "read")
+	follow_id = r.json()['follow-id-read']
+	check(r, 202)
+	
+	r = share(dev_name, dev_key, follow_id)
+	check(r, 200)
+
+	r = bind_unbind(app_name, str(app_keys[app_name]), dev_name, "test", "bind", "protected")
+	check(r, 200)
+	log("Received 403: OK",'')
+	permission = gen_rand(16)
+
+	r = unfollow(app_name, app_key, dev_name, "test", permission, "protected")
+	check(r, 400)
+	log("Received 400: OK",'')
+
+	r = unfollow(app_name, app_key, dev_name, "test", "read", "protected")
+	check(r, 200)
+
+	cmd = """ docker exec postgres psql -U postgres -c "delete from follow" """
+
+	try:
+		p = subprocess.check_output(cmd, shell=True)
+	except Exception as e:
+		pass
+
+	#Cross-owner follow
+	log("---------------> CROSS-OWNER UNFOLLOW", 'HEADER') 
+
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+	
+	r = follow(app_name, app_key, dev_name, "read")
+	follow_id = r.json()['follow-id-read']
+	check(r, 202)
+	
+	r = share(dev_name, dev_key, follow_id)
+	check(r, 200)
+
+	r = bind_unbind(app_name, str(app_keys[app_name]), dev_name, "test", "bind", "protected")
+	check(r, 200)
+	log("Received 200: OK",'')
+
+	r = unfollow("admin", admin_key, dev_name, "test", "read", "protected", from_id = app_name)
+	check(r, 403)
+	log("Received 403: OK",'')
+
+	r = unfollow(app_name, app_key, dev_name, "test", "read", "protected")
+	check(r, 200)
+
+	cmd = """ docker exec postgres psql -U postgres -c "delete from follow" """
+
+	try:
+		p = subprocess.check_output(cmd, shell=True)
+	except Exception as e:
+		pass
+
+	#Cross-device follow
+	log("---------------> CROSS-DEVICE UNFOLLOW", 'HEADER') 
+
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+	
+	r = follow(app_name, app_key, dev_name, "read")
+	follow_id = r.json()['follow-id-read']
+	check(r, 202)
+	
+	r = share(dev_name, dev_key, follow_id)
+	check(r, 200)
+
+	r = bind_unbind(app_name, str(app_keys[app_name]), dev_name, "test", "bind", "protected")
+	check(r, 200)
+	log("Received 200: OK",'')
+
+	r = unfollow(dev_name, dev_key, dev_name, "test", "read", "protected", from_id = app_name)
+	check(r, 403)
+	log("Received 403: OK",'')
+
+	r = unfollow(app_name, app_key, dev_name, "test", "read", "protected")
+	check(r, 200)
+
+	cmd = """ docker exec postgres psql -U postgres -c "delete from follow" """
+
+	try:
+		p = subprocess.check_output(cmd, shell=True)
+	except Exception as e:
+		pass
+
+	#Invalid message-type 
+	log("---------------> UNFOLLOW USING INVALID MESSAGE-TYPE", 'HEADER') 
+
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
+	r = follow(app_name, app_key, dev_name, "read")
+	follow_id = r.json()['follow-id-read']
+	check(r, 202)
+	
+	r = share(dev_name, dev_key, follow_id)
+	check(r, 200)
+
+	r = bind_unbind(app_name, str(app_keys[app_name]), dev_name, "test", "bind", "protected")
+	check(r, 200)
+	log("Received 200: OK",'')
+
+	r = unfollow(app_name, app_key, dev_name, "test","read", message_type=gen_rand(8))
+	check(r, 403)
+	log("Received 403: OK",'')
+
+	r = unfollow(app_name, app_key, dev_name, "test", "read", "protected")
+	check(r, 200)
+
+	cmd = """ docker exec postgres psql -U postgres -c "delete from follow" """
+
+	try:
+		p = subprocess.check_output(cmd, shell=True)
+	except Exception as e:
+		pass
+	
+	print("\n\n")
+	log("------------------------- DEREGISTRATION -------------------------\n\n", 'GREEN')
+
+	#Cross-owner deregistrations
+	log("---------------> CROSS-OWNER DEREGISTRATIONS", 'HEADER') 
+	
+	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+
+	r = deregister("admin", admin_key, app_name)
+	check(r, 403)
+	log("Received 403: OK",'')
+
+	r = deregister("admin1", "admin1", dev_name)
+	check(r, 403)
+	log("Received 403: OK",'')
+
 
 def functional_tests(devices, apps):
 	
