@@ -428,6 +428,7 @@ login_success (const char *id, const char *apikey, bool *is_autonomous)
 {
 	char *salt;
 	char *password_hash;
+	char *str_is_autonomous;
 
 	bool login_result = false;
 
@@ -605,7 +606,6 @@ publish (struct http_request *req)
 		content_type = "";
 	}
 
-
 	amqp_socket_t *socket = NULL;
 
 	node *n = NULL;
@@ -622,8 +622,12 @@ publish (struct http_request *req)
 	}
 	else
 	{
-		if (! login_success(id,apikey))
+/////////////////////////////////////////////////
+
+		if (! login_success(id,apikey,NULL))
 			FORBIDDEN("invalid id or apikey");
+
+/////////////////////////////////////////////////
 		
 		cached_conn = malloc(sizeof(amqp_connection_state_t));
 
@@ -704,8 +708,6 @@ subscribe (struct http_request *req)
 	const char *message_type;
 	const char *num_messages;
 
-	uint8_t int_num_messages;
-
 	amqp_socket_t 			*socket = NULL;
 	amqp_connection_state_t		connection;
 
@@ -750,15 +752,13 @@ subscribe (struct http_request *req)
 
 	kore_buf_append(Q,"\0",1);
 
-	int_num_messages = 10;
+	int int_num_messages = 10;
 	if (KORE_RESULT_OK == http_request_header(req, "num-messages", &num_messages))
 	{
-		int_num_messages = atoi(num_messages);
+		int_num_messages = strtonum(num_messages,1,100,NULL);
 
-		if (int_num_messages > 10 )
-			int_num_messages = 10;
-		else if (int_num_messages < 1 )
-			int_num_messages = 10;
+		if (int_num_messages <= 0)
+			BAD_REQUEST("num-messages is not valid");
 	}
 
 /////////////////////////////////////////////////
@@ -1801,6 +1801,10 @@ follow (struct http_request *req)
 
 	bool valid_permission = false;
 
+	int int_validity = strtonum(validity,1,10000,NULL);
+	if (int_validity <= 0)
+		BAD_REQUEST("validity must be in number of hours");
+
 	if (strcmp(permission,"read") == 0 || strcmp(permission,"read-write") == 0)
 	{
 		valid_permission = true;
@@ -1808,13 +1812,13 @@ follow (struct http_request *req)
 		CREATE_STRING (query, 
 			"INSERT INTO follow "
 			"(follow_id,requested_by,from_id,exchange,time,permission,topic,validity,status) "
-			"values(DEFAULT,'%s','%s','%s.%s',now(),'read','%s','%s','%s')",
+			"values(DEFAULT,'%s','%s','%s.%s',now(),'read','%s','%d','%s')",
 				id,
 				from,
 				to,	// .message_type is appended to it
 				message_type,
 				topic,
-				validity,
+				int_validity,
 				status
 		);
 		RUN_QUERY (query, "failed to insert follow - read");
@@ -1832,12 +1836,12 @@ follow (struct http_request *req)
 		CREATE_STRING (query,
 			"INSERT INTO follow "
 			"(follow_id,requested_by,from_id,exchange,time,permission,topic,validity,status) "
-			"values(DEFAULT,'%s','%s','%s.command',now(),'write','%s','%s','%s')",
+			"values(DEFAULT,'%s','%s','%s.command',now(),'write','%s','%d','%s')",
 				id,
 				from,
 				to,	// .command is appended to it
 				topic,
-				validity,
+				int_validity,
 				status
 		);
 		RUN_QUERY (query, "failed to insert follow - write");
@@ -1859,14 +1863,14 @@ follow (struct http_request *req)
 			CREATE_STRING (query,
 			"INSERT INTO acl "
 			"(acl_id,from_id,exchange,follow_id,permission,topic,valid_till) "
-			"values(DEFAULT,'%s','%s.%s','%s','%s', '%s', now() + interval '%s  hours')",
+			"values(DEFAULT,'%s','%s.%s','%s','%s', '%s', now() + interval '%d hours')",
 			        	from,
 					to,		// .message_type is appended to it
 					message_type,
 					read_follow_id,
 					"read",
 					topic,
-					validity
+					int_validity
 			);
 
 			RUN_QUERY (query,"could not run insert query on acl - read ");
@@ -1897,13 +1901,13 @@ follow (struct http_request *req)
 			CREATE_STRING (query,
 			"INSERT INTO acl "
 			"(acl_id,from_id,exchange,follow_id,permission,topic,valid_till) "
-			"values(DEFAULT,'%s','%s.command','%s','%s', '%s', now() + interval '%s  hours')",
+			"values(DEFAULT,'%s','%s.command','%s','%s', '%s', now() + interval '%d hours')",
 			        	from,
 					to,		// .command is appended to it
 					read_follow_id,
 					"write",
 					topic,
-					validity
+					int_validity
 			);
 
 			RUN_QUERY (query,"could not run insert query on acl - read ");
@@ -2222,7 +2226,7 @@ share (struct http_request *req)
 	// add entry in acl
 	CREATE_STRING (query,
 		"INSERT INTO acl (acl_id,from_id,exchange,follow_id,permission,topic,valid_till) "
-		"values(DEFAULT,'%s','%s','%s','%s','%s',now() + interval '%s  hours')",
+		"values(DEFAULT,'%s','%s','%s','%s','%s',now() + interval '%s hours')",
 	        	from_id,
 			exchange,
 			follow_id,
