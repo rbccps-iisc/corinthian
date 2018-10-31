@@ -1087,8 +1087,9 @@ def security_tests():
 	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
 
 	r = subscribe(app_name, app_key, num_messages= dummy_nm)
-	check(r,200)
-	log("Received 200: OK ",'')
+	print(r.text, r.status_code)
+	check(r,400)
+	log("Received 400: OK ",'')
 
 	print("\n\n")
 	log("------------------------- BIND -------------------------\n\n", 'GREEN')
@@ -1272,8 +1273,8 @@ def security_tests():
 	log("Received 200: OK",'')
 
 	r = bind_unbind(app_name, app_key, dev_name, "test", "unbind", gen_rand(8))
-	check(r, 200)
-	log("Received 200: OK",'')
+	check(r, 400)
+	log("Received 400: OK",'')
 
 	r = unfollow(app_name, str(app_keys[app_name]), dev_name, "test", "read", "protected")
 	check(r, 200)
@@ -1505,22 +1506,9 @@ def security_tests():
 
 	validity = random.randint(1000000, 100000000)
 	r = follow(app_name, app_key, dev_name, "read", validity=str(validity))
-	follow_id = r.json()['follow-id-read']
-
-	r = share(dev_name, dev_key, follow_id)
-	check(r, 200)
-	log("Received 200: OK",'')
-
-	r = unfollow(app_name, app_key, dev_name, "test", "read", "protected")
-	check(r, 200)
-
-	cmd = """ docker exec postgres psql -U postgres -c "delete from follow" """
-
-	try:
-		p = subprocess.check_output(cmd, shell=True)
-	except Exception as e:
-		pass
-
+	check(r, 400)
+	log("Received 400: OK",'')
+	
 	#Invalid validity period - non numeric validity
 	log("---------------> FOLLOW USING INVALID VALIDITY PERIOD - NON NUMERIC VALIDITY", 'HEADER') 
 	
@@ -1529,11 +1517,12 @@ def security_tests():
 
 	validity = gen_rand(16) 
 	r = follow(app_name, app_key, dev_name, "read", validity=validity)
-	follow_id = r.json()['follow-id-read']
+	check(r, 400)
+	log("Received 400: OK",'')
 
 	r = share(dev_name, dev_key, follow_id)
-	check(r, 500)
-	log("Received 500: OK",'')
+	check(r, 400)
+	log("Received 400: OK",'')
 
 	cmd = """ docker exec postgres psql -U postgres -c "delete from follow" """
 
