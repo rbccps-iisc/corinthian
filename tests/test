@@ -194,7 +194,7 @@ def share(ID, apikey, follow_id):
 	r = s.get(url=url, headers=headers, verify=False)
 	return r
 
-def bind_unbind(ID, apikey, to, topic, req_type, message_type, from_id=""):
+def bind_unbind(ID, apikey, to, topic, req_type, message_type, from_id="", is_priority="false"):
 
 	url = base_url
 	headers = {}
@@ -213,6 +213,7 @@ def bind_unbind(ID, apikey, to, topic, req_type, message_type, from_id=""):
 	headers['apikey'] = apikey
 	headers['to'] = to
 	headers['topic'] = topic
+	headers['is-priority'] = is_priority 
 
 	r = s.get(url=url, headers=headers, verify=False)
 	return r
@@ -249,14 +250,15 @@ def follow_requests(ID, apikey, request_type):
 	r = s.get(url=url, headers=headers, verify=False)
 	return r
 
-def dev_publish(device_keys):
+def dev_publish(device_keys, message_type="protected"):
 
 	for device, apikey in device_keys.items():
 		log("PUBLISHING MESSAGE FROM " + device,'')
-		pub_req = publish(device, apikey, device, "test", "protected", "test message from " + device)
+		pub_req = publish(device, apikey, device, "test", message_type, "test message from " + device)
 		check(pub_req, 202)
 
-def bind_unbind_dev(device_keys, app_keys, expected=0, as_admin="", req_type=""):
+def bind_unbind_dev(device_keys, app_keys, expected=0, as_admin="", req_type="",
+message_type="protected", is_priority="false"):
 
 	if as_admin == False:
 
@@ -279,7 +281,8 @@ def bind_unbind_dev(device_keys, app_keys, expected=0, as_admin="", req_type="")
 		for app, apikey in app_keys.items():
 			for device in device_keys:
 				log("APP " + app + " (UN)BINDING FROM DEVICE " + device,'')
-				bind_req = bind_unbind(app, apikey, device, "test", req_type, "protected")
+				bind_req = bind_unbind(app, apikey, device, "test", req_type,
+				message_type, is_priority=is_priority)
 				check(bind_req, 200)
 
 	elif as_admin == True:
@@ -305,27 +308,31 @@ def bind_unbind_dev(device_keys, app_keys, expected=0, as_admin="", req_type="")
 		for app in app_keys:
 			for device in device_keys:
 				log("APP " + app + " BINDING TO DEVICE " + device,'')
-				bind_req = bind_unbind("admin1", "admin1", device, "test", req_type, "protected", from_id=app)
+				bind_req = bind_unbind("admin1", "admin1", device, "test", req_type,
+				message_type, from_id=app, is_priority=is_priority)
 				check(bind_req, 200)
 
 
-def bind_unbind_without_follow(device_keys, app_keys, as_admin="", req_type=""):
+def bind_unbind_without_follow(device_keys, app_keys, as_admin="", req_type="",
+message_type="protected", is_priority = "false"):
 
 	if as_admin == False:
 			for app, apikey in app_keys.items():
 					for device in device_keys:
 						log("APP " + app + " (UN)BINDING FROM DEVICE " + device,'')
-						bind_req = bind_unbind(app, apikey, device, "test", req_type, "protected")
+						bind_req = bind_unbind(app, apikey, device, "test",
+						req_type, message_type, is_priority = is_priority)
 						check(bind_req, 403)
 
 	elif as_admin == True:
 		for app in app_keys:
 			for device in device_keys:
 				log("APP " + app + " BINDING TO DEVICE " + device,'')
-				bind_req = bind_unbind("admin1", "admin1", device, "test", req_type, "protected", from_id=app)
+				bind_req = bind_unbind("admin1", "admin1", device, "test", req_type,
+				message_type, from_id=app, is_priority=is_priority)
 				check(bind_req, 403)
 
-def app_subscribe(devices, app_keys, expected):
+def app_subscribe(devices, app_keys, expected, message_type=""):
 
 	count = math.ceil(devices / 10.0)
 
@@ -336,7 +343,13 @@ def app_subscribe(devices, app_keys, expected):
 		log("APP " + app + " SUBSCRIBING TO ITS QUEUE",'')
 
 		for i in range(0, int(count)):
-			sub_req = subscribe(app, apikey, num_messages="10")
+			
+			if message_type:
+			    sub_req = subscribe(app, apikey, num_messages="10",
+			    message_type=message_type)
+			else:
+			    sub_req = subscribe(app, apikey, num_messages="10")
+
 			response = sub_req.json() 
 			actual = actual + len(response)
 			check(sub_req, 200)
@@ -346,36 +359,39 @@ def app_subscribe(devices, app_keys, expected):
 		log("APP " + app + " has successfully received " + str(expected) + " messages",'')
 
 
-def follow_dev(device_keys, app_keys, as_admin="", permission=""):
+def follow_dev(device_keys, app_keys, as_admin="", permission="", message_type="protected"):
 
 	if as_admin == True:
 		for app in app_keys:
 			for device in device_keys:
 				log("FOLLOW REQUEST FROM APP " + app + " TO DEVICE " + device,'')
-				r = follow("admin1", "admin1", device, permission, from_id=app)
+				r = follow("admin1", "admin1", device, permission, from_id=app,
+				message_type=message_type)
 				check(r, 202)
 
 	elif as_admin == False:
 		for app, apikey in app_keys.items():
 			for device in device_keys:
 				log("FOLLOW REQUEST FROM APP " + app + " TO DEVICE " + device,'')
-				r = follow(app, apikey, device, permission)
+				r = follow(app, apikey, device, permission,
+				message_type=message_type)
 				check(r, 202)
 
-def unfollow_dev(device_keys, app_keys, as_admin="", permission=""):
+def unfollow_dev(device_keys, app_keys, as_admin="", permission="", message_type = "protected"):
 
 	if as_admin == True:
 		for app in app_keys:
 			for device in device_keys:
 				log("UNFOLLOW REQUEST FROM APP " + app + " TO DEVICE " + device,'')
-				r = unfollow("admin1", "admin1", device, "test", permission, "protected", from_id=app)
+				r = unfollow("admin1", "admin1", device, "test", permission,
+				message_type, from_id=app)
 				check(r, 200)
 
 	elif as_admin == False:
 		for app, apikey in app_keys.items():
 			for device in device_keys:
 				log("UNFOLLOW REQUEST FROM APP " + app + " TO DEVICE " + device,'')
-				r = unfollow(app, apikey, device, "test", permission, "protected")
+				r = unfollow(app, apikey, device, "test", permission, message_type)
 				check(r, 200)
 
 def share_dev(expected):
@@ -1755,9 +1771,13 @@ def security_tests():
 
 def functional_tests(devices, apps):
 	
+	print("\n\n")
 	log("========================= FUNCTIONAL TESTS =========================\n\n", 'GREEN', modifier='BOLD')
 	device_keys, app_keys = registrations(devices,apps)
 
+	print("\n\n")
+	log("------------------------- SIMPLE READ FOLLOW-SHARE -------------------------\n\n", 'GREEN')
+	
 	# Follow requests from apps to devices using apps' respective apikeys
 	log("---------------> FOLLOW REQUESTS WITH READ PERMISSION ", 'HEADER')
 	follow_dev(device_keys, app_keys, as_admin=False, permission="read")
@@ -1825,6 +1845,10 @@ def functional_tests(devices, apps):
 	log("---------------> APPS TRY TO BIND TO UNFOLLOWED DEVICES", 'HEADER')
 	bind_unbind_without_follow(device_keys, app_keys, as_admin=False, req_type="bind")
 
+
+	print("\n\n")
+	log("------------------------- FOLLOW REQUESTS AS ADMIN -------------------------\n\n", 'GREEN')
+
 	#Follow requests as admin	
 	log("---------------> FOLLOW REQUESTS WITH READ PERMISSION AS ADMIN", 'HEADER')
 	follow_dev(device_keys, app_keys, as_admin=True, permission="read")
@@ -1854,6 +1878,10 @@ def functional_tests(devices, apps):
 	log("---------------> APPS TRY TO BIND TO UNFOLLOWED DEVICES", 'HEADER')
 	bind_unbind_without_follow(device_keys, app_keys, as_admin=False, req_type="bind")
 
+
+	print("\n\n")
+	log("------------------------- FOLLOW REQUESTS WITH WRITE PERMISSION -------------------------\n\n", 'GREEN')
+
 	#Follow requests for write	
 	log("---------------> FOLLOW REQUESTS WITH WRITE PERMISSIONS", 'HEADER')
 	follow_dev(device_keys, app_keys, as_admin=False, permission="write")
@@ -1877,6 +1905,10 @@ def functional_tests(devices, apps):
 	#Apps publish to command queue of devices
 	log("---------------> APPS TRY TO PUBLISH TO COMMAND EXCHANGE OF UNFOLLOWED DEVICES", 'HEADER')
 	app_publish(device_keys, app_keys, 202)
+
+
+	print("\n\n")
+	log("------------------------- FOLLOW REQUESTS WITH READ-WRITE PERMISSIONS -------------------------\n\n", 'GREEN')
 
 	#Apps request follow with read-write permissions
 	log("---------------> APPS REQUEST FOLLOW WITH READ-WRITE PERMISSIONS", 'HEADER')
@@ -1930,6 +1962,9 @@ def functional_tests(devices, apps):
 	log("---------------> APPS TRY TO BIND TO UNFOLLOWED DEVICES", 'HEADER')
 	bind_unbind_without_follow(device_keys, app_keys, as_admin=False, req_type="bind")
 
+	print("\n\n")
+	log("------------------------- BIND USING ADMIN APIKEY -------------------------\n\n", 'GREEN')
+
 	#Apps obtain read-write follow
 	log("---------------> APPS FOLLOW WITH READ-WRITE PERMISSIONS", 'HEADER')
 	follow_dev(device_keys, app_keys, as_admin=False, permission="read-write")
@@ -1953,6 +1988,158 @@ def functional_tests(devices, apps):
 	# Apps unfollow with read permissions
 	log("---------------> APPS UNFOLLOW DEVICES WITH READ-WRITE ACCESS", 'HEADER')
 	unfollow_dev(device_keys, app_keys, as_admin=True, permission="read-write")
+
+	# ===============================Diagnostics channel ===============================
+
+	# Follow requests from apps to devices using apps' respective apikeys for diagnostics
+	# channel
+
+	print("\n\n")
+	log("------------------------- DIAGNOSTICS CHANNEL TESTS -------------------------\n\n", 'GREEN')
+
+	log("---------------> FOLLOW REQUESTS WITH READ PERMISSION TO DIAGNOSTICS CHANNEL", 'HEADER')
+	follow_dev(device_keys, app_keys, as_admin=False, permission="read",
+	message_type="diagnostics")
+
+	# Devices read all follow requests and share with apps
+	log("---------------> DEVICES READ FOLLOW REQUESTS AND ISSUE SHARE TO APPS", 'HEADER')
+
+	share_dev(apps*devices)
+
+	# Apps bind to devices' diagnostics exchanges
+	log("---------------> APPS BIND TO DEVICES' DIAGNOSTICS CHANNEL", 'HEADER')
+	bind_unbind_dev(device_keys, app_keys, expected=devices, as_admin=False, req_type="bind", message_type="diagnostics")
+
+	# Devices publish data to diagnostics exchanges
+	log("---------------> DEVICES PUBLISH DATA TO DIAGNOSTICS CHANNEL", 'HEADER')
+	dev_publish(device_keys, message_type="diagnostics")
+
+	# Apps subscribe to messages
+	log("---------------> APPS TRY TO READ PUBLISHED DATA", 'HEADER')
+	app_subscribe(devices, app_keys, devices)
+
+	# Apps unbind from devices diagnostics channel
+	log("---------------> APPS UNBIND FROM DEVICES' DIAGNOSTICS CHANNEL", 'HEADER')
+	bind_unbind_dev(device_keys, app_keys, expected=devices, as_admin=False, req_type="unbind", message_type="diagnostics")
+
+	# Devices again publish messages to diagnostics channel
+	log("---------------> DEVICES PUBLISH DATA TO DIAGNOSTICS CHANNEL", 'HEADER')
+	dev_publish(device_keys, message_type="diagnostics")
+
+	# Apps try to subscribe
+	log("---------------> APPS TRY TO READ PUBLISHED DATA", 'HEADER')
+	app_subscribe(devices, app_keys, 0)
+
+	# Apps bind to devices using admin apikey
+	log("---------------> APPS BIND TO DEVICES USING ADMIN APIKEY", 'HEADER')
+
+	bind_unbind_dev(device_keys, app_keys, expected=devices*apps, as_admin=True, req_type="bind", message_type="diagnostics")
+
+	# Devices publish again to diagnostics channel
+	log("---------------> DEVICES PUBLISH DATA TO DIAGNOSTICS CHANNEL", 'HEADER')
+	dev_publish(device_keys, message_type="diagnostics")
+
+	# Apps subscribe to messages
+	log("---------------> APPS TRY TO READ PUBLISHED DATA", 'HEADER')
+	app_subscribe(devices, app_keys, devices)
+
+	# Unbind from devices as admin
+	log("---------------> APPS UNBIND FROM DEVICES USING ADMIN APIKEY", 'HEADER')
+
+	bind_unbind_dev(device_keys, app_keys, expected=(devices*apps), as_admin=True, req_type="unbind", message_type="diagnostics")
+
+	# Devices now publish data to diagnostics channel
+	log("---------------> DEVICES PUBLISH DATA TO DIAGNOSTICS CHANNEL", 'HEADER')
+	dev_publish(device_keys, message_type="diagnostics")
+
+	# Apps try to subscribe but get 0 messages
+	log("---------------> APPS TRY TO READ PUBLISHED DATA", 'HEADER')
+	app_subscribe(devices, app_keys, 0)
+
+	# Apps unfollow all devices
+	log("---------------> APPS UNFOLLOW ALL DEVICES USING THEIR RESPECTIVE APIKEYS", 'HEADER')
+	unfollow_dev(device_keys, app_keys, as_admin=False, permission="read", message_type="diagnostics")
+
+	# Apps try to bind to unfollowed devices' diagnostics channel
+	log("---------------> APPS TRY TO BIND TO UNFOLLOWED DEVICES' DIAGNOSTICS CHANNEL", 'HEADER')
+	bind_unbind_without_follow(device_keys, app_keys, as_admin=False, req_type="bind", message_type="diagnostics")
+
+	# ===============================Priority queue ===============================
+
+	print("\n\n")
+	log("------------------------- PRIORITY QUEUE TESTS -------------------------\n\n", 'GREEN')
+
+	# Follow requests from apps to devices using apps' respective apikeys
+	log("---------------> FOLLOW REQUESTS WITH READ PERMISSION", 'HEADER')
+	follow_dev(device_keys, app_keys, as_admin=False, permission="read",)
+
+	# Devices read all follow requests and share with apps
+	log("---------------> DEVICES READ FOLLOW REQUESTS AND ISSUE SHARE TO APPS", 'HEADER')
+
+	share_dev(apps*devices)
+
+	# Apps bind to devices' diagnostics exchanges
+	log("---------------> APPS BIND TO DEVICES PROTECTED CHANNEL", 'HEADER')
+	bind_unbind_dev(device_keys, app_keys, expected=devices, as_admin=False, req_type="bind",
+	is_priority = "true")
+
+	# Devices publish data to diagnostics exchanges
+	log("---------------> DEVICES PUBLISH DATA", 'HEADER')
+	dev_publish(device_keys)
+
+	# Apps subscribe to messages
+	log("---------------> APPS TRY TO READ PUBLISHED DATA", 'HEADER')
+	app_subscribe(devices, app_keys, devices, message_type = "priority")
+
+	# Apps unbind from devices diagnostics channel
+	log("---------------> APPS UNBIND FROM DEVICES", 'HEADER')
+	bind_unbind_dev(device_keys, app_keys, expected=devices, as_admin=False, req_type="unbind",
+	is_priority = "true")
+
+	# Devices again publish messages to diagnostics channel
+	log("---------------> DEVICES PUBLISH DATA", 'HEADER')
+	dev_publish(device_keys)
+
+	# Apps try to subscribe
+	log("---------------> APPS TRY TO READ PUBLISHED DATA", 'HEADER')
+	app_subscribe(devices, app_keys, 0, message_type = "priority")
+
+	# Apps bind to devices using admin apikey
+	log("---------------> APPS BIND TO DEVICES USING ADMIN APIKEY", 'HEADER')
+
+	bind_unbind_dev(device_keys, app_keys, expected=devices*apps, as_admin=True,
+	req_type="bind", is_priority = "true")
+
+	# Devices publish again to diagnostics channel
+	log("---------------> DEVICES PUBLISH DATA", 'HEADER')
+	dev_publish(device_keys)
+
+	# Apps subscribe to messages
+	log("---------------> APPS TRY TO READ PUBLISHED DATA", 'HEADER')
+	app_subscribe(devices, app_keys, devices, message_type = "priority")
+
+	# Unbind from devices as admin
+	log("---------------> APPS UNBIND FROM DEVICES USING ADMIN APIKEY", 'HEADER')
+
+	bind_unbind_dev(device_keys, app_keys, expected=(devices*apps), as_admin=True,
+	req_type="unbind", is_priority = "true")
+
+	# Devices now publish data to diagnostics channel
+	log("---------------> DEVICES PUBLISH DATA", 'HEADER')
+	dev_publish(device_keys)
+
+	# Apps try to subscribe but get 0 messages
+	log("---------------> APPS TRY TO READ PUBLISHED DATA", 'HEADER')
+	app_subscribe(devices, app_keys, 0, message_type = "priority")
+
+	# Apps unfollow all devices
+	log("---------------> APPS UNFOLLOW ALL DEVICES USING THEIR RESPECTIVE APIKEYS", 'HEADER')
+	unfollow_dev(device_keys, app_keys, as_admin=False, permission="read")
+
+	# Apps try to bind to unfollowed devices' diagnostics channel
+	log("---------------> APPS TRY TO BIND TO UNFOLLOWED DEVICES' DIAGNOSTICS CHANNEL", 'HEADER')
+	bind_unbind_without_follow(device_keys, app_keys, as_admin=False, req_type="bind",
+	is_priority = "true")
 
 	deregistrations(device_keys, app_keys)
 	

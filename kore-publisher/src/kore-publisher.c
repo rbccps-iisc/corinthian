@@ -215,7 +215,7 @@ retry:
 	kore_pgsql_register("db","user=postgres password=password");
 #else
 	char conn_str[129];
-        snprintf(conn_str,129,"host = %s user = postgres password = %s",pgsql_ip, postgres_pwd);
+        snprintf(conn_str,129,"host = %s user = postgres password = %s", pgsql_ip, postgres_pwd);
 	kore_pgsql_register("db",conn_str);
 #endif
 
@@ -1478,6 +1478,7 @@ queue_bind (struct http_request *req)
 		"inputs missing in headers"
 	);
 
+
 	if (looks_like_a_valid_owner(id))
 	{
 		if (KORE_RESULT_OK != http_request_header(req, "from", &from))
@@ -1530,14 +1531,14 @@ queue_bind (struct http_request *req)
 	strlcpy(queue,from,128);
 	if (KORE_RESULT_OK == http_request_header(req, "is-priority", &is_priority))
 	{
-		if (strcmp(message_type,"true") == 0)
+		if (strcmp(is_priority,"true") == 0)
 		{
 			strlcat(queue,".priority",128);
 		}
 	}
 
-	debug_printf("queue = %s",queue);
-	debug_printf("exchange = %s", exchange);
+	debug_printf("queue = %s\n",queue);
+	debug_printf("exchange = %s\n", exchange);
 
 	if(strcmp(message_type,"public") != 0)
 	{
@@ -1592,6 +1593,7 @@ queue_unbind (struct http_request *req)
 
         const char *topic;
 	const char *message_type;
+	const char *is_priority;
 
 	char queue 	[129];
 	char exchange	[129];
@@ -1607,6 +1609,8 @@ queue_unbind (struct http_request *req)
 		KORE_RESULT_OK != http_request_header(req, "to", &to)
 				||
 		KORE_RESULT_OK != http_request_header(req, "topic", &topic)
+				||
+		KORE_RESULT_OK != http_request_header(req, "message-type", &message_type)
 			,
 		"inputs missing in headers"
 	);
@@ -1632,6 +1636,18 @@ queue_unbind (struct http_request *req)
 	if (! looks_like_a_valid_entity(to))
 		FORBIDDEN("'to' is not a valid entity");
 
+	if (
+		(strcmp(message_type,"public") != 0) &&
+		(strcmp(message_type,"private") != 0) &&
+		(strcmp(message_type,"protected") != 0) &&
+		(strcmp(message_type,"diagnostics") != 0)
+	)
+	{
+		BAD_REQUEST("message-type is invalid");
+	}
+
+	snprintf (exchange,128,"%s.%s", to,message_type); 
+
 /////////////////////////////////////////////////
 
 	bool is_autonomous = false;
@@ -1649,15 +1665,13 @@ queue_unbind (struct http_request *req)
 /////////////////////////////////////////////////
 
 	strlcpy(queue,from,128);
-	if (KORE_RESULT_OK == http_request_header(req, "message-type", &message_type))
+	if (KORE_RESULT_OK == http_request_header(req, "is-priority", &is_priority))
 	{
-		if (strcmp(message_type,"priority") == 0)
+		if (strcmp(is_priority,"true") == 0)
 		{
 			strlcat(queue,".priority",128);
 		}
 	}
-
-	snprintf (exchange,128,"%s.protected", to); 
 
 	debug_printf("queue = %s",queue);
 	debug_printf("exchange = %s", exchange);
