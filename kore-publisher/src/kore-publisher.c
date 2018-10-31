@@ -75,7 +75,7 @@ init (int state)
 // lazy queues
 //////////////
 
-	lazy_queue_table.num_entries = 1;
+	lazy_queue_table.num_entries = 3;
 	lazy_queue_table.entries = malloc(lazy_queue_table.num_entries * sizeof(amqp_table_entry_t));
 
 	if (! lazy_queue_table.entries)
@@ -85,6 +85,16 @@ init (int state)
 	entry->key = amqp_cstring_bytes("x-queue-mode");
 	entry->value.kind = AMQP_FIELD_KIND_UTF8;
 	entry->value.value.bytes = amqp_cstring_bytes("lazy");
+
+	entry = &lazy_queue_table.entries[1];
+	entry->key = amqp_cstring_bytes("x-max-length");
+	entry->value.kind = AMQP_FIELD_TYPE_I64;
+	entry->value.value.i64 = 50000;
+
+	entry = &lazy_queue_table.entries[2];
+	entry->key = amqp_cstring_bytes("x-message-ttl");
+	entry->value.kind = AMQP_FIELD_TYPE_I64;
+	entry->value.value.i64 = 43200000; // half day
 
 //////////////
 
