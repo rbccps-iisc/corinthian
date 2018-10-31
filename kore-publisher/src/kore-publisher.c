@@ -88,12 +88,12 @@ init (int state)
 
 	entry = &lazy_queue_table.entries[1];
 	entry->key = amqp_cstring_bytes("x-max-length");
-	entry->value.kind = AMQP_FIELD_TYPE_I64;
+	entry->value.kind = AMQP_FIELD_KIND_I64;
 	entry->value.value.i64 = 50000;
 
 	entry = &lazy_queue_table.entries[2];
 	entry->key = amqp_cstring_bytes("x-message-ttl");
-	entry->value.kind = AMQP_FIELD_TYPE_I64;
+	entry->value.kind = AMQP_FIELD_KIND_I64;
 	entry->value.value.i64 = 43200000; // half day
 
 //////////////
