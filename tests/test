@@ -455,7 +455,7 @@ def registrations(devices, apps):
 		r = register('admin', admin_key, dev_name)
 		response = r.json()
 		log(json.dumps(response),'')
-		check(r, 200)
+		check(r, 201)
 
 		device_keys[response['id']] = response['apikey']
 
@@ -469,7 +469,7 @@ def registrations(devices, apps):
 		r = register('admin1', 'admin1', app_name)
 		response = r.json()
 		log(json.dumps(response),'')
-		check(r, 200)
+		check(r, 201)
 
 		app_keys[response['id']] = response['apikey']
 

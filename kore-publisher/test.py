@@ -49,7 +49,7 @@ check(r, 200)
 
 r =get("register-owner", { "id":"admin", "apikey":admin_api, "owner":"owner-b" })
 owner_b_apikey = r.json()['apikey']
-check(r, 200)
+check(r, 201)
 
 a = {}
 b = {} 
@@ -62,12 +62,12 @@ for i in xrange(0,num_devices):
 	r =post("register", {"id":"owner-a", "apikey":owner_a_apikey, "entity":"device-"+str(i)},'{"x":"y"}')
 	device 		= r.json()['id']
 	device_apikey 	= r.json()['apikey']
-	check(r, 200)
+	check(r, 201)
 
 	r =post("register", {"id":"owner-b", "apikey":owner_b_apikey, "entity":"app-"+str(i)},'{"x":"y"}')
 	app = r.json()['id']
 	app_apikey = r.json()['apikey']
-	check(r, 200)
+	check(r, 201)
 
 	a[i] = {}
 	b[i] = {}

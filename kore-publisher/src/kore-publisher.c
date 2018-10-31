@@ -690,7 +690,7 @@ publish (struct http_request *req)
 		"broker refused to publish message"
 	);
 
-	OK202();
+	OK_202();
 
 done:
 	if (req->status == 500)
@@ -1034,7 +1034,7 @@ register_entity (struct http_request *req)
 	kore_buf_append(response,entity_apikey,strlen(entity_apikey));
 	kore_buf_append(response,"\"}\n",3);
 
-	OK();
+	OK_201();
 
 done:
 	// wait for thread ...
@@ -1337,7 +1337,7 @@ register_owner(struct http_request *req)
 	kore_buf_append(response,owner_apikey,strlen(owner_apikey));
 	kore_buf_append(response,"\"}\n",3);
 
-	OK();
+	OK_201();
 
 done:
 	// wait for thread ...

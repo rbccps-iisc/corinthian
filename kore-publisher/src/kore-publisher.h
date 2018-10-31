@@ -84,8 +84,9 @@ void sanitize (char *string);
 
 bool is_request_from_localhost (struct http_request *);
 
-#define OK()    {req->status=200; goto done;}
-#define OK202() {req->status=202; goto done;}
+#define OK()		{req->status=200; goto done;}
+#define OK_201() 	{req->status=201; goto done;}
+#define OK_202() 	{req->status=202; goto done;}
 
 #define BAD_REQUEST(x) { 				\
 	req->status = 400;				\
