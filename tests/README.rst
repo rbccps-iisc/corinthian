@@ -56,6 +56,7 @@ Publish
 * To ``amq.topic`` ``amq.direct`` ``amq.headers`` and ``amq.fanout``
 * "Subscribe only" devices trying to publish - *
 * Without a schema - *
+* Invalid message-type
 
 Subscribe
 ^^^^^^^^^
@@ -75,6 +76,7 @@ Bind
 * After the authorised validity has expired - *
 * Cross-owner binding
 * Cross-device binding
+* Invalid message-type
 
 
 Unbind
@@ -88,6 +90,7 @@ Unbind
 * After the authorised validity has expired - *
 * Cross-owner unbinding
 * Cross-device unbinding
+* Invalid message-type
 
 
 Share
@@ -109,8 +112,10 @@ Follow
 * Cross-owner follow
 * Cross-device follow
 * Multiple follow requests for the same device
+* Invalid message-type
 
 Unfollow
 ^^^^^^^^
 
 * Using wrong ID
+* Invalid message-type
