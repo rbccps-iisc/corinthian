@@ -14,3 +14,4 @@ docker-compose up -d
 docker exec postgres ./scripts/pgsql_install.sh
 docker exec broker ./scripts/broker_install.sh
 docker exec kore ./scripts/kore_install.sh
+docker exec postgres python /scripts/daemon.py > daemon.log &

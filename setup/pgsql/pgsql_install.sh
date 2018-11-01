@@ -22,4 +22,3 @@ done
 
 psql -U postgres -c "alter user postgres with password '$postgres_pwd'" > /dev/null 2>&1 
 psql -U postgres -c "insert into users values('admin','$hash',NULL,'$salt','f', 't')" > /dev/null 2>&1
-
