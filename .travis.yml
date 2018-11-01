@@ -18,3 +18,4 @@ script:
   - cd ..
   - ./tests/test fxnl --random 
   - ./tests/test sec
+  - ./tests/test concr
