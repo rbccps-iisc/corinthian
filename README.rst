@@ -37,4 +37,4 @@ Quickstart
 
 #. Test the middleware using::
 
-    ./tests/test --random
+    ./tests/test fxnl --random
