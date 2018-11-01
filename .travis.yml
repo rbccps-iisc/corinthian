@@ -11,6 +11,9 @@ install:
   - cd docker
   - ./install
 
+before_script:
+  - sleep 10
+
 script:
   - cd ..
   - ./tests/test fxnl --random 
