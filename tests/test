@@ -7,13 +7,16 @@ import argparse
 import random
 import string
 import argparse
+import hashlib
 import logging
 import time
+import sys
 import warnings
 import requests
 import urllib3
 import subprocess
 from requests.adapters import HTTPAdapter
+import multiprocessing as mp 
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -24,17 +27,7 @@ base_url = "https://localhost"
 s = requests.Session();
 s.mount('https://localhost/', HTTPAdapter(pool_connections=1))
 
-f = open("./vars/admin.passwd", "r")
-admin_key = str(f.read())[:-1]
-
-cmd = """ docker exec postgres psql -U postgres -c "insert into users
-values('admin1','fa8d4b8fe10794af430f04b7af55388be9f676361c49849daff827918b6bd2f3',NULL,'salt','f',
-'t') ON CONFLICT DO NOTHING" """
-
-try:
-	p = subprocess.check_output(cmd, shell=True)
-except Exception as e:
-	pass
+output = mp.Queue()
 
 colour ={}
 
@@ -48,6 +41,27 @@ colour['BOLD'] 			= '\033[1m'
 colour['UNDERLINE'] 		= '\033[4m'
 colour[''] 			= ''
 
+def gen_admin():
+    
+    admin_id = gen_rand(8)
+    apikey = gen_rand(32)
+    salt = gen_rand(32)
+
+    string = apikey + salt + admin_id
+
+    hash_string = hashlib.sha256(string.encode()).hexdigest()
+
+    cmd = "docker exec postgres psql -U postgres -c \"insert into users values('"+admin_id+"','"+hash_string+"',NULL,'"+salt+"','f','t') ON CONFLICT DO NOTHING\""
+
+    try:
+	p = subprocess.check_output(cmd, shell=True)
+    except Exception as e:
+	print("Could not create admin user")
+	sys.exit(1)
+
+    return admin_id, apikey
+
+    
 def log(message, clr, modifier=""):
 
 	if clr:
@@ -258,7 +272,7 @@ def dev_publish(device_keys, message_type="protected"):
 		check(pub_req, 202)
 
 def bind_unbind_dev(device_keys, app_keys, expected=0, as_admin="", req_type="",
-message_type="protected", is_priority="false"):
+message_type="protected", is_priority="false", admin_id="", admin_key=""):
 
 	if as_admin == False:
 
@@ -292,7 +306,7 @@ message_type="protected", is_priority="false"):
 		for app in app_keys:
 
 			log("APP " + app + " CHECKING APPROVAL STATUS OF FOLLOW REQUESTS BEFORE BINDING",'')
-			follow_status = follow_requests("admin1", "admin1", "status")
+			follow_status = follow_requests(admin_id, admin_key, "status")
 			response = follow_status.json()
 
 			check(follow_status, 200)
@@ -308,13 +322,13 @@ message_type="protected", is_priority="false"):
 		for app in app_keys:
 			for device in device_keys:
 				log("APP " + app + " BINDING TO DEVICE " + device,'')
-				bind_req = bind_unbind("admin1", "admin1", device, "test", req_type,
+				bind_req = bind_unbind(admin_id, admin_key, device, "test", req_type,
 				message_type, from_id=app, is_priority=is_priority)
 				check(bind_req, 200)
 
 
 def bind_unbind_without_follow(device_keys, app_keys, as_admin="", req_type="",
-message_type="protected", is_priority = "false"):
+message_type="protected", is_priority = "false", admin_id="", admin_key=""):
 
 	if as_admin == False:
 			for app, apikey in app_keys.items():
@@ -328,7 +342,7 @@ message_type="protected", is_priority = "false"):
 		for app in app_keys:
 			for device in device_keys:
 				log("APP " + app + " BINDING TO DEVICE " + device,'')
-				bind_req = bind_unbind("admin1", "admin1", device, "test", req_type,
+				bind_req = bind_unbind(admin_id, admin_key, device, "test", req_type,
 				message_type, from_id=app, is_priority=is_priority)
 				check(bind_req, 403)
 
@@ -359,13 +373,14 @@ def app_subscribe(devices, app_keys, expected, message_type=""):
 		log("APP " + app + " has successfully received " + str(expected) + " messages",'')
 
 
-def follow_dev(device_keys, app_keys, as_admin="", permission="", message_type="protected"):
+def follow_dev(device_keys, app_keys, as_admin="", permission="", message_type="protected",
+admin_id="", admin_key=""):
 
 	if as_admin == True:
 		for app in app_keys:
 			for device in device_keys:
 				log("FOLLOW REQUEST FROM APP " + app + " TO DEVICE " + device,'')
-				r = follow("admin1", "admin1", device, permission, from_id=app,
+				r = follow(admin_id, admin_key, device, permission, from_id=app,
 				message_type=message_type)
 				check(r, 202)
 
@@ -377,13 +392,14 @@ def follow_dev(device_keys, app_keys, as_admin="", permission="", message_type="
 				message_type=message_type)
 				check(r, 202)
 
-def unfollow_dev(device_keys, app_keys, as_admin="", permission="", message_type = "protected"):
+def unfollow_dev(device_keys, app_keys, as_admin="", permission="", message_type = "protected",
+admin_id="", admin_key=""):
 
 	if as_admin == True:
 		for app in app_keys:
 			for device in device_keys:
 				log("UNFOLLOW REQUEST FROM APP " + app + " TO DEVICE " + device,'')
-				r = unfollow("admin1", "admin1", device, "test", permission,
+				r = unfollow(admin_id, admin_key, device, "test", permission,
 				message_type, from_id=app)
 				check(r, 200)
 
@@ -394,9 +410,9 @@ def unfollow_dev(device_keys, app_keys, as_admin="", permission="", message_type
 				r = unfollow(app, apikey, device, "test", permission, message_type)
 				check(r, 200)
 
-def share_dev(expected):
+def share_dev(expected, admin_id, admin_key):
 
-	r = follow_requests("admin", admin_key, "requests")
+	r = follow_requests(admin_id, admin_key, "requests")
 	response = r.json() 
 	count = 0
 
@@ -405,7 +421,7 @@ def share_dev(expected):
 	for follow_req in response:
 		count = count + 1
 		log("SHARE FROM DEVICE " + str(follow_req['to']).split(".")[0] + " TO APP " + str(follow_req['from']),'')
-		share_req = share("admin", admin_key, str(follow_req['follow-id']))
+		share_req = share(admin_id, admin_key, str(follow_req['follow-id']))
 		check(share_req, 200)
 
 	assert(count == expected)
@@ -440,7 +456,7 @@ def dev_subscribe(apps, device_keys, expected):
 		actual = 0
 		log("DEVICE " + device + " HAS RECEIVED " + str(expected) + " COMMAND MESSAGES",'')
 
-def registrations(devices, apps):
+def registrations(devices, apps, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key):
 	
 	device_keys = {}
 	app_keys = {}
@@ -452,7 +468,7 @@ def registrations(devices, apps):
 		log("REGISTERING DEVICE " + str(i),'')
 		dev_name = "dev" + ''.join(
 		random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(16))
-		r = register('admin', admin_key, dev_name)
+		r = register(dev_admin_id, dev_admin_key, dev_name)
 		response = r.json()
 		log(json.dumps(response),'')
 		check(r, 201)
@@ -466,7 +482,7 @@ def registrations(devices, apps):
 		log("REGISTERING APP " + str(i),'')
 		app_name = "app" + ''.join(
 			random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(16))
-		r = register('admin1', 'admin1', app_name)
+		r = register(app_admin_id, app_admin_key, app_name)
 		response = r.json()
 		log(json.dumps(response),'')
 		check(r, 201)
@@ -475,19 +491,19 @@ def registrations(devices, apps):
 
 	return device_keys, app_keys
 
-def deregistrations(device_keys, app_keys):
+def deregistrations(device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key):
 
 	#Deregister all apps and devices
-	log("---------------> DEREGISTERING DEVICES AND APPS",'')
+	log("---------------> DEREGISTERING DEVICES AND APPS",'HEADER')
 
 	for device in device_keys:
 		log("DEREGISTERING DEVICE "+ device,'')
-		dereg = deregister("admin",admin_key,device)
+		dereg = deregister(dev_admin_id, dev_admin_key,device)
 		check(dereg,200)
  
 	for app in app_keys:
 		log("DEREGISTERING APP "+ app,'')
-		dereg = deregister("admin1","admin1",app)
+		dereg = deregister(app_admin_id, app_admin_key, app)
 		check(dereg,200)
 
 def security_tests():
@@ -501,7 +517,13 @@ def security_tests():
 	devices = random.randint(2,5)
 	apps 	= random.randint(2,5)
 
-	device_keys, app_keys = registrations(devices,apps)	
+	dev_admin_id, dev_admin_key = gen_admin()
+	app_admin_id, app_admin_key = gen_admin()
+
+	reg_time = time.time()
+	device_keys, app_keys = registrations(devices, apps, dev_admin_id, dev_admin_key,
+	app_admin_id, app_admin_key)	
+	reg_time = time.time() - reg_time
 
 	#Trying to register an owner from outside the localhost
 	
@@ -511,7 +533,7 @@ def security_tests():
 	#check(r,403)
 	#logger.info("Received 403: OK")
 
-
+	test_time = time.time()
 	#=========================================Invalid API key===============================================
 	print("\n\n")
 	log("------------------------- INVALID APIKEY -------------------------\n\n", 'GREEN')
@@ -526,7 +548,7 @@ def security_tests():
 	#Registration
 	log("---------------> REGISTRATION USING INVALID APIKEY", 'HEADER')
 	
-	r = register("admin", dummy_key, "dev"+dummy_id)
+	r = register(dev_admin_id, dummy_key, "dev"+dummy_id)
 	check(r,403)
 	log("Received 403: OK",'')
 
@@ -577,7 +599,7 @@ def security_tests():
 
 	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
 
-	r = follow("admin1", dummy_key, random.choice(device_keys.keys()), "read")
+	r = follow(app_admin_id, dummy_key, random.choice(device_keys.keys()), "read")
 	check(r,403)
 	log("Received 403: OK",'')
 
@@ -595,7 +617,7 @@ def security_tests():
 
 	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
 
-	r = share("admin", dummy_key, str(random.randint(0,5)))
+	r = share(dev_admin_id, dummy_key, str(random.randint(0,5)))
 	check(r,403)
 	log("Received 403: OK",'')
 
@@ -613,14 +635,14 @@ def security_tests():
 	
 	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
 
-	r = unfollow("admin1", dummy_key, str(random.choice(device_keys.keys())), "test", "read", "protected", from_id=app_name)
+	r = unfollow(app_admin_id, dummy_key, str(random.choice(device_keys.keys())), "test", "read", "protected", from_id=app_name)
 	check(r,403)
 	log("Received 403: OK",'')
 
 	#Follow-requests
 	log("---------------> FOLLOW-REQUESTS USING INVALID APIKEY", 'HEADER')
 
-	r = follow_requests("admin", dummy_key, "requests")
+	r = follow_requests(dev_admin_id, dummy_key, "requests")
 	check(r,403)
 	log("Received 403: OK",'')
 	
@@ -636,7 +658,7 @@ def security_tests():
 	#Follow-status
 	log("---------------> FOLLOW-STATUS USING INVALID APIKEY", 'HEADER')
 
-	r = follow_requests("admin", dummy_key, "status")
+	r = follow_requests(dev_admin_id, dummy_key, "status")
 	check(r,403)
 	log("Received 403: OK",'')
 
@@ -652,7 +674,7 @@ def security_tests():
 	#Reject follow using invalid admin key
 	log("---------------> REJECT-FOLLOW USING INVALID ADMIN APIKEY", 'HEADER')
 
-	r = reject_follow("admin", dummy_key, str(random.randint(1,5)))
+	r = reject_follow(dev_admin_id, dummy_key, str(random.randint(1,5)))
 	check(r,403)
 	log("Received 403: OK",'')
 		
@@ -683,7 +705,7 @@ def security_tests():
 	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
 	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
 
-	r = bind_unbind("admin1", dummy_key, dev_name, "test", "bind", "protected", from_id = app_name)
+	r = bind_unbind(app_admin_id, dummy_key, dev_name, "test", "bind", "protected", from_id = app_name)
 	check(r,403)
 	log("Received 403: OK",'')
 
@@ -705,21 +727,21 @@ def security_tests():
 	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
 	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
 
-	r = bind_unbind("admin1", dummy_key, dev_name, "test", "unbind", "protected", from_id = app_name)
+	r = bind_unbind(app_admin_id, dummy_key, dev_name, "test", "unbind", "protected", from_id = app_name)
 	check(r,403)
 	log("Received 403: OK",'')
 
 	#Block using invalid admin apikey	
 	log("---------------> BLOCK USING INVALID ADMIN APIKEY", 'HEADER')
 
-	r = block_unblock("admin", dummy_key, str(random.choice(app_keys.keys())), "block")
+	r = block_unblock(dev_admin_id, dummy_key, str(random.choice(app_keys.keys())), "block")
 	check(r,403)
 	log("Received 403: OK",'')
 
 	#Unblock using invalid admin apikey	
 	log("---------------> UNBLOCK USING INVALID ADMIN APIKEY", 'HEADER')
 
-	r = block_unblock("admin", dummy_key, str(random.choice(app_keys.keys())), "unblock")
+	r = block_unblock(dev_admin_id, dummy_key, str(random.choice(app_keys.keys())), "unblock")
 	check(r,403)
 	log("Received 403: OK",'')
 
@@ -728,7 +750,7 @@ def security_tests():
 	
 	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
 
-	r = permissions("admin", dummy_key, entity_id = dev_name)
+	r = permissions(dev_admin_id, dummy_key, entity_id = dev_name)
 	check(r,403)
 	log("Received 403: OK",'')
 	
@@ -747,7 +769,7 @@ def security_tests():
 
 	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
 
-	r = deregister("admin", dummy_key, dev_name)
+	r = deregister(dev_admin_id, dummy_key, dev_name)
 	check(r,403)
 	log("Received 403: OK",'')
 
@@ -770,7 +792,7 @@ def security_tests():
 	#Registration
 	log("---------------> REGISTRATION USING INVALID ID", 'HEADER')
 	
-	r = register(dummy_id, admin_key, "dev"+dummy_id)
+	r = register(dummy_id, dev_admin_key, "dev"+dummy_id)
 	check(r,403)
 	log("Received 403: OK",'')
 
@@ -822,7 +844,7 @@ def security_tests():
 
 	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
 
-	r = follow(dummy_id, "admin1", random.choice(device_keys.keys()), "read")
+	r = follow(dummy_id, app_admin_key, random.choice(device_keys.keys()), "read")
 	check(r,403)
 	log("Received 403: OK",'')
 
@@ -840,7 +862,7 @@ def security_tests():
 
 	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
 
-	r = share(dummy_id, admin_key, str(random.randint(0,5)))
+	r = share(dummy_id, dev_admin_key, str(random.randint(0,5)))
 	check(r,403)
 	log("Received 403: OK",'')
 
@@ -858,14 +880,14 @@ def security_tests():
 	
 	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
 
-	r = unfollow(dummy_id, "admin1", str(random.choice(device_keys.keys())), "test", "read", "protected", from_id=app_name)
+	r = unfollow(dummy_id, app_admin_key, str(random.choice(device_keys.keys())), "test", "read", "protected", from_id=app_name)
 	check(r,403)
 	log("Received 403: OK",'')
 
 	#Follow-requests
 	log("---------------> FOLLOW-REQUESTS USING INVALID ID", 'HEADER')
 
-	r = follow_requests(dummy_id, admin_key, "requests")
+	r = follow_requests(dummy_id, dev_admin_key, "requests")
 	check(r,403)
 	log("Received 403: OK",'')
 	
@@ -881,7 +903,7 @@ def security_tests():
 	#Follow-status
 	log("---------------> FOLLOW-STATUS USING INVALID ID", 'HEADER')
 
-	r = follow_requests(dummy_id, admin_key , "status")
+	r = follow_requests(dummy_id, app_admin_key , "status")
 	check(r,403)
 	log("Received 403: OK",'')
 
@@ -897,7 +919,7 @@ def security_tests():
 	#Reject follow using invalid admin id
 	log("---------------> REJECT-FOLLOW USING INVALID ADMIN ID", 'HEADER')
 
-	r = reject_follow(dummy_id, admin_key, str(random.randint(1,5)))
+	r = reject_follow(dummy_id, dev_admin_key, str(random.randint(1,5)))
 	check(r,403)
 	log("Received 403: OK",'')
 		
@@ -928,7 +950,7 @@ def security_tests():
 	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
 	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
 
-	r = bind_unbind(dummy_id, "admin1", dev_name, "test", "bind", "protected", from_id = app_name)
+	r = bind_unbind(dummy_id, app_admin_key, dev_name, "test", "bind", "protected", from_id = app_name)
 	check(r,403)
 	log("Received 403: OK",'')
 
@@ -950,21 +972,21 @@ def security_tests():
 	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
 	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
 
-	r = bind_unbind(dummy_id, "admin1", dev_name, "test", "unbind", "protected", from_id = app_name)
+	r = bind_unbind(dummy_id, app_admin_key, dev_name, "test", "unbind", "protected", from_id = app_name)
 	check(r,403)
 	log("Received 403: OK",'')
 
 	#Block using invalid admin id	
 	log("---------------> BLOCK USING INVALID ADMIN ID", 'HEADER')
 
-	r = block_unblock(dummy_admin_id, admin_key, str(random.choice(device_keys.keys())), "block")
+	r = block_unblock(dummy_admin_id, dev_admin_key, str(random.choice(device_keys.keys())), "block")
 	check(r,403)
 	log("Received 403: OK",'')
 
 	#Unblock using invalid admin id	
 	log("---------------> UNBLOCK USING INVALID ADMIN ID", 'HEADER')
 
-	r = block_unblock(dummy_admin_id, admin_key, str(random.choice(device_keys.keys())), "unblock")
+	r = block_unblock(dummy_admin_id, dev_admin_key, str(random.choice(device_keys.keys())), "unblock")
 	check(r,403)
 	log("Received 403: OK",'')
 
@@ -973,7 +995,7 @@ def security_tests():
 	
 	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
 
-	r = permissions(dummy_admin_id, admin_key, entity_id = dev_name)
+	r = permissions(dummy_admin_id, dev_admin_key, entity_id = dev_name)
 	check(r,403)
 	log("Received 403: OK",'')
 	
@@ -992,7 +1014,7 @@ def security_tests():
 
 	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
 
-	r = deregister(dummy_id, admin_key, dev_name)
+	r = deregister(dummy_id, dev_admin_key, dev_name)
 	check(r,403)
 	log("Received 403: OK",'')
 
@@ -1087,7 +1109,6 @@ def security_tests():
 	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
 
 	r = subscribe(app_name, app_key, num_messages= dummy_nm)
-	print(r.text, r.status_code)
 	check(r,400)
 	log("Received 400: OK ",'')
 
@@ -1184,7 +1205,7 @@ def security_tests():
 	r = share(dev_name, str(device_keys[dev_name]), follow_id)
 	check(r, 200)
 
-	r = bind_unbind("admin", admin_key, dev_name, "test", "bind", "protected", from_id =
+	r = bind_unbind(dev_admin_id, dev_admin_key, dev_name, "test", "bind", "protected", from_id =
 	app_name)
 	check(r, 403)
 	log("Received 403: OK",'')
@@ -1334,7 +1355,7 @@ def security_tests():
 	check(r, 200)
 	log("Received 200: OK",'')
 
-	r = bind_unbind("admin", admin_key, dev_name, "test", "unbind", "protected", from_id =
+	r = bind_unbind(dev_admin_id, dev_admin_key, dev_name, "test", "unbind", "protected", from_id =
 	app_name)
 	check(r, 403)
 	log("Received 403: OK",'')
@@ -1418,7 +1439,7 @@ def security_tests():
 	follow_id = r.json()['follow-id-read']
 	check(r, 202)
 
-	r = share("admin1", "admin1", follow_id)
+	r = share(app_admin_id, app_admin_key, follow_id)
 	check(r, 400)
 	log("Received 400: OK",'')
 
@@ -1485,7 +1506,7 @@ def security_tests():
 
 	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
 
-	r = follow("admin1","admin1", dev_name, "read", from_id = gen_rand(8, prefix = gen_rand(8)))
+	r = follow(app_admin_id,app_admin_key, dev_name, "read", from_id = gen_rand(8, prefix = gen_rand(8)))
 	check(r,403)
 	log("Received 403: OK",'')
 
@@ -1537,7 +1558,7 @@ def security_tests():
 	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
 	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
 	
-	r = follow("admin", admin_key, dev_name, "read", from_id = app_name)
+	r = follow(dev_admin_id, dev_admin_key, dev_name, "read", from_id = app_name)
 	check(r, 403)
 	log("Received 403: OK",'')
 
@@ -1664,7 +1685,7 @@ def security_tests():
 	check(r, 200)
 	log("Received 200: OK",'')
 
-	r = unfollow("admin", admin_key, dev_name, "test", "read", "protected", from_id = app_name)
+	r = unfollow(dev_admin_id, dev_admin_key, dev_name, "test", "read", "protected", from_id = app_name)
 	check(r, 403)
 	log("Received 403: OK",'')
 
@@ -1749,21 +1770,47 @@ def security_tests():
 	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
 	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
 
-	r = deregister("admin", admin_key, app_name)
+	r = deregister(dev_admin_id, dev_admin_key, app_name)
 	check(r, 403)
 	log("Received 403: OK",'')
 
-	r = deregister("admin1", "admin1", dev_name)
+	r = deregister(app_admin_id, app_admin_key, dev_name)
 	check(r, 403)
 	log("Received 403: OK",'')
 
+	test_time = time.time() - test_time
 
-def functional_tests(devices, apps):
+	dereg_time = time.time()
+	deregistrations(device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id,
+	app_admin_key)
+	dereg_time = time.time() - dereg_time
+
+	time_list = [reg_time, test_time, dereg_time]
+
+	output.put(time_list)
+
+
+def functional_tests(*args):
 	
+	if type(args[0]) is list:
+	    devices = args[0][0]
+	    apps    = args[0][1]
+
+	else:
+	    devices = args[0]
+	    apps    = args[1]
+
+	dev_admin_id, dev_admin_key = gen_admin()
+	app_admin_id, app_admin_key = gen_admin()
+
 	print("\n\n")
 	log("========================= FUNCTIONAL TESTS =========================\n\n", 'GREEN', modifier='BOLD')
-	device_keys, app_keys = registrations(devices,apps)
 
+	reg_time = time.time()
+	device_keys, app_keys = registrations(devices, apps, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
+	reg_time = time.time() - reg_time
+
+	test_time = time.time()
 	print("\n\n")
 	log("------------------------- SIMPLE READ FOLLOW-SHARE -------------------------\n\n", 'GREEN')
 	
@@ -1774,7 +1821,7 @@ def functional_tests(devices, apps):
 	# Devices read all follow requests and share with apps
 	log("---------------> DEVICES READ FOLLOW REQUESTS AND ISSUE SHARE TO APPS", 'HEADER')
 
-	share_dev(apps*devices)
+	share_dev((apps*devices), dev_admin_id, dev_admin_key)
 
 	# Apps bind to devices' queues
 	log("---------------> APPS BIND TO DEVICES", 'HEADER')
@@ -1803,7 +1850,8 @@ def functional_tests(devices, apps):
 	# Apps bind to devices again but this time using admin apikey
 	log("---------------> APPS BIND TO DEVICES USING ADMIN APIKEY", 'HEADER')
 
-	bind_unbind_dev(device_keys, app_keys, expected=devices*apps, as_admin=True, req_type="bind")
+	bind_unbind_dev(device_keys, app_keys, expected=devices*apps, as_admin=True,
+	req_type="bind", admin_id = app_admin_id, admin_key = app_admin_key)
 
 	# Devices publish again
 	log("---------------> DEVICES PUBLISH DATA", 'HEADER')
@@ -1816,7 +1864,8 @@ def functional_tests(devices, apps):
 	# Unbind from devices as admin
 	log("---------------> APPS UNBIND FROM DEVICES USING ADMIN APIKEY", 'HEADER')
 
-	bind_unbind_dev(device_keys, app_keys, expected=(devices*apps), as_admin=True, req_type="unbind")
+	bind_unbind_dev(device_keys, app_keys, expected=(devices*apps), as_admin=True,
+	req_type="unbind", admin_id = app_admin_id, admin_key = app_admin_key)
 
 	# Devices now publish data
 	log("---------------> DEVICES PUBLISH DATA", 'HEADER')
@@ -1840,12 +1889,12 @@ def functional_tests(devices, apps):
 
 	#Follow requests as admin	
 	log("---------------> FOLLOW REQUESTS WITH READ PERMISSION AS ADMIN", 'HEADER')
-	follow_dev(device_keys, app_keys, as_admin=True, permission="read")
+	follow_dev(device_keys, app_keys, as_admin=True, permission="read", admin_id = app_admin_id, admin_key = app_admin_key)
 
 	#Devices share with apps
 	log("---------------> DEVICES READ FOLLOW REQUESTS AND ISSUE SHARE TO APPS", 'HEADER')
 
-	share_dev(apps*devices)
+	share_dev((apps*devices), admin_id = dev_admin_id, admin_key = dev_admin_key)
 
 	# Apps bind to devices' queues
 	log("---------------> APPS BIND TO DEVICES", 'HEADER')
@@ -1861,7 +1910,7 @@ def functional_tests(devices, apps):
 
 	# Apps unfollow all devices
 	log("---------------> APPS UNFOLLOW ALL DEVICES USING THEIR ADMIN APIKEYS", 'HEADER')
-	unfollow_dev(device_keys, app_keys, as_admin=True, permission="read")
+	unfollow_dev(device_keys, app_keys, as_admin=True, permission="read", admin_id = app_admin_id, admin_key = app_admin_key)
 
 	# Apps try to bind to unfollowed devices
 	log("---------------> APPS TRY TO BIND TO UNFOLLOWED DEVICES", 'HEADER')
@@ -1877,7 +1926,7 @@ def functional_tests(devices, apps):
 
 	#Devices share with apps with write access
 	log("---------------> DEVICES READ FOLLOW REQUESTS AND ISSUE SHARE TO APPS", 'HEADER')
-	share_dev(apps*devices)
+	share_dev((apps*devices), dev_admin_id, dev_admin_key)
 
 	#Apps publish to command queue of devices
 	log("---------------> APPS PUBLISH TO COMMAND EXCHANGE OF DEVICES", 'HEADER')
@@ -1905,7 +1954,7 @@ def functional_tests(devices, apps):
 
 	#Devices approve issue share to apps
 	log("---------------> DEVICES APPROVE READ-WRITE FOLLOW REQUESTS WITH SHARE", 'HEADER')
-	share_dev(devices*apps*2)
+	share_dev((devices*apps*2), dev_admin_id, dev_admin_key)
 
 	#Apps publish to command queue of devices
 	log("---------------> APPS PUBLISH TO COMMAND EXCHANGE OF DEVICES", 'HEADER')
@@ -1945,7 +1994,7 @@ def functional_tests(devices, apps):
 
 	# Apps unfollow with read permissions
 	log("---------------> APPS UNFOLLOW DEVICES WITH READ ACCESS", 'HEADER')
-	unfollow_dev(device_keys, app_keys, as_admin=True, permission="read")
+	unfollow_dev(device_keys, app_keys, as_admin=True, permission="read", admin_id = app_admin_id, admin_key = app_admin_key)
 
 	# Apps try to bind to unfollowed devices
 	log("---------------> APPS TRY TO BIND TO UNFOLLOWED DEVICES", 'HEADER')
@@ -1960,11 +2009,11 @@ def functional_tests(devices, apps):
 
 	#Devices approve issue share to apps
 	log("---------------> DEVICES APPROVE READ-WRITE FOLLOW REQUESTS WITH SHARE", 'HEADER')
-	share_dev(devices*apps*2)
+	share_dev((devices*apps*2), dev_admin_id, dev_admin_key)
 
 	# Apps bind to devices' queues
 	log("---------------> APPS BIND TO DEVICES WITH ADMIN APIKEY", 'HEADER')
-	bind_unbind_dev(device_keys, app_keys, expected=(2*devices*apps), as_admin=True, req_type="bind")
+	bind_unbind_dev(device_keys, app_keys, expected=(2*devices*apps), as_admin=True, req_type="bind", admin_id = app_admin_id, admin_key = app_admin_key)
 
 	# Devices publish again
 	log("---------------> DEVICES PUBLISH DATA", 'HEADER')
@@ -1976,7 +2025,7 @@ def functional_tests(devices, apps):
 
 	# Apps unfollow with read permissions
 	log("---------------> APPS UNFOLLOW DEVICES WITH READ-WRITE ACCESS", 'HEADER')
-	unfollow_dev(device_keys, app_keys, as_admin=True, permission="read-write")
+	unfollow_dev(device_keys, app_keys, as_admin=True, permission="read-write", admin_id = app_admin_id, admin_key = app_admin_key)
 
 	# ===============================Diagnostics channel ===============================
 
@@ -1993,7 +2042,7 @@ def functional_tests(devices, apps):
 	# Devices read all follow requests and share with apps
 	log("---------------> DEVICES READ FOLLOW REQUESTS AND ISSUE SHARE TO APPS", 'HEADER')
 
-	share_dev(apps*devices)
+	share_dev((apps*devices), dev_admin_id, dev_admin_key)
 
 	# Apps bind to devices' diagnostics exchanges
 	log("---------------> APPS BIND TO DEVICES' DIAGNOSTICS CHANNEL", 'HEADER')
@@ -2022,7 +2071,7 @@ def functional_tests(devices, apps):
 	# Apps bind to devices using admin apikey
 	log("---------------> APPS BIND TO DEVICES USING ADMIN APIKEY", 'HEADER')
 
-	bind_unbind_dev(device_keys, app_keys, expected=devices*apps, as_admin=True, req_type="bind", message_type="diagnostics")
+	bind_unbind_dev(device_keys, app_keys, expected=devices*apps, as_admin=True, req_type="bind", message_type="diagnostics", admin_id = app_admin_id, admin_key = app_admin_key)
 
 	# Devices publish again to diagnostics channel
 	log("---------------> DEVICES PUBLISH DATA TO DIAGNOSTICS CHANNEL", 'HEADER')
@@ -2035,7 +2084,7 @@ def functional_tests(devices, apps):
 	# Unbind from devices as admin
 	log("---------------> APPS UNBIND FROM DEVICES USING ADMIN APIKEY", 'HEADER')
 
-	bind_unbind_dev(device_keys, app_keys, expected=(devices*apps), as_admin=True, req_type="unbind", message_type="diagnostics")
+	bind_unbind_dev(device_keys, app_keys, expected=(devices*apps), as_admin=True, req_type="unbind", message_type="diagnostics", admin_id = app_admin_id, admin_key = app_admin_key)
 
 	# Devices now publish data to diagnostics channel
 	log("---------------> DEVICES PUBLISH DATA TO DIAGNOSTICS CHANNEL", 'HEADER')
@@ -2065,7 +2114,7 @@ def functional_tests(devices, apps):
 	# Devices read all follow requests and share with apps
 	log("---------------> DEVICES READ FOLLOW REQUESTS AND ISSUE SHARE TO APPS", 'HEADER')
 
-	share_dev(apps*devices)
+	share_dev((apps*devices), dev_admin_id, dev_admin_key)
 
 	# Apps bind to devices' diagnostics exchanges
 	log("---------------> APPS BIND TO DEVICES PROTECTED CHANNEL", 'HEADER')
@@ -2097,7 +2146,7 @@ def functional_tests(devices, apps):
 	log("---------------> APPS BIND TO DEVICES USING ADMIN APIKEY", 'HEADER')
 
 	bind_unbind_dev(device_keys, app_keys, expected=devices*apps, as_admin=True,
-	req_type="bind", is_priority = "true")
+	req_type="bind", is_priority = "true", admin_id = app_admin_id, admin_key = app_admin_key)
 
 	# Devices publish again to diagnostics channel
 	log("---------------> DEVICES PUBLISH DATA", 'HEADER')
@@ -2111,7 +2160,7 @@ def functional_tests(devices, apps):
 	log("---------------> APPS UNBIND FROM DEVICES USING ADMIN APIKEY", 'HEADER')
 
 	bind_unbind_dev(device_keys, app_keys, expected=(devices*apps), as_admin=True,
-	req_type="unbind", is_priority = "true")
+	req_type="unbind", is_priority = "true", admin_id = app_admin_id, admin_key = app_admin_key)
 
 	# Devices now publish data to diagnostics channel
 	log("---------------> DEVICES PUBLISH DATA", 'HEADER')
@@ -2130,41 +2179,79 @@ def functional_tests(devices, apps):
 	bind_unbind_without_follow(device_keys, app_keys, as_admin=False, req_type="bind",
 	is_priority = "true")
 
-	deregistrations(device_keys, app_keys)
+	test_time = time.time() - test_time
+
+
+	dereg_time = time.time()
+	deregistrations(device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id,
+	app_admin_key)
+	dereg_time = time.time() - dereg_time
+
+	time_list = [reg_time, test_time, dereg_time]
+
+	output.put(time_list)
+
+def concurrency_tests():
+
+    concurrent_processes = random.randint(2, 7)
+
+    num_list = []
+
+    for num in range(concurrent_processes):
+
+	devices = random.randint(2,7)
+	apps	= random.randint(2,7)
 	
+	num_list.append([devices,apps])
+
+    processes = [mp.Process(target=functional_tests, args=(num,)) for num in num_list]
+    
+    for p in processes:
+	p.start()
+
+    for p in processes:
+	p.join()
+
+    i = 1
+
+    print("\n\n")
+    log("=========================All tests have passed=========================", 'GREEN', modifier='BOLD')
+    
+    for p in processes:
+
+	time_list = output.get()
+
+	print("\n\n")
+	log("------------------------- Process "+ str(i) +" -------------------------\n\n", 'GREEN')
+	log("Time taken for registrations    :	    "+str(time_list[0])+"s",'GREEN')
+	log("Time taken for test cases       :	    "+str(time_list[1])+"s",'GREEN')
+	log("Time taken for deregistrations  :	    "+str(time_list[2])+"s",'GREEN')
+
+	i = i + 1
+
+    sys.exit(0)
 
 def start_tests(devices, apps, args):
 	
 	if args.choice == "fxnl":
 		
-		test_time = time.time()
 		functional_tests(devices, apps)
-		test_time = time.time() - test_time
-	
+		time_list = output.get()
+
 	elif args.choice == "sec":
 		
-		test_time = time.time()
 		security_tests()
-		test_time = time.time() - test_time
+		time_list = output.get()
 
 	elif args.choice == "concr":
 		
-		test_time = time.time()
-		concurrency_tests(devices, apps)
-		test_time = time.time() - test_time
-
-	elif args.choice == "all":
-		
-		test_time = time.time()
-		all_tests(devices, apps)
-		test_time = time.time() - test_time
-	
+		concurrency_tests()
 
 	print("\n\n")
 	log("=========================All tests have passed=========================", 'GREEN', modifier='BOLD')
-	#print(colour.OKGREEN+"Registrations    : "+str(reg_time)+"s"+colour.ENDC)
-	log("Test cases       : "+str(test_time)+"s", 'GREEN')
-	#print(colour.OKGREEN+"Deregistrations  : "+str(dereg_time)+"s"+colour.ENDC)
+	log("Time taken for registrations    :	    "+str(time_list[0])+"s",'GREEN')
+	log("Time taken for test cases       :	    "+str(time_list[1])+"s",'GREEN')
+	log("Time taken for deregistrations  :	    "+str(time_list[2])+"s",'GREEN')
 
 if __name__ == '__main__':
 
