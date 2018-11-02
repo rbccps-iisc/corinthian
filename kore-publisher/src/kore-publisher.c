@@ -559,9 +559,6 @@ publish (struct http_request *req)
 	);
 
 /*
-	if (! looks_like_a_valid_entity(id))
-		BAD_REQUEST("id is not a valid entity");
-
 	if (! looks_like_a_valid_entity(to))
 		BAD_REQUEST("'to' is not a valid entity");
 */
@@ -624,7 +621,11 @@ publish (struct http_request *req)
 	}
 	else
 	{
+
 /////////////////////////////////////////////////
+
+		if (! looks_like_a_valid_entity(id))
+			BAD_REQUEST("id is not a valid entity");
 
 		if (! login_success(id,apikey,NULL))
 			FORBIDDEN("invalid id or apikey");
