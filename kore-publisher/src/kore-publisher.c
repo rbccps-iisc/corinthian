@@ -277,7 +277,7 @@ is_alpha_numeric (const char *str)
 bool
 looks_like_a_valid_owner (const char *str)
 {
-	return is_alpha_numeric(str);
+	return (str[0] >= 'a' && str[0] <= 'z' && is_alpha_numeric(str));
 }
 
 bool
@@ -963,6 +963,8 @@ register_entity (struct http_request *req)
 
 /////////////////////////////////////////////////
 
+	str_to_lower(entity);
+
 	snprintf(entity_name,66,"%s/%s",id,entity);
 
 	// create entries in to RabbitMQ
@@ -1292,7 +1294,7 @@ register_owner(struct http_request *req)
 
 	// it should look like an owner
 	if (! looks_like_a_valid_owner(owner))
-		BAD_REQUEST("entity should be an owner");
+		BAD_REQUEST("entity should be a valid owner");
 
 /////////////////////////////////////////////////
 
@@ -1302,6 +1304,8 @@ register_owner(struct http_request *req)
 	sanitize(owner);
 
 /////////////////////////////////////////////////
+
+	str_to_lower(owner);
 
 	// conflict if owner already exist
 	CREATE_STRING (query,
@@ -3066,4 +3070,15 @@ is_request_from_localhost (struct http_request *req)
 	}
 
 	return false;
+}
+
+void str_to_lower (char *str)
+{
+	while (*str)
+	{
+		if (*str >= 'A' && *str <= 'Z')
+			*str += 32; 
+
+		++str;
+	}
 }
