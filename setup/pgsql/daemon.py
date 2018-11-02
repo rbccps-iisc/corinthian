@@ -56,7 +56,7 @@ def run():
             except Exception as e:
                 pass
          
-            cur.execute("DELETE FROM acl WHERE from_id = %s AND exchange = %s AND topic = %s",(queue, exchange, topic,))
+            cur.execute("DELETE FROM acl WHERE from_id = '%s' AND exchange = '%s' AND topic = '%s'",(queue, exchange, topic,))
             conn.commit()
 
             print("Deleted acl entry and binding between "+queue+" and "+exchange)
