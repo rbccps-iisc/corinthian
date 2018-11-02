@@ -304,6 +304,7 @@ looks_like_a_valid_entity (const char *str)
 
 	uint8_t front_slash_count = 0;
 
+	// format is owner/entity
 	if (strlen_str < 3 || strlen_str > 65)
 		return false;
 
@@ -346,7 +347,8 @@ looks_like_a_valid_resource (const char *str)
  
         uint8_t dot_count = 0;
 
-	if (strlen_str < 3 || strlen_str > 65)
+	// format is owner/entity.public
+	if (strlen_str < 10 || strlen_str > 128)
 		return false;
 
 	for (i = 0; i < strlen_str; ++i)
@@ -369,15 +371,6 @@ looks_like_a_valid_resource (const char *str)
 						return false;
 			}
 		}
-
-		if (
-			(front_slash_count > 1)
-				  ||
-		            (dot_count > 1)
-		   )
-		   {
-			return false;
-	           }
 	}
 
 	// there should be only one front slash. Dot may or may not exist
@@ -565,11 +558,13 @@ publish (struct http_request *req)
 		"inputs missing in headers"
 	);
 
+/*
 	if (! looks_like_a_valid_entity(id))
 		BAD_REQUEST("id is not a valid entity");
 
 	if (! looks_like_a_valid_entity(to))
 		BAD_REQUEST("'to' is not a valid entity");
+*/
 
 	// ok to publish to himself
 	if (strcmp(id,to) == 0)
@@ -606,7 +601,7 @@ publish (struct http_request *req)
 
 	if (http_request_header(req, "message", &message) != KORE_RESULT_OK)
 	{
-		if (!(message = (char *)req->http_body->data))
+		if ((message = (char *)req->http_body->data) == NULL)
 			BAD_REQUEST("no body found in request");
 	}
 
@@ -616,10 +611,7 @@ publish (struct http_request *req)
 		content_type = "";
 	}
 
-	amqp_socket_t *socket = NULL;
-
 	node *n = NULL;
-
 	amqp_connection_state_t	*cached_conn = NULL;
 
 	char key[65];
@@ -645,7 +637,7 @@ publish (struct http_request *req)
 			ERROR("out of memory");
 
 		*cached_conn = amqp_new_connection();
-		socket = amqp_tcp_socket_new(*cached_conn);
+		amqp_socket_t *socket = amqp_tcp_socket_new(*cached_conn);
 
 		if (socket == NULL)
 			ERROR("could not create a new socket");
@@ -908,8 +900,6 @@ register_entity (struct http_request *req)
 	const char *entity;
 	const char *char_is_autonomous;
 
-	char *body;
-
 	char entity_name[66];
 
 	char salt		[33];
@@ -939,9 +929,7 @@ register_entity (struct http_request *req)
 	if (! is_alpha_numeric(entity))
 		BAD_REQUEST("entity is not valid");
 
-	body = NULL;
-	if (req->http_body)
-		body = (char *)req->http_body->data;
+	char *body = (char *)req->http_body->data;
 
 	bool is_autonomous = false;
 	if (http_request_header(req, "is-autonomous", &char_is_autonomous) == KORE_RESULT_OK)
@@ -1423,8 +1411,10 @@ deregister_owner(struct http_request *req)
 	}
 
 	// delete entries in to RabbitMQ
-	pthread_create(&thread,NULL,delete_exchanges_and_queues,(void *)owner); 
-	thread_started = true;
+	if (0 == pthread_create(&thread,NULL,delete_exchanges_and_queues,(void *)owner))	
+		thread_started = true;
+	else
+		delete_exchanges_and_queues(owner);
 
 	// delete from acl
 	CREATE_STRING (query,
@@ -1699,7 +1689,8 @@ queue_unbind (struct http_request *req)
 			"from_id = '%s' "
 			"AND exchange = '%s' "
 			"AND permission = 'read' "
-			"AND valid_till > now() AND topic = '%s'",
+			"AND valid_till > now() "
+			"AND topic = '%s'",
 			from,
 			exchange,
 			topic
