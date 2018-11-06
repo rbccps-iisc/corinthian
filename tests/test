@@ -71,7 +71,7 @@ def log(message, clr, modifier=""):
 
 def check(response, code):
 	
-	assert(response.status_code == code), "Message = "+r.text+" Status code = "+str(r.status_code)
+	assert(response.status_code == code), "Message = "+response.text+" Status code = "+str(response.status_code)
 
 def gen_rand(size, prefix=""):
 
