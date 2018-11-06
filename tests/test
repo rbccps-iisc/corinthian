@@ -1049,7 +1049,7 @@ def security_tests():
 	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
 
 	r = publish(dev_name, str(device_keys[dev_name]), "amq.topic", "test", "command", "hello") 
-	check(r,400)
+	check(r,202)
 	log("Received 202: OK",'')
 
 	#Publish to amq.direct
@@ -1058,8 +1058,8 @@ def security_tests():
 	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
 
 	r = publish(dev_name, str(device_keys[dev_name]), "amq.direct", "test", "command", "hello") 
-	check(r,400)
-	log("Received 400: OK",'')
+	check(r,202)
+	log("Received 202: OK",'')
 
 	#Publish to amq.headers
 	log("---------------> PUBLISH TO amq.headers", 'HEADER')
@@ -1067,8 +1067,8 @@ def security_tests():
 	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
 
 	r = publish(dev_name, str(device_keys[dev_name]), "amq.headers", "test", "command", "hello") 
-	check(r,400)
-	log("Received 400: OK",'')
+	check(r,202)
+	log("Received 202: OK",'')
 
 	#Publish to amq.fanout
 	log("---------------> PUBLISH TO amq.fanout", 'HEADER')
@@ -1076,8 +1076,8 @@ def security_tests():
 	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
 
 	r = publish(dev_name, str(device_keys[dev_name]), "amq.fanout", "test", "command", "hello") 
-	check(r,400)
-	log("Received 400: OK",'')
+	check(r,202)
+	log("Received 202: OK",'')
 
 	#Publish with invalid message-type
 	log("---------------> PUBLISH WITH INVALID MESSAGE-TYPE", 'HEADER')
