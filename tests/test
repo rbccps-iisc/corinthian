@@ -43,7 +43,7 @@ colour[''] 			= ''
 
 def gen_admin():
     
-    admin_id = gen_rand(16)
+    admin_id = gen_rand(8)
     apikey = gen_rand(32)
     salt = gen_rand(32)
 
@@ -71,7 +71,7 @@ def log(message, clr, modifier=""):
 
 def check(response, code):
 	
-	assert(response.status_code == code)
+	assert(response.status_code == code), "Message = "+response.text+" Status code = "+str(response.status_code)
 
 def gen_rand(size, prefix=""):
 
@@ -467,7 +467,7 @@ def registrations(devices, apps, dev_admin_id, dev_admin_key, app_admin_id, app_
 	for i in range(0, devices):
 		log("REGISTERING DEVICE " + str(i),'')
 		dev_name = "dev" + ''.join(
-		random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(16))
+		random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(8))
 		r = register(dev_admin_id, dev_admin_key, dev_name)
 		response = r.json()
 		log(json.dumps(response),'')
@@ -481,7 +481,7 @@ def registrations(devices, apps, dev_admin_id, dev_admin_key, app_admin_id, app_
 	for i in range(0, apps):
 		log("REGISTERING APP " + str(i),'')
 		app_name = "app" + ''.join(
-			random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(16))
+			random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(8))
 		r = register(app_admin_id, app_admin_key, app_name)
 		response = r.json()
 		log(json.dumps(response),'')
@@ -512,7 +512,7 @@ def security_tests():
 	log("========================= SECURITY TESTS =========================\n\n", 'GREEN', modifier='BOLD')
 	
 	dummy_key = gen_rand(32) 
-	dummy_id  = gen_rand(16) 
+	dummy_id  = gen_rand(8) 
 
 	devices = random.randint(2,5)
 	apps 	= random.randint(2,5)
@@ -776,8 +776,8 @@ def security_tests():
 	#=========================================Invalid ID===============================================
 	
 	dummy_key = gen_rand(32) 
-	dummy_id  = gen_rand(16, prefix="admin/") 
-	dummy_admin_id = gen_rand(16) 
+	dummy_id  = gen_rand(8, prefix="admin/") 
+	dummy_admin_id = gen_rand(8) 
 
 	print("\n\n")
 	log("------------------------- INVALID ID -------------------------\n\n", 'GREEN')
@@ -1027,7 +1027,7 @@ def security_tests():
 	
 	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
 
-	dummy_exchange = gen_rand(16, prefix = gen_rand(16)+"/") 
+	dummy_exchange = gen_rand(8, prefix = gen_rand(8)+"/") 
 	r = publish(dev_name, dev_key, dummy_exchange, "test", "command", "hello") 
 	check(r,202)
 	log("Received 202: OK",'')
@@ -1050,7 +1050,7 @@ def security_tests():
 
 	r = publish(dev_name, str(device_keys[dev_name]), "amq.topic", "test", "command", "hello") 
 	check(r,400)
-	log("Received 400: OK",'')
+	log("Received 202: OK",'')
 
 	#Publish to amq.direct
 	log("---------------> PUBLISH TO amq.direct", 'HEADER')
@@ -1080,9 +1080,10 @@ def security_tests():
 	log("Received 400: OK",'')
 
 	#Publish with invalid message-type
+	log("---------------> PUBLISH WITH INVALID MESSAGE-TYPE", 'HEADER')
 	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
 
-	r = publish(dev_name, str(device_keys[dev_name]), dev_name, "test", gen_rand(16), "hello") 
+	r = publish(dev_name, str(device_keys[dev_name]), dev_name, "test", gen_rand(8), "hello") 
 	check(r,400)
 	log("Received 400: OK",'')
 
@@ -1092,7 +1093,7 @@ def security_tests():
 	#With invalid message type
 
 	log("---------------> SUBSCRIBE WITH INVALID MESSAGE-TYPE", 'HEADER') 
-	dummy_mt = gen_rand(16)
+	dummy_mt = gen_rand(8)
 
 
 	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
@@ -1104,7 +1105,7 @@ def security_tests():
 	#With invalid num messages 
 
 	log("---------------> SUBSCRIBE WITH INVALID NUM MESSSAGES", 'HEADER') 
-	dummy_nm = gen_rand(16)
+	dummy_nm = gen_rand(8)
 
 	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
 
@@ -1129,7 +1130,7 @@ def security_tests():
 	#Bind to non-existent exchange
 	log("---------------> BIND TO NON-EXISTENT EXCHANGE", 'HEADER') 
 
-	dummy_exchange = gen_rand(16, prefix= gen_rand(16))
+	dummy_exchange = gen_rand(8, prefix= gen_rand(8))
 	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
 
 	r = bind_unbind(app_name, str(app_keys[app_name]), dummy_exchange, "test", "bind", "protected")
@@ -1149,7 +1150,7 @@ def security_tests():
 	r = share(dev_name, str(device_keys[dev_name]), follow_id)
 	check(r, 200)
 
-	r = bind_unbind(app_name, str(app_keys[app_name]), dev_name, "test", "bind", gen_rand(16))
+	r = bind_unbind(app_name, str(app_keys[app_name]), dev_name, "test", "bind", gen_rand(8))
 	check(r, 400)
 	log("Received 400: OK",'')
 
@@ -1177,7 +1178,7 @@ def security_tests():
 	r = share(dev_name, str(device_keys[dev_name]), follow_id)
 	check(r, 200)
 
-	dummy_topic = gen_rand(16)
+	dummy_topic = gen_rand(8)
 	r = bind_unbind(app_name, str(app_keys[app_name]), dev_name, dummy_topic, "bind", "protected")
 	check(r, 403)
 	log("Received 403: OK",'')
@@ -1268,7 +1269,7 @@ def security_tests():
 	#Unbind to non-existent exchange
 	log("---------------> UNBIND FROM NON-EXISTENT EXCHANGE", 'HEADER') 
 
-	dummy_exchange = gen_rand(16, prefix= gen_rand(16))
+	dummy_exchange = gen_rand(8, prefix= gen_rand(8))
 
 	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
 
@@ -1293,7 +1294,7 @@ def security_tests():
 	check(r, 200)
 	log("Received 200: OK",'')
 
-	r = bind_unbind(app_name, app_key, dev_name, "test", "unbind", gen_rand(16))
+	r = bind_unbind(app_name, app_key, dev_name, "test", "unbind", gen_rand(8))
 	check(r, 400)
 	log("Received 400: OK",'')
 
@@ -1324,7 +1325,7 @@ def security_tests():
 	check(r, 200)
 	log("Received 200: OK",'')
 
-	r = bind_unbind(app_name, str(app_keys[app_name]), dev_name, gen_rand(16), "unbind", "protected")
+	r = bind_unbind(app_name, str(app_keys[app_name]), dev_name, gen_rand(8), "unbind", "protected")
 	check(r, 403)
 	log("Received 403: OK",'')
 
@@ -1487,7 +1488,7 @@ def security_tests():
 	follow_id = r.json()['follow-id-read']
 	check(r, 202)
 
-	r = share(dev_name, dev_key, gen_rand(16))
+	r = share(dev_name, dev_key, gen_rand(8))
 	check(r, 500)
 	log("Received 500: OK",'')
 
@@ -1506,7 +1507,7 @@ def security_tests():
 
 	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
 
-	r = follow(app_admin_id,app_admin_key, dev_name, "read", from_id = gen_rand(16, prefix = gen_rand(16)))
+	r = follow(app_admin_id,app_admin_key, dev_name, "read", from_id = gen_rand(8, prefix = gen_rand(8)))
 	check(r,403)
 	log("Received 403: OK",'')
 
@@ -1515,7 +1516,7 @@ def security_tests():
 	
 	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
 
-	r = follow(app_name, str(app_keys[app_name]), gen_rand(16, prefix = gen_rand(16)), "read")
+	r = follow(app_name, str(app_keys[app_name]), gen_rand(8, prefix = gen_rand(8)), "read")
 	check(r, 403)
 	log("Received 403: OK",'')
 
@@ -1536,7 +1537,7 @@ def security_tests():
 	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
 	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
 
-	validity = gen_rand(16) 
+	validity = gen_rand(8) 
 	r = follow(app_name, app_key, dev_name, "read", validity=validity)
 	check(r, 400)
 	log("Received 400: OK",'')
@@ -1585,7 +1586,7 @@ def security_tests():
 	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
 	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
 
-	permission = gen_rand(16)
+	permission = gen_rand(8)
 
 	r = follow(app_name, app_key, dev_name, permission)
 	check(r, 400)
@@ -1597,7 +1598,7 @@ def security_tests():
 	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
 	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
 
-	r = follow(app_name, app_key, dev_name, "read", message_type=gen_rand(16))
+	r = follow(app_name, app_key, dev_name, "read", message_type=gen_rand(8))
 	check(r, 400)
 	log("Received 400: OK",'')
 
@@ -1621,7 +1622,7 @@ def security_tests():
 	check(r, 200)
 	log("Received 200: OK",'')
 	
-	r = unfollow(app_name, app_key, gen_rand(16, prefix = gen_rand(16)), "test",
+	r = unfollow(app_name, app_key, gen_rand(8, prefix = gen_rand(8)), "test",
 	"read", "protected")
 	check(r, 403)
 	log("Received 403: OK",'')
@@ -1652,7 +1653,7 @@ def security_tests():
 	r = bind_unbind(app_name, str(app_keys[app_name]), dev_name, "test", "bind", "protected")
 	check(r, 200)
 	log("Received 403: OK",'')
-	permission = gen_rand(16)
+	permission = gen_rand(8)
 
 	r = unfollow(app_name, app_key, dev_name, "test", permission, "protected")
 	check(r, 400)
@@ -1747,7 +1748,7 @@ def security_tests():
 	check(r, 200)
 	log("Received 200: OK",'')
 
-	r = unfollow(app_name, app_key, dev_name, "test","read", message_type=gen_rand(16))
+	r = unfollow(app_name, app_key, dev_name, "test","read", message_type=gen_rand(8))
 	check(r, 403)
 	log("Received 403: OK",'')
 
