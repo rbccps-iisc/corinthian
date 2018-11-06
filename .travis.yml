@@ -16,6 +16,6 @@ before_script:
 
 script:
   - cd ..
-  - ./tests/test fxnl --random 
+#  - ./tests/test fxnl --random 
   - ./tests/test sec
-  - ./tests/test concr
+#  - ./tests/test concr
