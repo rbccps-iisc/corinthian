@@ -1049,9 +1049,8 @@ def security_tests():
 	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
 
 	r = publish(dev_name, str(device_keys[dev_name]), "amq.topic", "test", "command", "hello") 
-	print(r.text, r.status_code)
 	check(r,400)
-	log("Received 400: OK",'')
+	log("Received 202: OK",'')
 
 	#Publish to amq.direct
 	log("---------------> PUBLISH TO amq.direct", 'HEADER')
@@ -1059,7 +1058,6 @@ def security_tests():
 	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
 
 	r = publish(dev_name, str(device_keys[dev_name]), "amq.direct", "test", "command", "hello") 
-	print(r.text, r.status_code)
 	check(r,400)
 	log("Received 400: OK",'')
 
@@ -1069,7 +1067,6 @@ def security_tests():
 	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
 
 	r = publish(dev_name, str(device_keys[dev_name]), "amq.headers", "test", "command", "hello") 
-	print(r.text, r.status_code)
 	check(r,400)
 	log("Received 400: OK",'')
 
@@ -1079,7 +1076,6 @@ def security_tests():
 	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
 
 	r = publish(dev_name, str(device_keys[dev_name]), "amq.fanout", "test", "command", "hello") 
-	print(r.text, r.status_code)
 	check(r,400)
 	log("Received 400: OK",'')
 
@@ -1088,7 +1084,6 @@ def security_tests():
 	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
 
 	r = publish(dev_name, str(device_keys[dev_name]), dev_name, "test", gen_rand(8), "hello") 
-	print(r.text, r.status_code)
 	check(r,400)
 	log("Received 400: OK",'')
 
