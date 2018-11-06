@@ -11,3 +11,4 @@ authenticator/kore.pid
 authenticator/authenticator.so
 authenticator/resolv.conf
 vars/
+docker/daemon.log
