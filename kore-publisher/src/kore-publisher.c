@@ -2147,7 +2147,11 @@ unfollow (struct http_request *req)
 		amqp_empty_table
 	))
 	{
-		ERROR("unfollow failed");
+		char msg[129];
+
+		snprintf(msg, 129, "unfollow failed, id = %s apikey = %s to = %s topic = %s"
+		"permission = %s message-type = %s", id, apikey, to, topic, permission, message_type);
+		ERROR(msg);
 	}
 
 	if (! amqp_queue_unbind (
