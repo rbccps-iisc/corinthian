@@ -2138,32 +2138,40 @@ unfollow (struct http_request *req)
 	CREATE_STRING 	(query, "DELETE FROM follow WHERE follow_id='%s'", follow_id);
 	RUN_QUERY	(query, "failed to delete from follow table");
 
-	if (! amqp_queue_unbind (
+	int z = amqp_queue_unbind (
 		cached_admin_conn,
 		1,
 		amqp_cstring_bytes(from),
 		amqp_cstring_bytes(exchange),
 		amqp_cstring_bytes(topic),
 		amqp_empty_table
-	))
+	);
+
+	if (! z)
 	{
 		char msg[129];
-
-		snprintf(msg, 129, "unfollow failed, id = %s apikey = %s to = %s topic = %s"
-		"permission = %s message-type = %s", id, apikey, to, topic, permission, message_type);
+		snprintf(msg, 129, "regular unbind failed, id = %s apikey = %s to = %s topic = %s"
+		"permission = %s message-type = %s: error = %d", id, apikey, to, topic, permission,
+		message_type, z);
 		ERROR(msg);
 	}
 
-	if (! amqp_queue_unbind (
+	int x = amqp_queue_unbind (
 		cached_admin_conn,
 		1,
 		amqp_cstring_bytes(priority_queue),
 		amqp_cstring_bytes(exchange),
 		amqp_cstring_bytes(topic),
 		amqp_empty_table
-	))
+	);
+
+	if (! x)
 	{
-		ERROR("unbind priority queue failed");
+		char msg[129];
+		snprintf(msg, 129, "priority unbind failed, id = %s apikey = %s to = %s topic = %s"
+		"permission = %s message-type = %s: error = %d", id, apikey, to, topic, permission,
+		message_type,x);
+		ERROR(msg);
 	}
 
 	OK();
