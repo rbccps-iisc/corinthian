@@ -147,6 +147,8 @@ def publish(ID, apikey, to, topic, message_type, data):
 
 def follow(ID, apikey, to_id, permission, from_id="", topic ="", validity = "", message_type=""):
 
+	print("FOLLOW: ID = "+ID+" apikey = "+apikey+" to = "+to_id+" permission = "+permission+" from = \
+	"+from_id+" topic = "+topic+" validity = "+validity+" message-type = "+message_type)
 	url = base_url + "/follow"
 	headers = {}
 
@@ -184,6 +186,9 @@ def reject_follow(ID, apikey, follow_id):
 	
 
 def unfollow(ID, apikey, to, topic, permission, message_type, from_id=""):
+
+	print("UNFOLLOW: ID = "+ID+" apikey = "+apikey+" to = "+to+" permission = "+permission+" from = \
+	"+from_id+" topic = "+topic+" message-type = "+message_type)
 
 	url = base_url + "/unfollow"
 	headers = {}
