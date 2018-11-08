@@ -52,11 +52,12 @@ def run():
             try:
                 channel.queue_unbind(exchange=exchange, queue=queue, routing_key = topic)
                 channel.queue_unbind(exchange=exchange, queue=queue+".priority", routing_key = topic)
+                channel.queue_unbind(exchange=queue+".publish", queue=exchange, routing_key = exchange+"."+topic)
          
             except Exception as e:
                 pass
          
-            cur.execute("DELETE FROM acl WHERE from_id = '%s' AND exchange = '%s' AND topic = '%s'",(queue, exchange, topic,))
+            cur.execute("DELETE FROM acl WHERE from_id = %s AND exchange = %s AND topic = %s",(queue, exchange, topic,))
             conn.commit()
 
             print("Deleted acl entry and binding between "+queue+" and "+exchange)
