@@ -25,6 +25,8 @@ char postgres_pwd[33];
 char broker_ip	[100];
 char pgsql_ip	[100];
 
+char error_string [100];
+
 amqp_connection_state_t	cached_admin_conn;
 amqp_table_t 		lazy_queue_table;
 amqp_rpc_reply_t 	login_reply;
@@ -169,9 +171,9 @@ retry:
 
 	login_reply = amqp_login
 #ifdef TEST
-		(cached_admin_conn, "/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN, "guest", "guest");
+		(cached_admin_conn, "/", 0, 131072, HEART_BEAT, AMQP_SASL_METHOD_PLAIN, "guest", "guest");
 #else
-		(cached_admin_conn, "/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN, "admin", admin_apikey);
+		(cached_admin_conn, "/", 0, 131072, HEART_BEAT, AMQP_SASL_METHOD_PLAIN, "admin", admin_apikey);
 #endif
 	if (login_reply.reply_type != AMQP_RESPONSE_NORMAL)
 	{
@@ -643,7 +645,7 @@ publish (struct http_request *req)
 			ERROR("could not open a socket");
 
 		login_reply = amqp_login(*cached_conn, 
-			"/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN, id, apikey);
+			"/", 0, 131072, HEART_BEAT, AMQP_SASL_METHOD_PLAIN, id, apikey);
 
 		if (login_reply.reply_type != AMQP_RESPONSE_NORMAL)
 			FORBIDDEN("broker: invalid id or apkey");
@@ -782,7 +784,7 @@ subscribe (struct http_request *req)
 			"/",
 			0,
 			131072,
-			0,
+			HEART_BEAT,
 			AMQP_SASL_METHOD_PLAIN,
 			id,
 			apikey
@@ -1711,11 +1713,10 @@ queue_unbind (struct http_request *req)
 
 	amqp_rpc_reply_t r = amqp_get_rpc_reply(cached_admin_conn);
 
-	char err[100];
 	if (r.reply_type != AMQP_RESPONSE_NORMAL)
 	{
-		sprintf(err,"unbind failed %d\n",r.reply_type);
-		ERROR(err);
+		snprintf(error_string,100,"unbind failed %d\n",r.reply_type);
+		ERROR(error_string);
 	}
 
 	OK();
@@ -2156,12 +2157,10 @@ unfollow (struct http_request *req)
 
 	r = amqp_get_rpc_reply(cached_admin_conn);
 
-	char err[100];
-
 	if (r.reply_type != AMQP_RESPONSE_NORMAL)
 	{
-		sprintf(err,"unbind failed %d\n",r.reply_type);
-		ERROR(err);
+		snprintf(error_string,100,"unbind failed %d\n",r.reply_type);
+		ERROR(error_string);
 	}
 
 	amqp_queue_unbind (
@@ -2177,8 +2176,8 @@ unfollow (struct http_request *req)
 
 	if (r.reply_type != AMQP_RESPONSE_NORMAL)
 	{
-		sprintf(err,"unbind to priority failed %d\n",r.reply_type);
-		ERROR(err);
+		snprintf(error_string,100,"unbind to priority failed %d\n",r.reply_type);
+		ERROR(error_string);
 	}
 
 	OK();

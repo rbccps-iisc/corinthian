@@ -36,6 +36,8 @@
 
 //#define TEST (1)
 
+#define HEART_BEAT (0)
+
 #if 1
 	#define debug_printf(...)
 #else
