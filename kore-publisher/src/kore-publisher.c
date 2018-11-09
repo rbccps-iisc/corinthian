@@ -1711,8 +1711,12 @@ queue_unbind (struct http_request *req)
 
 	amqp_rpc_reply_t r = amqp_get_rpc_reply(cached_admin_conn);
 
+	char err[100];
 	if (r.reply_type != AMQP_RESPONSE_NORMAL)
-		ERROR("unbind failed");
+	{
+		sprintf(err,"unbind failed %d\n",r.reply_type);
+		ERROR(err);
+	}
 
 	OK();
 
@@ -2152,8 +2156,13 @@ unfollow (struct http_request *req)
 
 	r = amqp_get_rpc_reply(cached_admin_conn);
 
+	char err[100];
+
 	if (r.reply_type != AMQP_RESPONSE_NORMAL)
-		ERROR("unbind failed");
+	{
+		sprintf(err,"unbind failed %d\n",r.reply_type);
+		ERROR(err);
+	}
 
 	amqp_queue_unbind (
 		cached_admin_conn,
@@ -2167,7 +2176,10 @@ unfollow (struct http_request *req)
 	r = amqp_get_rpc_reply(cached_admin_conn);
 
 	if (r.reply_type != AMQP_RESPONSE_NORMAL)
-		ERROR("unbind to priority failed");
+	{
+		sprintf(err,"unbind to priority failed %d\n",r.reply_type);
+		ERROR(err);
+	}
 
 	OK();
 
