@@ -558,10 +558,8 @@ publish (struct http_request *req)
 		"inputs missing in headers"
 	);
 
-/*
 	if (! looks_like_a_valid_entity(to))
 		BAD_REQUEST("'to' is not a valid entity");
-*/
 
 	// ok to publish to himself
 	if (strcmp(id,to) == 0)
