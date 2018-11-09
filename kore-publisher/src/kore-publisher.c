@@ -956,10 +956,10 @@ register_entity (struct http_request *req)
 
 	// create entries in to RabbitMQ
 
-	if (0 == pthread_create(&thread,NULL,create_exchanges_and_queues,(void *)&entity_name)) 
+	if (0 == pthread_create(&thread,NULL,create_exchanges_and_queues,(const void *)entity_name)) 
 		thread_started = true;
 	else
-		create_exchanges_and_queues(&entity_name);
+		create_exchanges_and_queues((const void *)entity_name);
 
 	// conflict if entity_name already exist
 
@@ -1095,10 +1095,10 @@ deregister_entity (struct http_request *req)
 		BAD_REQUEST("invalid entity");
 
 	// delete entries in to RabbitMQ
-	if (0 == pthread_create(&thread,NULL,delete_exchanges_and_queues,(void *)entity))
+	if (0 == pthread_create(&thread,NULL,delete_exchanges_and_queues,(const void *)entity))
 		thread_started = true;
 	else
-		delete_exchanges_and_queues(entity);
+		delete_exchanges_and_queues((const void *)entity);
 
 	CREATE_STRING (query,
 		"DELETE FROM acl WHERE from_id = '%s' or exchange LIKE '%s.%%'",
@@ -1143,7 +1143,7 @@ cat (struct http_request *req)
 	req->status = 403;
 
 	http_populate_get(req);
-	if (http_argument_get_string(req,"id",&entity))
+	if (http_argument_get_string(req,"id",(void *)&entity))
 	{
 		// if not a valid entity
 		if (! looks_like_a_valid_entity(entity))
@@ -1303,10 +1303,10 @@ register_owner(struct http_request *req)
 	if(kore_pgsql_ntuples(&sql) > 0)
 		CONFLICT("id already used");
 
-	if (0 == pthread_create(&thread,NULL,create_exchanges_and_queues,(void *)owner))
+	if (0 == pthread_create(&thread,NULL,create_exchanges_and_queues,(const void *)owner))
 		thread_started = true;
 	else
-		create_exchanges_and_queues(owner);
+		create_exchanges_and_queues((const void *)owner);
 
 	gen_salt_password_and_apikey (owner, salt, password_hash, owner_apikey);
 
@@ -1411,10 +1411,10 @@ deregister_owner(struct http_request *req)
 	}
 
 	// delete entries in to RabbitMQ
-	if (0 == pthread_create(&thread,NULL,delete_exchanges_and_queues,(void *)owner))
+	if (0 == pthread_create(&thread,NULL,delete_exchanges_and_queues,(const void *)owner))
 		thread_started = true;
 	else
-		delete_exchanges_and_queues(owner);
+		delete_exchanges_and_queues((const void *)owner);
 
 	// delete from acl
 	CREATE_STRING (query,
