@@ -32,7 +32,8 @@ amqp_rpc_reply_t 	rpc_reply;
 amqp_table_entry_t 	*entry;
 amqp_basic_properties_t	props;
 
-int hostname_to_ip(char * hostname , char* ip)
+static int
+hostname_to_ip(char * hostname , char* ip)
 {
     struct hostent *he;
     struct in_addr **addr_list;
@@ -57,13 +58,10 @@ int hostname_to_ip(char * hostname , char* ip)
     return 1;
 }
 
+int
 init (int state)
 {
 	int i;
-
-	// ignore the https worker
-	if (worker->id == 0)
-		return KORE_RESULT_OK;
 
 	// mask server name 
 	http_server_version("");
@@ -123,7 +121,7 @@ init (int state)
 		}
 	}
 
-	close (fd);
+	(void) close (fd);
 
 	fd = open("/vars/postgres.passwd",O_RDONLY);
 	if (fd < 0)
@@ -150,7 +148,7 @@ init (int state)
 		}
 	}
 
-	close (fd);
+	(void) close (fd);
 
 	cached_admin_conn = amqp_new_connection();
 	amqp_socket_t *socket = amqp_tcp_socket_new(cached_admin_conn);
@@ -1136,10 +1134,9 @@ done:
 int
 cat (struct http_request *req)
 {
-	int i;
+	int i, num_rows;
 
 	const char *entity;
-	uint32_t num_rows = 0;
 
 	req->status = 403;
 
@@ -1349,6 +1346,8 @@ done:
 int
 deregister_owner(struct http_request *req)
 {
+	int i, num_rows;
+
 	const char *id;
 	const char *apikey;
 	const char *owner;
@@ -1400,9 +1399,9 @@ deregister_owner(struct http_request *req)
 
 	RUN_QUERY (query,"could not get app/devices associated with owner");
 
-	uint32_t num_rows = kore_pgsql_ntuples(&sql);
+	num_rows = kore_pgsql_ntuples(&sql);
 
-	for (int i = 0; i < num_rows; ++i)
+	for (i = 0; i < num_rows; ++i)
 	{
 		char *entity = kore_pgsql_getvalue(&sql,i,0);
 		debug_printf("Deleting {%s}\n",entity);
@@ -1410,7 +1409,7 @@ deregister_owner(struct http_request *req)
 	}
 
 	// delete entries in to RabbitMQ
-	if (0 == pthread_create(&thread,NULL,delete_exchanges_and_queues,(void *)owner))	
+	if (0 == pthread_create(&thread,NULL,delete_exchanges_and_queues,(void *)owner))
 		thread_started = true;
 	else
 		delete_exchanges_and_queues(owner);
@@ -1701,17 +1700,19 @@ queue_unbind (struct http_request *req)
 			FORBIDDEN("unauthorized");
 	}
 
-	if (! amqp_queue_unbind (
+	amqp_queue_unbind (
 		cached_admin_conn,
 		1,
 		amqp_cstring_bytes(queue),
 		amqp_cstring_bytes(exchange),
 		amqp_cstring_bytes(topic),
 		amqp_empty_table
-	))
-	{
+	);
+
+	amqp_rpc_reply_t r = amqp_get_rpc_reply(cached_admin_conn);
+
+	if (r.reply_type != AMQP_RESPONSE_NORMAL)
 		ERROR("unbind failed");
-	}
 
 	OK();
 
@@ -2072,17 +2073,19 @@ unfollow (struct http_request *req)
 		snprintf(command_queue,129,"%s.command",to);
 		snprintf(write_topic,129,"%s.command.%s",to,topic); // XXX use message_type instead of command
 
-		if (! amqp_queue_unbind (
+		amqp_queue_unbind (
 			cached_admin_conn,
 			1,
 			amqp_cstring_bytes(command_queue),
 			amqp_cstring_bytes(write_exchange),
 			amqp_cstring_bytes(write_topic),
 			amqp_empty_table
-		))
-		{
+		);
+
+		amqp_rpc_reply_t r = amqp_get_rpc_reply(cached_admin_conn);
+
+		if (r.reply_type != AMQP_RESPONSE_NORMAL)
 			ERROR("unbind failed for app.publish with device.command");
-		}
 
 		CREATE_STRING 	(query, "DELETE FROM follow WHERE follow_id='%s'", follow_id);
 		RUN_QUERY	(query, "failed to delete from follow table");
@@ -2136,7 +2139,9 @@ unfollow (struct http_request *req)
 	CREATE_STRING 	(query, "DELETE FROM follow WHERE follow_id='%s'", follow_id);
 	RUN_QUERY	(query, "failed to delete from follow table");
 
-	int z = amqp_queue_unbind (
+	amqp_rpc_reply_t r;
+
+	amqp_queue_unbind (
 		cached_admin_conn,
 		1,
 		amqp_cstring_bytes(from),
@@ -2145,16 +2150,12 @@ unfollow (struct http_request *req)
 		amqp_empty_table
 	);
 
-	if (! z)
-	{
-		char msg[129];
-		snprintf(msg, 129, "regular unbind failed, id = %s apikey = %s to = %s topic = %s"
-		"permission = %s message-type = %s: error = %d", id, apikey, to, topic, permission,
-		message_type, z);
-		ERROR(msg);
-	}
+	r = amqp_get_rpc_reply(cached_admin_conn);
 
-	int x = amqp_queue_unbind (
+	if (r.reply_type != AMQP_RESPONSE_NORMAL)
+		ERROR("unbind failed");
+
+	amqp_queue_unbind (
 		cached_admin_conn,
 		1,
 		amqp_cstring_bytes(priority_queue),
@@ -2163,14 +2164,10 @@ unfollow (struct http_request *req)
 		amqp_empty_table
 	);
 
-	if (! x)
-	{
-		char msg[129];
-		snprintf(msg, 129, "priority unbind failed, id = %s apikey = %s to = %s topic = %s"
-		"permission = %s message-type = %s: error = %d", id, apikey, to, topic, permission,
-		message_type,x);
-		ERROR(msg);
-	}
+	r = amqp_get_rpc_reply(cached_admin_conn);
+
+	if (r.reply_type != AMQP_RESPONSE_NORMAL)
+		ERROR("unbind to priority failed");
 
 	OK();
 
@@ -2235,7 +2232,7 @@ share (struct http_request *req)
 
 	RUN_QUERY (query,"could not run select query on follow");
 
-	uint32_t num_rows = kore_pgsql_ntuples(&sql);
+	int num_rows = kore_pgsql_ntuples(&sql);
 
 	if (num_rows != 1)
 		BAD_REQUEST("follow-id is not valid");
@@ -2430,7 +2427,7 @@ get_follow_status (struct http_request *req)
 
 	RUN_QUERY(query, "could not get follow requests");
 
-	uint32_t num_rows = kore_pgsql_ntuples(&sql);
+	int num_rows = kore_pgsql_ntuples(&sql);
 
 	kore_buf_reset(response);
 	kore_buf_append(response,"[",1);
@@ -2528,7 +2525,7 @@ get_follow_requests (struct http_request *req)
 
 	RUN_QUERY(query, "could not get follow requests");
 
-	uint32_t num_rows = kore_pgsql_ntuples(&sql);
+	int num_rows = kore_pgsql_ntuples(&sql);
 
 	kore_buf_reset(response);
 	kore_buf_append(response,"[",1);
@@ -2724,7 +2721,7 @@ permissions (struct http_request *req)
 	kore_buf_reset(response);
 	kore_buf_append(response,"[",1);
 
-	uint32_t num_rows = kore_pgsql_ntuples(&sql);
+	int num_rows = kore_pgsql_ntuples(&sql);
 
 	for (i = 0; i < num_rows; ++i)
 	{
@@ -2752,7 +2749,7 @@ done:
 }
 
 void *
-create_exchanges_and_queues (void *v)
+create_exchanges_and_queues (const void *v)
 {
 	int i;
 
@@ -2927,7 +2924,7 @@ done:
 }
 
 void *
-delete_exchanges_and_queues (void *v)
+delete_exchanges_and_queues (const void *v)
 {
 	int i;
 
@@ -3020,7 +3017,7 @@ done:
 }
 
 void
-sanitize (char *string)
+sanitize (const char *string)
 {
 	// string should not be NULL. let it crash if it is 
 	char *p = (char *)string;
@@ -3074,13 +3071,16 @@ is_request_from_localhost (struct http_request *req)
 	return false;
 }
 
-void str_to_lower (char *str)
+void
+str_to_lower (const char *str)
 {
-	while (*str)
-	{
-		if (*str >= 'A' && *str <= 'Z')
-			*str += 32; 
+	char *p = (char *)str;
 
-		++str;
+	while (*p)
+	{
+		if (*p >= 'A' && *p <= 'Z')
+			*p += 32; 
+
+		++p;
 	}
 }

@@ -36,11 +36,14 @@
 
 //#define TEST (1)
 
-#if 0
+#if 1
 	#define debug_printf(...)
 #else
-	#define debug_printf(...) printf(__VA_ARGS__)
+	#define debug_printf(...) (void)printf(__VA_ARGS__)
 #endif
+
+
+/////////////////////// APIs /////////////////////////////////
 
 int cat			(struct http_request *);
 
@@ -56,6 +59,7 @@ int deregister_owner 	(struct http_request *);
 int follow		(struct http_request *);
 int unfollow		(struct http_request *);
 
+int get_follow_status 	(struct http_request *);
 int get_follow_requests (struct http_request *);
 
 int share		(struct http_request *);
@@ -67,6 +71,12 @@ int queue_unbind        (struct http_request *);
 
 int block		(struct http_request *);
 int unblock		(struct http_request *);
+
+int permissions 	(struct http_request *);
+
+int db_cleanup		(struct http_request *);
+
+///////////////////////////////////////////////////////////
 
 int init (int);
 
@@ -82,11 +92,11 @@ bool looks_like_a_valid_resource(const char *str);
 bool is_alpha_numeric 	(const char *str);
 bool is_owner		(const char *, const char *);
 
-void *create_exchanges_and_queues (void *);
-void *delete_exchanges_and_queues (void *);
+void *create_exchanges_and_queues (const void *);
+void *delete_exchanges_and_queues (const void *);
 
-void sanitize 		(char *str);
-void str_to_lower 	(char *str);
+void sanitize 		(const char *str);
+void str_to_lower 	(const char *str);
 
 bool is_request_from_localhost (struct http_request *);
 
