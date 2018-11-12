@@ -879,7 +879,8 @@ subscribe (struct http_request *req)
 			kore_buf_append(response,"\"",1);
 
 			char *p = message.body.bytes;
-			while (*p)
+
+			for (int j = 0; j < message.body.len; ++j)
 			{
 				// escape any double quotes
 				if (*p == '\"')
