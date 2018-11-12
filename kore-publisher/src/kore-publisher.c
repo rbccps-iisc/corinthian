@@ -574,7 +574,7 @@ publish (struct http_request *req)
 			BAD_REQUEST("message-type is not valid");
 		}
 
-		snprintf(exchange,129,"%s.%s",to,message_type);
+		snprintf(exchange,129,"%s.%s",id,message_type);
 		strlcpy(topic_to_publish,subject,129);
 
 		debug_printf("------------------> exchange = %s\n",exchange);
