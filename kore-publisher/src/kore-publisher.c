@@ -864,14 +864,18 @@ subscribe (struct http_request *req)
 			kore_buf_append(response,message.properties.content_type.bytes,
 				message.properties.content_type.len);
 
-			if (strcmp(message.properties.content_type.bytes,"application/json") == 0)
+			if (strncmp(message.properties.content_type.bytes,"application/json", message.properties.content_type.len) == 0)
 				is_json = true;
+
 		}
 
 		kore_buf_append(response,"\",\"body\":",9);
-
+		
+		
 		if (is_json)
 		{
+			printf("is-json = true\n");
+
 			kore_buf_append(response,message.body.bytes, message.body.len);
 		}
 		else
