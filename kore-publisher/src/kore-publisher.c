@@ -855,16 +855,45 @@ subscribe (struct http_request *req)
 		if (header->routing_key.len > 0)
 			kore_buf_append(response,header->routing_key.bytes, header->routing_key.len);
 
+
+		bool is_json = false;
+
 		kore_buf_append(response,"\",\"content-type\":\"",18);
 		if (message.properties._flags & AMQP_BASIC_CONTENT_TYPE_FLAG)
 		{
 			kore_buf_append(response,message.properties.content_type.bytes,
 				message.properties.content_type.len);
+
+			if (strcmp(message.properties.content_type.bytes,"application/json") == 0)
+				is_json = true;
 		}
 
-		kore_buf_append(response,"\",\"body\":\"",10);
-		kore_buf_append(response,message.body.bytes, message.body.len);
-		kore_buf_append(response,"\"},",3);
+		kore_buf_append(response,"\",\"body\":",9);
+
+		if (is_json)
+		{
+			kore_buf_append(response,message.body.bytes, message.body.len);
+		}
+		else
+		{
+			kore_buf_append(response,"\"",1);
+
+			char *p = message.body.bytes;
+			while (*p)
+			{
+				// escape any double quotes
+				if (*p == '\"')
+					kore_buf_append(response,"\\",1);
+			
+				kore_buf_append(response,p,1);
+
+				++p;
+			}
+
+			kore_buf_append(response,"\"",1);
+		}
+
+		kore_buf_append(response,"},",2);
 
 		// we waited for messages for at least a second
 		if (time_spent >= 1)
@@ -1201,39 +1230,6 @@ cat (struct http_request *req)
 
 		kore_buf_append(response,schema,strlen(schema));
 	}
-
-	OK();
-
-done:
-	END();
-}
-
-int
-db_cleanup (struct http_request *req)
-{
-	const char *apikey;
-
-	req->status = 403;
-
-	if (! is_request_from_localhost(req))
-		FORBIDDEN("this api can only be called from localhost");
-
-	BAD_REQUEST_if
-	(
-		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
-			,
-		"inputs missing in headers"
-	);
-
-/////////////////////////////////////////////////
-
-	if (! login_success("admin",apikey,NULL))
-		FORBIDDEN("invalid id or apikey");
-
-/////////////////////////////////////////////////
-
-	CREATE_STRING 	(query,"DELETE FROM acl WHERE now() > valid_till");
-	RUN_QUERY 	(query,"could not delete old entiries from acl table");
 
 	OK();
 
