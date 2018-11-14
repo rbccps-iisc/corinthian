@@ -1,4 +1,5 @@
 #include "ht.h"
+#include "node.h"
 
 unsigned int hash_function (const void *key)
 {
@@ -15,7 +16,6 @@ unsigned int hash_function (const void *key)
 
 	return (hash * hash + hash) % MAX_HASH;
 }
-
 
 void ht_init (ht *h)
 {

@@ -6,27 +6,14 @@
 #include<string.h>
 #include<assert.h>
 
+#include "ll.h"
+
 #define MAX_HASH (4096)
-
-typedef struct node {
-
-	char 	*key;
-	void 	*value;
-
-	struct node 	*next;
-} node;
-
-typedef struct ll
-{
-	node *head;
-	node *tail;
-} ll;
 
 typedef struct ht
 {
 	ll *list [MAX_HASH];	
 } ht;
-
 
 unsigned int hash_function (const void *key);
 void ht_init (ht *h);

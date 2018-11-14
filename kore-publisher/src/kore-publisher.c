@@ -345,7 +345,7 @@ looks_like_a_valid_resource (const char *str)
 
 	uint8_t front_slash_count = 0;
  
-        uint8_t dot_count = 0;
+	uint8_t dot_count = 0;
 
 	// format is owner/entity.public
 	if (strlen_str < 10 || strlen_str > 128)
@@ -694,6 +694,123 @@ done:
 	
 			ht_delete(&connection_ht,key);
 		}
+	}
+
+	END();
+}
+
+int
+publish_async (struct http_request *req)
+{
+	const char *id;
+	const char *apikey;
+	const char *to;
+	const char *subject;
+	const char *message;
+	const char *message_type;
+
+	const char *content_type;
+
+	char exchange[129];
+	char topic_to_publish[129];
+
+	req->status = 403;
+
+	BAD_REQUEST_if
+	(
+		KORE_RESULT_OK != http_request_header(req, "id", &id)
+				||
+		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+				||
+		KORE_RESULT_OK != http_request_header(req, "to", &to)
+				||
+		KORE_RESULT_OK != http_request_header(req, "subject", &subject)
+				||
+		KORE_RESULT_OK != http_request_header(req, "message-type", &message_type)
+			,
+		"inputs missing in headers"
+	);
+
+	if (! looks_like_a_valid_entity(to))
+		BAD_REQUEST("'to' is not a valid entity");
+
+	// ok to publish to himself
+	if (strcmp(id,to) == 0)
+	{
+		if (
+			(strcmp(message_type,"public") 		!= 0)	&&
+			(strcmp(message_type,"private") 	!= 0)	&&
+			(strcmp(message_type,"protected") 	!= 0)	&&
+			(strcmp(message_type,"diagnostics") 	!= 0)	
+		)
+		{
+			BAD_REQUEST("message-type is not valid");
+		}
+
+		snprintf(exchange,129,"%s.%s",id,message_type);
+		strlcpy(topic_to_publish,subject,129);
+
+		debug_printf("------------------> exchange = %s\n",exchange);
+		debug_printf("------------------> topic = %s\n",topic_to_publish);
+	}
+	else
+	{
+		if (strcmp(message_type,"command") != 0)
+		{
+			BAD_REQUEST("message-type can only be command");		
+		}
+
+		snprintf(topic_to_publish,129,"%s.%s.%s",to,message_type,subject);
+		snprintf(exchange,129,"%s.publish",id);
+
+		debug_printf("------------------> exchange = %s\n",exchange);
+		debug_printf("------------------> topic = %s\n",topic_to_publish);
+	}
+
+	if (http_request_header(req, "message", &message) != KORE_RESULT_OK)
+	{
+		if ((message = (char *)req->http_body->data) == NULL)
+			BAD_REQUEST("no body found in request");
+	}
+
+	if (http_request_header(req, "content-type", &content_type) != KORE_RESULT_OK)
+		content_type = "";
+
+	publish_async_data_t *d = malloc (sizeof(publish_async_data_t));
+
+	if (d == NULL)
+		ERROR("out of memory");
+
+	d->id 		=
+	d->apikey 	=
+	d->to		=
+	d->message	=
+	d->exchange	=
+	d->topic	=
+	d->content_type	= NULL;
+
+	if (!(d->id 		= strdup(id)))			ERROR("out of memmory");
+	if (!(d->apikey		= strdup(apikey)))		ERROR("out of memmory");
+	if (!(d->to 		= strdup(to)))			ERROR("out of memmory");
+	if (!(d->message	= strdup(message)))		ERROR("out of memmory");
+	if (!(d->exchange 	= strdup(exchange)))		ERROR("out of memmory");
+	if (!(d->topic 		= strdup(topic_to_publish)))	ERROR("out of memmory");
+	if (!(d->content_type	= strdup(content_type)))	ERROR("out of memmory");
+
+	// push in queue id, apikey, message_type, message
+
+done:
+	if (req->status == 500)
+	{
+		if (d->id)		free (d->id);
+		if (d->apikey)		free (d->apikey);
+		if (d->to)		free (d->to);
+		if (d->message)		free (d->message);
+		if (d->exchange)	free (d->exchange);
+		if (d->topic)		free (d->topic);
+		if (d->content_type)	free (d->content_type);
+
+		free (d);
 	}
 
 	END();

@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <pthread.h>
 
 #include <kore/kore.h>
 #include <kore/http.h>
@@ -44,12 +45,25 @@
 	#define debug_printf(...) (void)printf(__VA_ARGS__)
 #endif
 
+typedef struct publish_async_data {
+
+	char *id;
+	char *apikey;
+	char *to;
+	char *message;
+	char *exchange;
+	char *topic;
+	char *content_type;
+		
+} publish_async_data_t;
+
 
 /////////////////////// APIs /////////////////////////////////
 
 int cat			(struct http_request *);
 
 int publish		(struct http_request *);
+int publish_async	(struct http_request *);
 int subscribe		(struct http_request *);
 
 int register_entity	(struct http_request *);
