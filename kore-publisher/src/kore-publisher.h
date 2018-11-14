@@ -30,6 +30,8 @@
 #include <pthread.h>
 
 #include "ht.h"
+#include "q.h"
+
 #include<arpa/inet.h>
 #include<netdb.h>
 #include<sys/socket.h>

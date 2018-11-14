@@ -8,7 +8,7 @@ char *_q[] = {"\0", ".private", ".priority", ".command", ".notification", NULL};
 
 struct kore_pgsql sql;
 
-struct kore_buf *Q = NULL;
+struct kore_buf *queue = NULL;
 struct kore_buf *query = NULL;
 struct kore_buf *response = NULL;
 
@@ -58,6 +58,12 @@ hostname_to_ip(char * hostname , char* ip)
     }
      
     return 1;
+}
+
+void*
+async_publish_function (void *v)
+{
+	
 }
 
 int
@@ -212,8 +218,8 @@ retry:
 
 	ht_init (&connection_ht);
 
-	if (Q == NULL)
-		Q = kore_buf_alloc(256);
+	if (queue == NULL)
+		queue = kore_buf_alloc(256);
 
 	if (query == NULL)
 		query = kore_buf_alloc(512);
@@ -244,6 +250,22 @@ retry:
 		perror("setuid ");
 
 /////////////////////////////////
+
+#define MAX_ASYNC_THREADS (1)
+
+	Q 		async_q		[MAX_ASYNC_THREADS];
+	pthread_t 	async_thread	[MAX_ASYNC_THREADS];
+
+	for (i = 0; i < MAX_ASYNC_THREADS; ++i)
+	{
+		q_init(&async_q[i]);
+
+		if (pthread_create(&async_thread[i],NULL,async_publish_function,(void *)&async_q[i]) != 0)
+		{
+			perror("could not create async thread");
+			return KORE_RESULT_ERROR;
+		}
+	}
 
 	return KORE_RESULT_OK;
 }
@@ -797,20 +819,25 @@ publish_async (struct http_request *req)
 	if (!(d->topic 		= strdup(topic_to_publish)))	ERROR("out of memmory");
 	if (!(d->content_type	= strdup(content_type)))	ERROR("out of memmory");
 
-	// push in queue id, apikey, message_type, message
+	// TODO push d in any of the queue 
+
+	OK_202();
 
 done:
 	if (req->status == 500)
 	{
-		if (d->id)		free (d->id);
-		if (d->apikey)		free (d->apikey);
-		if (d->to)		free (d->to);
-		if (d->message)		free (d->message);
-		if (d->exchange)	free (d->exchange);
-		if (d->topic)		free (d->topic);
-		if (d->content_type)	free (d->content_type);
+		if (d)
+		{
+			if (d->id)		free (d->id);
+			if (d->apikey)		free (d->apikey);
+			if (d->to)		free (d->to);
+			if (d->message)		free (d->message);
+			if (d->exchange)	free (d->exchange);
+			if (d->topic)		free (d->topic);
+			if (d->content_type)	free (d->content_type);
 
-		free (d);
+			free (d);
+		}
 	}
 
 	END();
@@ -845,22 +872,22 @@ subscribe (struct http_request *req)
 	if (! looks_like_a_valid_entity(id))
 		BAD_REQUEST("id is not a valid entity");
 
-	kore_buf_reset(Q);
-	kore_buf_append(Q,id,strlen(id));
+	kore_buf_reset(queue);
+	kore_buf_append(queue,id,strlen(id));
 
 	if (KORE_RESULT_OK == http_request_header(req, "message-type", &message_type))
 	{
 		if (strcmp(message_type,"priority") == 0)
 		{
-			kore_buf_append (Q,".priority",sizeof(".priority") - 1);
+			kore_buf_append (queue,".priority",sizeof(".priority") - 1);
 		}
 		else if (strcmp(message_type,"command") == 0)
 		{
-			kore_buf_append (Q,".command",sizeof(".command") - 1);
+			kore_buf_append (queue,".command",sizeof(".command") - 1);
 		}
 		else if (strcmp(message_type,"notification") == 0)
 		{
-			kore_buf_append (Q,".notification",sizeof(".notification") - 1);
+			kore_buf_append (queue,".notification",sizeof(".notification") - 1);
 		}
 		else
 		{
@@ -868,7 +895,7 @@ subscribe (struct http_request *req)
 		}
 	}
 
-	kore_buf_append(Q,"\0",1);
+	kore_buf_append(queue,"\0",1);
 
 	int int_num_messages = 10;
 	if (KORE_RESULT_OK == http_request_header(req, "num-messages", &num_messages))
@@ -934,7 +961,7 @@ subscribe (struct http_request *req)
 			res = amqp_basic_get(
 					connection,
 					1,
-					amqp_cstring_bytes((const char *)Q->data),
+					amqp_cstring_bytes((const char *)queue->data),
 					/*no ack*/ 1
 			);
 
