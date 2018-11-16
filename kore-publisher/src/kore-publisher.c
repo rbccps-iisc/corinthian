@@ -64,7 +64,7 @@ hostname_to_ip(char * hostname , char* ip)
 void*
 async_publish_function (void *v)
 {
-	
+	return NULL;	
 }
 
 int
@@ -1023,7 +1023,7 @@ subscribe (struct http_request *req)
 
 			char *p = message.body.bytes;
 
-			for (int j = 0; j < message.body.len; ++j)
+			for (size_t j = 0; j < message.body.len; ++j)
 			{
 				// escape any double quotes
 				if (*p == '\"')
@@ -2904,6 +2904,7 @@ create_exchanges_and_queues (const void *v)
 
 	const char *id = (const char *)v;
 
+	char queue	[129];
 	char exchange	[129];
 
 	is_success = false;
@@ -3078,7 +3079,8 @@ delete_exchanges_and_queues (const void *v)
 
 	const char *id = (const char *)v;
 
-	char exchange[129];
+	char queue	[129];
+	char exchange	[129];
 
 	if (looks_like_a_valid_owner(id))
 	{
