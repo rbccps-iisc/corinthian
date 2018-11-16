@@ -1420,7 +1420,7 @@ register_owner(struct http_request *req)
 		FORBIDDEN("only admin can call this api");
 
 	// cannot create an admin
-	if (strcmp(owner,"admin") == 0 || strcmp(owner,"DATABASE") == 0 || strcmp(owner,"database") == 0)
+	if (strcmp(owner,"admin") == 0 || strcmp(owner,"validator") == 0 || strcmp(owner,"database") == 0)
 		FORBIDDEN("cannot create the user");
 
 	// it should look like an owner
