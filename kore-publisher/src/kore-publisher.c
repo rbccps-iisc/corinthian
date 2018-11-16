@@ -8,7 +8,8 @@ char *_q[] = {"\0", ".private", ".priority", ".command", ".notification", NULL};
 
 struct kore_pgsql sql;
 
-struct kore_buf *queue = NULL;
+char queue[129];
+
 struct kore_buf *query = NULL;
 struct kore_buf *response = NULL;
 
@@ -217,9 +218,6 @@ retry:
 	}
 
 	ht_init (&connection_ht);
-
-	if (queue == NULL)
-		queue = kore_buf_alloc(256);
 
 	if (query == NULL)
 		query = kore_buf_alloc(512);
@@ -872,30 +870,27 @@ subscribe (struct http_request *req)
 	if (! looks_like_a_valid_entity(id))
 		BAD_REQUEST("id is not a valid entity");
 
-	kore_buf_reset(queue);
-	kore_buf_append(queue,id,strlen(id));
+	strlcat(queue,id,128);
 
 	if (KORE_RESULT_OK == http_request_header(req, "message-type", &message_type))
 	{
 		if (strcmp(message_type,"priority") == 0)
 		{
-			kore_buf_append (queue,".priority",sizeof(".priority") - 1);
+			strlcat(queue,".priority",128);
 		}
 		else if (strcmp(message_type,"command") == 0)
 		{
-			kore_buf_append (queue,".command",sizeof(".command") - 1);
+			strlcat(queue,".command",128);
 		}
 		else if (strcmp(message_type,"notification") == 0)
 		{
-			kore_buf_append (queue,".notification",sizeof(".notification") - 1);
+			strlcat(queue,".notification",128);
 		}
 		else
 		{
 			BAD_REQUEST("invalid message-type");
 		}
 	}
-
-	kore_buf_append(queue,"\0",1);
 
 	int int_num_messages = 10;
 	if (KORE_RESULT_OK == http_request_header(req, "num-messages", &num_messages))
@@ -961,7 +956,7 @@ subscribe (struct http_request *req)
 			res = amqp_basic_get(
 					connection,
 					1,
-					amqp_cstring_bytes((const char *)queue->data),
+					amqp_cstring_bytes((const char *)queue),
 					/*no ack*/ 1
 			);
 
@@ -1120,6 +1115,8 @@ register_entity (struct http_request *req)
 	if (! login_success(id,apikey,NULL))
 		FORBIDDEN("invalid id or apikey");
 
+	str_to_lower(entity);
+
 	sanitize(entity);
 
 	// TODO maybe body needs a different sanitizer
@@ -1127,8 +1124,6 @@ register_entity (struct http_request *req)
 		sanitize(body);
 
 /////////////////////////////////////////////////
-
-	str_to_lower(entity);
 
 	snprintf(entity_name,66,"%s/%s",id,entity);
 
@@ -1419,6 +1414,8 @@ register_owner(struct http_request *req)
 	if (strcmp(id,"admin") != 0)
 		FORBIDDEN("only admin can call this api");
 
+	str_to_lower(owner);
+
 	// cannot create an admin
 	if (strcmp(owner,"admin") == 0 || strcmp(owner,"validator") == 0 || strcmp(owner,"database") == 0)
 		FORBIDDEN("cannot create the user");
@@ -1435,8 +1432,6 @@ register_owner(struct http_request *req)
 	sanitize(owner);
 
 /////////////////////////////////////////////////
-
-	str_to_lower(owner);
 
 	// conflict if owner already exist
 	CREATE_STRING (query,
@@ -1607,8 +1602,7 @@ queue_bind (struct http_request *req)
 	const char *message_type;
 	const char *is_priority;
 
-	char queue 	[129];
-	char exchange	[129];
+	char exchange[129];
 
  	req->status = 403;
 
@@ -1744,7 +1738,6 @@ queue_unbind (struct http_request *req)
 	const char *message_type;
 	const char *is_priority;
 
-	char queue 	[129];
 	char exchange	[129];
 
  	req->status = 403;
@@ -2911,7 +2904,6 @@ create_exchanges_and_queues (const void *v)
 
 	const char *id = (const char *)v;
 
-	char queue	[129];
 	char exchange	[129];
 
 	is_success = false;
@@ -3086,7 +3078,6 @@ delete_exchanges_and_queues (const void *v)
 
 	const char *id = (const char *)v;
 
-	char queue[129];
 	char exchange[129];
 
 	if (looks_like_a_valid_owner(id))
