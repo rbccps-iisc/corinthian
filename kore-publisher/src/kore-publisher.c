@@ -870,7 +870,7 @@ subscribe (struct http_request *req)
 	if (! looks_like_a_valid_entity(id))
 		BAD_REQUEST("id is not a valid entity");
 
-	strlcat(queue,id,128);
+	strlcpy(queue,id,128);
 
 	if (KORE_RESULT_OK == http_request_header(req, "message-type", &message_type))
 	{
