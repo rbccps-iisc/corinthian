@@ -3,7 +3,7 @@
 char password_chars[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-";
 
 // variables for exchanges and queues
-char *_e[] = {".public",".private",".protected",".notification",".publish",".diagnostics",NULL};
+char *_e[] = {".public",".private",".protected",".notification",".publish",".diagnostics",".validated",NULL};
 char *_q[] = {"\0", ".private", ".priority", ".command", ".notification", NULL};
 
 struct kore_pgsql sql;
