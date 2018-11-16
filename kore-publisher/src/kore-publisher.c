@@ -3,7 +3,7 @@
 char password_chars[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-";
 
 // variables for exchanges and queues
-char *_e[] = {".public",".private",".protected",".notification",".publish",".diagnostics",".validated",NULL};
+char *_e[] = {".public",".private",".protected",".notification",".publish",".diagnostics",".public.validated",".protected.validated",NULL};
 char *_q[] = {"\0", ".private", ".priority", ".command", ".notification", NULL};
 
 struct kore_pgsql sql;
@@ -62,7 +62,7 @@ hostname_to_ip(char * hostname , char* ip)
 }
 
 void*
-async_publish_function (void *v)
+async_publish_function (const void *v)
 {
 	return NULL;	
 }
@@ -851,11 +851,6 @@ subscribe (struct http_request *req)
 	const char *message_type;
 	const char *num_messages;
 
-	amqp_socket_t 			*socket = NULL;
-	amqp_connection_state_t		connection;
-
-	bool connection_opened = false;
-
 	req->status = 403;
 
 	BAD_REQUEST_if
@@ -901,43 +896,59 @@ subscribe (struct http_request *req)
 			BAD_REQUEST("num-messages is not valid");
 	}
 
+	node *n = NULL;
+	amqp_connection_state_t	*cached_conn = NULL;
+
+	char key[65];
+	strlcpy(key,id,32);
+	strlcat(key,apikey,64);
+
+	if ((n = ht_search(&connection_ht,key)) != NULL)
+	{
+		cached_conn = n->value;
+	}
+	else
+	{
+
 /////////////////////////////////////////////////
 
-	if (! login_success(id,apikey,NULL))
-		FORBIDDEN("invalid id or apikey");
+		if (! looks_like_a_valid_entity(id))
+			BAD_REQUEST("id is not a valid entity");
+
+		if (! login_success(id,apikey,NULL))
+			FORBIDDEN("invalid id or apikey");
 
 /////////////////////////////////////////////////
+		
+		cached_conn = malloc(sizeof(amqp_connection_state_t));
 
-	connection 	= amqp_new_connection();
-	socket		= amqp_tcp_socket_new(connection);
+		if (cached_conn == NULL)
+			ERROR("out of memory");
 
-	connection_opened = true;
+		*cached_conn = amqp_new_connection();
+		amqp_socket_t *socket = amqp_tcp_socket_new(*cached_conn);
 
-	if (socket == NULL)
-		ERROR("could not create a new socket");
+		if (socket == NULL)
+			ERROR("could not create a new socket");
 
-	if (amqp_socket_open(socket, broker_ip, 5672))
-		ERROR("could not open a socket");
+		if (amqp_socket_open(socket, broker_ip , 5672))
+			ERROR("could not open a socket");
 
-	login_reply = amqp_login(connection, 
-			"/",
-			0,
-			131072,
-			HEART_BEAT,
-			AMQP_SASL_METHOD_PLAIN,
-			id,
-			apikey
-	);
+		login_reply = amqp_login(*cached_conn, 
+			"/", 0, 131072, HEART_BEAT, AMQP_SASL_METHOD_PLAIN, id, apikey);
 
-	if (login_reply.reply_type != AMQP_RESPONSE_NORMAL)
-		FORBIDDEN("invalid id or apikey");
+		if (login_reply.reply_type != AMQP_RESPONSE_NORMAL)
+			FORBIDDEN("broker: invalid id or apkey");
 
-	if (! amqp_channel_open(connection, 1))
-		ERROR("could not open an AMQP connection");
+		if(! amqp_channel_open(*cached_conn, 1))
+			ERROR("could not open an AMQP connection");
 
-	rpc_reply = amqp_get_rpc_reply(connection);
-	if (rpc_reply.reply_type != AMQP_RESPONSE_NORMAL)
-		FORBIDDEN("did not receive expected response from the broker");
+		rpc_reply = amqp_get_rpc_reply(*cached_conn);
+		if (rpc_reply.reply_type != AMQP_RESPONSE_NORMAL)
+			ERROR("did not receive expected response from the broker");
+
+		ht_insert (&connection_ht, key, cached_conn);
+	}
 
 	kore_buf_reset(response);
 	kore_buf_append(response,"[",1);
@@ -954,7 +965,7 @@ subscribe (struct http_request *req)
 		do
 		{
 			res = amqp_basic_get(
-					connection,
+					*cached_conn,
 					1,
 					amqp_cstring_bytes((const char *)queue),
 					/*no ack*/ 1
@@ -977,7 +988,7 @@ subscribe (struct http_request *req)
 
 		amqp_basic_get_ok_t *header = (amqp_basic_get_ok_t *) res.reply.decoded;
          
-		amqp_read_message(connection, 1, &message, 0);
+		amqp_read_message(*cached_conn, 1, &message, 0);
 
 		/* construct the response */
 		kore_buf_append(response,"{\"sent-by\":\"",12);
@@ -1054,11 +1065,16 @@ subscribe (struct http_request *req)
 	OK();
 
 done:
-	if (connection_opened)
+	if (req->status == 500)
 	{
-		amqp_channel_close	(connection, 1, AMQP_REPLY_SUCCESS);
-		amqp_connection_close	(connection,    AMQP_REPLY_SUCCESS);
-		amqp_destroy_connection	(connection);
+		if (cached_conn)
+		{
+			amqp_channel_close	(*cached_conn, 1, AMQP_REPLY_SUCCESS);
+			amqp_connection_close	(*cached_conn,    AMQP_REPLY_SUCCESS);
+			amqp_destroy_connection	(*cached_conn);
+	
+			ht_delete(&connection_ht,key);
+		}
 	}
 
 	END();
