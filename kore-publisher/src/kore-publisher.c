@@ -238,6 +238,9 @@ retry:
 
 ///// chroot and drop priv /////
 
+	explicit_bzero(admin_apikey,33);
+	explicit_bzero(postgres_pwd,33);
+
 	if (chroot("./jail") < 0)
 		perror("chroot ");
 	
