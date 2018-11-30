@@ -8,7 +8,8 @@ char *_q[] = {"\0", ".private", ".priority", ".command", ".notification", NULL};
 
 struct kore_pgsql sql;
 
-char queue[129];
+char queue	[129];
+char exchange	[129];
 
 struct kore_buf *query = NULL;
 struct kore_buf *response = NULL;
@@ -553,7 +554,6 @@ publish (struct http_request *req)
 
 	const char *content_type;
 
-	char exchange[129];
 	char topic_to_publish[129];
 
 	req->status = 403;
@@ -726,7 +726,6 @@ publish_async (struct http_request *req)
 
 	const char *content_type;
 
-	char exchange[129];
 	char topic_to_publish[129];
 
 	req->status = 403;
@@ -1613,8 +1612,6 @@ queue_bind (struct http_request *req)
 	const char *message_type;
 	const char *is_priority;
 
-	char exchange[129];
-
  	req->status = 403;
 
 	BAD_REQUEST_if
@@ -1748,8 +1745,6 @@ queue_unbind (struct http_request *req)
         const char *topic;
 	const char *message_type;
 	const char *is_priority;
-
-	char exchange	[129];
 
  	req->status = 403;
 
@@ -2130,7 +2125,6 @@ unfollow (struct http_request *req)
 
 	char *acl_id;
 	char *follow_id;
-	char *exchange;
 
 	BAD_REQUEST_if
 	(
@@ -2258,21 +2252,21 @@ unfollow (struct http_request *req)
 	}
 
 //// for read permissions /////
+	snprintf(exchange,128,"%s.%s",to,message_type);
 
 	CREATE_STRING ( query,
-		"SELECT acl_id,follow_id,exchange FROM acl "
+		"SELECT acl_id,follow_id FROM acl "
 			"WHERE "
 			"from_id = '%s' "
 				"AND "
-			"exchange = '%s.%s' "
+			"exchange = '%s' "
 				"AND "
 			"topic = '%s' "
 				"AND "
 			"permission = 'read'",
 
 				from,
-				to,
-				message_type,
+				exchange,
 				topic
 	);
 
@@ -2288,7 +2282,6 @@ unfollow (struct http_request *req)
 
 	acl_id		= kore_pgsql_getvalue(&sql,0,0);
 	follow_id	= kore_pgsql_getvalue(&sql,0,1);
-	exchange 	= kore_pgsql_getvalue(&sql,0,2);
 
 	CREATE_STRING 	(query, "DELETE FROM acl WHERE acl_id='%s'", acl_id);
 	RUN_QUERY	(query, "failed to delete from acl table");
@@ -2297,6 +2290,7 @@ unfollow (struct http_request *req)
 	RUN_QUERY	(query, "failed to delete from follow table");
 
 	amqp_rpc_reply_t r;
+
 
 	amqp_queue_unbind (
 		cached_admin_conn,
@@ -2918,6 +2912,7 @@ create_exchanges_and_queues (const void *v)
 
 	const char *id = (const char *)v;
 
+	// local variables
 	char queue	[129];
 	char exchange	[129];
 
@@ -3093,6 +3088,7 @@ delete_exchanges_and_queues (const void *v)
 
 	const char *id = (const char *)v;
 
+	// local variables
 	char queue	[129];
 	char exchange	[129];
 
