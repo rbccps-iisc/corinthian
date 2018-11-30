@@ -26,7 +26,7 @@ char postgres_pwd[33];
 char broker_ip	[100];
 char pgsql_ip	[100];
 
-char error_string [100];
+char error_string [1025];
 
 amqp_connection_state_t	cached_admin_conn;
 amqp_table_t 		lazy_queue_table;
@@ -176,12 +176,8 @@ retry:
 		goto retry;
 	}
 
-	login_reply = amqp_login
-#ifdef TEST
-		(cached_admin_conn, "/", 0, 131072, HEART_BEAT, AMQP_SASL_METHOD_PLAIN, "guest", "guest");
-#else
-		(cached_admin_conn, "/", 0, 131072, HEART_BEAT, AMQP_SASL_METHOD_PLAIN, "admin", admin_apikey);
-#endif
+	login_reply = amqp_login(cached_admin_conn, "/", 0, 131072, HEART_BEAT, AMQP_SASL_METHOD_PLAIN, "admin", admin_apikey);
+
 	if (login_reply.reply_type != AMQP_RESPONSE_NORMAL)
 	{
 		fprintf(stderr,"invalid id or apikey\n");
@@ -225,13 +221,9 @@ retry:
 	if (response == NULL)
 		response = kore_buf_alloc(1024*1024);
 
-#ifdef TEST
-	kore_pgsql_register("db","user=postgres password=password");
-#else
 	char conn_str[129];
         snprintf(conn_str,129,"host = %s user = postgres password = %s", pgsql_ip, postgres_pwd);
 	kore_pgsql_register("db",conn_str);
-#endif
 
 	memset(&props, 0, sizeof props);
 	props._flags = AMQP_BASIC_CONTENT_TYPE_FLAG | AMQP_BASIC_USER_ID_FLAG ;
@@ -1872,7 +1864,7 @@ queue_unbind (struct http_request *req)
 
 	if (r.reply_type != AMQP_RESPONSE_NORMAL)
 	{
-		snprintf(error_string,100,"unbind failed %d\n",r.reply_type);
+		snprintf(error_string,1024,"unbind failed %d e={%s} q={%s} t={%s}\n",r.reply_type,exchange,queue,topic);
 		ERROR(error_string);
 	}
 
@@ -2233,7 +2225,7 @@ unfollow (struct http_request *req)
 
 		snprintf(write_exchange,129,"%s.publish",from);
 		snprintf(command_queue,129,"%s.command",to);
-		snprintf(write_topic,129,"%s.command.%s",to,topic); // XXX use message_type instead of command
+		snprintf(write_topic,129,"%s.command.%s",to,topic);
 
 		amqp_queue_unbind (
 			cached_admin_conn,
@@ -2247,7 +2239,10 @@ unfollow (struct http_request *req)
 		amqp_rpc_reply_t r = amqp_get_rpc_reply(cached_admin_conn);
 
 		if (r.reply_type != AMQP_RESPONSE_NORMAL)
-			ERROR("unbind failed for app.publish with device.command");
+		{
+			snprintf(error_string,1024,"unbind failed %d e={%s} q={%s} t={%s}\n",r.reply_type,write_exchange,command_queue,write_topic);
+			ERROR(error_string);
+		}
 
 		CREATE_STRING 	(query, "DELETE FROM follow WHERE follow_id='%s'", follow_id);
 		RUN_QUERY	(query, "failed to delete from follow table");
@@ -2316,7 +2311,7 @@ unfollow (struct http_request *req)
 
 	if (r.reply_type != AMQP_RESPONSE_NORMAL)
 	{
-		snprintf(error_string,100,"unbind failed %d\n",r.reply_type);
+		snprintf(error_string,1024,"unbind failed %d e={%s} q={%s} t={%s}\n",r.reply_type,exchange,from,topic);
 		ERROR(error_string);
 	}
 
@@ -2333,7 +2328,7 @@ unfollow (struct http_request *req)
 
 	if (r.reply_type != AMQP_RESPONSE_NORMAL)
 	{
-		snprintf(error_string,100,"unbind to priority failed %d\n",r.reply_type);
+		snprintf(error_string,1024,"unbind priority failed %d e={%s} q={%s} t={%s}\n",r.reply_type,exchange,priority_queue,topic);
 		ERROR(error_string);
 	}
 
