@@ -49,7 +49,6 @@ typedef struct publish_async_data {
 
 	char *id;
 	char *apikey;
-	char *to;
 	char *message;
 	char *exchange;
 	char *subject;

@@ -95,7 +95,7 @@ hostname_to_ip(char * hostname , char* ip)
 void*
 async_publish_function (const void *v)
 {
-	Q *q = (int *)v;
+	Q *q = (Q *)v;
 
 	publish_async_data_t *data = NULL; 
 
@@ -104,15 +104,11 @@ async_publish_function (const void *v)
 
 	const char *id;
 	const char *apikey;
-	const char *to;
 	const char *subject;
 	const char *message;
-	const char *message_type;
-
 	const char *content_type;
 
-	char async_exchange [129];
-	char async_topic_to_publish[129];
+	char *async_exchange;
 
 	// TODO : yet to be tested !
 
@@ -133,16 +129,13 @@ async_publish_function (const void *v)
 		{
 			id		= data->id;
 			apikey		= data->apikey;
-			to		= data->to;
 			subject		= data->subject;
 			message		= data->message;
 			content_type	= data->content_type;
+			async_exchange	= data->exchange;
 
 			strlcpy(key,id,32);
 			strlcat(key,apikey,64);
-
-			snprintf(async_exchange,129,"%s.%s",id,message_type);
-			strlcpy(async_topic_to_publish,subject,129);
 
 			if ((n = ht_search(&async_connection_ht,key)) != NULL)
 			{
@@ -206,7 +199,7 @@ async_publish_function (const void *v)
 				*async_cached_conn,
 				1,
 				amqp_cstring_bytes(async_exchange),
-        			amqp_cstring_bytes(async_topic_to_publish),
+        			amqp_cstring_bytes(subject),
 				0,
 				0,
 				&async_props,
@@ -999,7 +992,6 @@ publish_async (struct http_request *req)
 
 	data->id 		=
 	data->apikey 		=
-	data->to		=
 	data->message		=
 	data->exchange		=
 	data->subject		=
@@ -1007,7 +999,6 @@ publish_async (struct http_request *req)
 
 	if (!(data->id 			= strdup(id)))			ERROR("out of memmory");
 	if (!(data->apikey		= strdup(apikey)))		ERROR("out of memmory");
-	if (!(data->to 			= strdup(to)))			ERROR("out of memmory");
 	if (!(data->message		= strdup(message)))		ERROR("out of memmory");
 	if (!(data->exchange 		= strdup(exchange)))		ERROR("out of memmory");
 	if (!(data->subject		= strdup(topic_to_publish)))	ERROR("out of memmory");
@@ -1015,14 +1006,10 @@ publish_async (struct http_request *req)
 
 	// TODO push "data" in any of the queue 
 
-	/*
-
-	if (q_insert (async_q[async_queue_index], data) < 0)
+	if (q_insert (&async_q[async_queue_index], data) < 0)
 		ERROR("inserting into queue failed");
 
 	async_queue_index = (async_queue_index + 1) % MAX_ASYNC_THREADS;
-
-	*/
 
 	OK_202();
 
@@ -1033,7 +1020,6 @@ done:
 		{
 			if (data->id)		free (data->id);
 			if (data->apikey)	free (data->apikey);
-			if (data->to)		free (data->to);
 			if (data->message)	free (data->message);
 			if (data->exchange)	free (data->exchange);
 			if (data->subject)	free (data->subject);
@@ -2639,7 +2625,7 @@ share (struct http_request *req)
 		BAD_REQUEST("follow-id is not valid");
 
 	char *from_id		= kore_pgsql_getvalue(&sql,0,0);
-	char *exchange 	 	= kore_pgsql_getvalue(&sql,0,1);
+	char *my_exchange 	= kore_pgsql_getvalue(&sql,0,1);
 	char *permission 	= kore_pgsql_getvalue(&sql,0,2); 
 	char *validity_hours 	= kore_pgsql_getvalue(&sql,0,3); 
 	char *topic 	 	= kore_pgsql_getvalue(&sql,0,4); 
@@ -2656,7 +2642,7 @@ share (struct http_request *req)
 		"INSERT INTO acl (acl_id,from_id,exchange,follow_id,permission,topic,valid_till) "
 		"VALUES(DEFAULT,'%s','%s','%s','%s','%s',now() + interval '%s hours')",
 	        	from_id,
-			exchange,
+			my_exchange,
 			follow_id,
 			permission,
 			topic,
@@ -2672,8 +2658,8 @@ share (struct http_request *req)
 		char write_topic	[129];
 
 		snprintf(write_exchange,129,"%s.publish",from_id);
-		snprintf(command_queue,129,"%s",exchange);	// exchange in follow is device.command
-		snprintf(write_topic,129,"%s.%s",exchange,topic); // routing key will be dev.command.topic
+		snprintf(command_queue,129,"%s",my_exchange);	// exchange in follow is device.command
+		snprintf(write_topic,129,"%s.%s",my_exchange,topic); // routing key will be dev.command.topic
 
 		debug_printf("\n--->binding {%s} with {%s} {%s}\n",command_queue,write_exchange,write_topic);
 
@@ -3126,11 +3112,11 @@ permissions (struct http_request *req)
 
 	for (i = 0; i < num_rows; ++i)
 	{
-		char *exchange 	= kore_pgsql_getvalue(&sql,i,0);
-		char *perm 	= kore_pgsql_getvalue(&sql,i,1);
+		char *my_exchange 	= kore_pgsql_getvalue(&sql,i,0);
+		char *perm 		= kore_pgsql_getvalue(&sql,i,1);
 
 		kore_buf_append(response,"{\"entity\":\"",11);
-		kore_buf_append(response,exchange,strlen(exchange));
+		kore_buf_append(response,my_exchange,strlen(my_exchange));
 		kore_buf_append(response,"\",\"permission\":\"",16);
 		kore_buf_append(response,perm,strlen(perm));
 		kore_buf_append(response,"\"},",3);
@@ -3157,22 +3143,22 @@ create_exchanges_and_queues (const void *v)
 	const char *id = (const char *)v;
 
 	// local variables
-	char queue	[129];
-	char exchange	[129];
+	char my_queue	[129];
+	char my_exchange[129];
 
 	is_success = false;
 
 	if (looks_like_a_valid_owner(id))
 	{
 		// create notification exchange 
-		snprintf(exchange,129,"%s.notification",id);
+		snprintf(my_exchange,129,"%s.notification",id);
 
-		debug_printf("[owner] creating exchange {%s}\n",exchange);
+		debug_printf("[owner] creating exchange {%s}\n",my_exchange);
 
 		if (! amqp_exchange_declare (
 			cached_admin_conn,
 			1,
-			amqp_cstring_bytes(exchange),
+			amqp_cstring_bytes(my_exchange),
 			amqp_cstring_bytes("topic"),
 			0,
 			1, /* durable */
@@ -3181,18 +3167,18 @@ create_exchanges_and_queues (const void *v)
 			amqp_empty_table
 		))
 		{
-			fprintf(stderr,"amqp_exchange_declare failed {%s}\n",exchange);
+			fprintf(stderr,"amqp_exchange_declare failed {%s}\n",my_exchange);
 			goto done;
 		}
-		debug_printf("[owner] done creating exchange {%s}\n",exchange);
+		debug_printf("[owner] done creating exchange {%s}\n",my_exchange);
 
 		// create notification queue
 		snprintf(queue,129,"%s.notification",id);
-		debug_printf("[owner] creating queue {%s}\n",queue);
+		debug_printf("[owner] creating queue {%s}\n",my_queue);
 		if (! amqp_queue_declare (
 			cached_admin_conn,
 			1,
-			amqp_cstring_bytes(queue),
+			amqp_cstring_bytes(my_queue),
 			0,
 			1, /* durable */
 			0,
@@ -3200,53 +3186,53 @@ create_exchanges_and_queues (const void *v)
 			lazy_queue_table
 		))
 		{
-			fprintf(stderr,"amqp_queue_declare failed {%s}\n",queue);
+			fprintf(stderr,"amqp_queue_declare failed {%s}\n",my_queue);
 			goto done;
 		}
 
-		debug_printf("done creating queue {%s}\n",queue);
+		debug_printf("done creating queue {%s}\n",my_queue);
 
 		if (! amqp_queue_bind (
 			cached_admin_conn,
 			1,
-			amqp_cstring_bytes(queue),
-			amqp_cstring_bytes(exchange),
+			amqp_cstring_bytes(my_queue),
+			amqp_cstring_bytes(my_exchange),
 			amqp_cstring_bytes("#"),
 			amqp_empty_table
 		))
 		{
-			fprintf(stderr,"bind failed for {%s} -> {%s}\n",queue,exchange);
+			fprintf(stderr,"bind failed for {%s} -> {%s}\n",my_queue,my_exchange);
 			goto done;
 		}
 
-		debug_printf("bound queue {%s} to exchange {%s}\n",queue,exchange);
+		debug_printf("bound queue {%s} to exchange {%s}\n",my_queue,my_exchange);
 
 		if (! amqp_queue_bind (
 			cached_admin_conn,
 			1,
 			amqp_cstring_bytes("DATABASE"),
-			amqp_cstring_bytes(exchange),
+			amqp_cstring_bytes(my_exchange),
 			amqp_cstring_bytes("#"),
 			amqp_empty_table
 		))
 		{
-			fprintf(stderr,"failed to bind {%s} to DATABASE queue for\n",exchange);
+			fprintf(stderr,"failed to bind {%s} to DATABASE queue for\n",my_exchange);
 			goto done;
 		}
-		debug_printf("bound queue {%s} to exchange {%s}\n",queue,"DATABASE");
+		debug_printf("bound queue {%s} to exchange {%s}\n",my_queue,"DATABASE");
 	}
 	else
 	{
 		for (i = 0; _e[i]; ++i)
 		{
-			snprintf(exchange,129,"%s%s",id,_e[i]);
+			snprintf(my_exchange,129,"%s%s",id,_e[i]);
 
-			debug_printf("[entity] creating exchange {%s}\n",exchange);
+			debug_printf("[entity] creating exchange {%s}\n",my_exchange);
 
 			if (! amqp_exchange_declare (
 					cached_admin_conn,
 					1,
-					amqp_cstring_bytes(exchange),
+					amqp_cstring_bytes(my_exchange),
 					amqp_cstring_bytes("topic"),
 					0,
 					1, /* durable */
@@ -3256,35 +3242,35 @@ create_exchanges_and_queues (const void *v)
 				)
 			)
 			{
-				fprintf(stderr,"something went wrong with exchange creation {%s}\n",exchange);
+				fprintf(stderr,"something went wrong with exchange creation {%s}\n",my_exchange);
 				goto done;
 			}
-			debug_printf("[entity] DONE creating exchange {%s}\n",exchange);
+			debug_printf("[entity] DONE creating exchange {%s}\n",my_exchange);
 
 			if (! amqp_queue_bind (
 				cached_admin_conn,
 				1,
 				amqp_cstring_bytes("DATABASE"),
-				amqp_cstring_bytes(exchange),
+				amqp_cstring_bytes(my_exchange),
 				amqp_cstring_bytes("#"),
 				amqp_empty_table
 			))
 			{
-				fprintf(stderr,"failed to bind {%s} to DATABASE queue for\n",exchange);
+				fprintf(stderr,"failed to bind {%s} to DATABASE queue for\n",my_exchange);
 				goto done;
 			}
 		}
 
 		for (i = 0; _q[i]; ++i)
 		{
-			snprintf(queue,129,"%s%s",id,_q[i]);
+			snprintf(my_queue,129,"%s%s",id,_q[i]);
 
-			debug_printf("[entity] creating queue {%s}\n",queue);
+			debug_printf("[entity] creating queue {%s}\n",my_queue);
 
 			if (! amqp_queue_declare (
 				cached_admin_conn,
 				1,
-				amqp_cstring_bytes(queue),
+				amqp_cstring_bytes(my_queue),
 				0,
 				1, /* durable */
 				0,
@@ -3292,27 +3278,27 @@ create_exchanges_and_queues (const void *v)
 				lazy_queue_table
 			))
 			{
-				fprintf(stderr,"amqp_queue_declare failed {%s}\n",queue);
+				fprintf(stderr,"amqp_queue_declare failed {%s}\n",my_queue);
 				goto done;
 			}
-			debug_printf("[entity] DONE creating queue {%s}\n",queue);
+			debug_printf("[entity] DONE creating queue {%s}\n",my_queue);
 
 			// bind .private and .notification 
 			if (strcmp(_q[i],".private") == 0 || strcmp(_q[i],".notification") == 0)
 			{
 				snprintf(exchange,129,"%s%s",id,_q[i]);
-				debug_printf("[entity] binding {%s} -> {%s}\n",queue,exchange);
+				debug_printf("[entity] binding {%s} -> {%s}\n",my_queue,my_exchange);
 
 				if (! amqp_queue_bind (
 					cached_admin_conn,
 					1,
-					amqp_cstring_bytes(queue),
-					amqp_cstring_bytes(exchange),
+					amqp_cstring_bytes(my_queue),
+					amqp_cstring_bytes(my_exchange),
 					amqp_cstring_bytes("#"),
 					amqp_empty_table
 				))
 				{
-					fprintf(stderr,"failed to bind {%s} to {%s}\n",queue,exchange);
+					fprintf(stderr,"failed to bind {%s} to {%s}\n",my_queue,my_exchange);
 					goto done;
 				}
 			}
@@ -3333,84 +3319,84 @@ delete_exchanges_and_queues (const void *v)
 	const char *id = (const char *)v;
 
 	// local variables
-	char queue	[129];
-	char exchange	[129];
+	char my_queue	[129];
+	char my_exchange[129];
 
 	if (looks_like_a_valid_owner(id))
 	{
 		// delete notification exchange 
-		snprintf(exchange,129,"%s.notification",id);
+		snprintf(my_exchange,129,"%s.notification",id);
 
-		debug_printf("[owner] deleting exchange {%s}\n",exchange);
+		debug_printf("[owner] deleting exchange {%s}\n",my_exchange);
 
 		if (! amqp_exchange_delete (
 			cached_admin_conn,
 			1,
-			amqp_cstring_bytes(exchange),
+			amqp_cstring_bytes(my_exchange),
 			0
 		))
 		{
-			fprintf(stderr,"amqp_exchange_delete failed {%s}\n",exchange);
+			fprintf(stderr,"amqp_exchange_delete failed {%s}\n",my_exchange);
 			goto done;
 		}
-		debug_printf("[owner] done deleting exchange {%s}\n",exchange);
+		debug_printf("[owner] done deleting exchange {%s}\n",my_exchange);
 
 		// delete notification queue
-		snprintf(queue,129,"%s.notification",id);
-		debug_printf("[owner] deleting queue {%s}\n",queue);
+		snprintf(my_queue,129,"%s.notification",id);
+		debug_printf("[owner] deleting queue {%s}\n",my_queue);
 		if (! amqp_queue_delete (
 			cached_admin_conn,
 			1,
-			amqp_cstring_bytes(queue),
+			amqp_cstring_bytes(my_queue),
 			0,
 			0
 		))
 		{
-			fprintf(stderr,"amqp_queue_delete failed {%s}\n",queue);
+			fprintf(stderr,"amqp_queue_delete failed {%s}\n",my_queue);
 			goto done;
 		}
-		debug_printf("[owner] DONE deleting queue {%s}\n",queue);
+		debug_printf("[owner] DONE deleting queue {%s}\n",my_queue);
 	}
 	else
 	{
 		for (i = 0; _e[i]; ++i)
 		{
-			snprintf(exchange,129,"%s%s",id,_e[i]);
+			snprintf(my_exchange,129,"%s%s",id,_e[i]);
 
-			debug_printf("[entity] deleting exchange {%s}\n",exchange);
+			debug_printf("[entity] deleting exchange {%s}\n",my_exchange);
 
 			if (! amqp_exchange_delete (
 					cached_admin_conn,
 					1,
-					amqp_cstring_bytes(exchange),
+					amqp_cstring_bytes(my_exchange),
 					0
 				)
 			)
 			{
-				fprintf(stderr,"something went wrong with exchange deletion {%s}\n",exchange);
+				fprintf(stderr,"something went wrong with exchange deletion {%s}\n",my_exchange);
 				goto done;
 			}
-			debug_printf("[entity] DONE deleting exchange {%s}\n",exchange);
+			debug_printf("[entity] DONE deleting exchange {%s}\n",my_exchange);
 		}
 
 		for (i = 0; _q[i]; ++i)
 		{
-			snprintf(queue,129,"%s%s",id,_q[i]);
+			snprintf(my_queue,129,"%s%s",id,_q[i]);
 
-			debug_printf("[entity] deleting queue {%s}\n",queue);
+			debug_printf("[entity] deleting queue {%s}\n",my_queue);
 
 			if (! amqp_queue_delete (
 				cached_admin_conn,
 				1,
-				amqp_cstring_bytes(queue),
+				amqp_cstring_bytes(my_queue),
 				0,
 				0
 			))
 			{
-				fprintf(stderr,"amqp_queue_delete failed {%s}\n",queue);
+				fprintf(stderr,"amqp_queue_delete failed {%s}\n",my_queue);
 				goto done;
 			}
-			debug_printf("[entity] DONE deleting queue {%s}\n",queue);
+			debug_printf("[entity] DONE deleting queue {%s}\n",my_queue);
 		}
 	}
 
