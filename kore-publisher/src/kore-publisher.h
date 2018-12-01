@@ -52,7 +52,7 @@ typedef struct publish_async_data {
 	char *to;
 	char *message;
 	char *exchange;
-	char *topic;
+	char *subject;
 	char *content_type;
 		
 } publish_async_data_t;

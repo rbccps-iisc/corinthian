@@ -40,6 +40,7 @@ uint8_t	binary_hash 		[SHA256_DIGEST_LENGTH];
 char 	hash_string		[SHA256_DIGEST_LENGTH*2 + 1];
 
 ht connection_ht;
+ht async_connection_ht;
 
 bool is_success = false;
 char admin_apikey[33];
@@ -96,13 +97,124 @@ async_publish_function (const void *v)
 {
 	Q *q = (int *)v;
 
-	void *data = NULL;
+	publish_async_data_t *data = NULL; 
+
+	node *n = NULL;
+	char key[65];
+
+	const char *id;
+	const char *apikey;
+	const char *to;
+	const char *subject;
+	const char *message;
+	const char *message_type;
+
+	const char *content_type;
+
+	char async_exchange [129];
+	char async_topic_to_publish[129];
+
+	// TODO : yet to be tested !
+
+	amqp_connection_state_t	*async_cached_conn = NULL;
+	
+	amqp_rpc_reply_t 	async_login_reply;
+	amqp_rpc_reply_t 	async_rpc_reply;
+	amqp_basic_properties_t	async_props;
+
+	memset(&async_props, 0, sizeof props);
+	async_props._flags = AMQP_BASIC_CONTENT_TYPE_FLAG | AMQP_BASIC_USER_ID_FLAG;
+
+	ht_init (&async_connection_ht);
 
 	while (1)
 	{
-		while (data = q_delete(q))
+		while ((data = q_delete(q)))
 		{
-			// TODO publish
+			id		= data->id;
+			apikey		= data->apikey;
+			to		= data->to;
+			subject		= data->subject;
+			message		= data->message;
+			content_type	= data->content_type;
+
+			strlcpy(key,id,32);
+			strlcat(key,apikey,64);
+
+			snprintf(async_exchange,129,"%s.%s",id,message_type);
+			strlcpy(async_topic_to_publish,subject,129);
+
+			if ((n = ht_search(&async_connection_ht,key)) != NULL)
+			{
+				async_cached_conn = n->value;
+			}
+			else
+			{
+
+/////////////////////////////////////////////////
+
+				if (! looks_like_a_valid_entity(id))
+					goto done;	
+
+				if (! login_success(id,apikey,NULL))
+					goto done;	
+
+/////////////////////////////////////////////////
+
+				async_cached_conn = malloc(sizeof(amqp_connection_state_t));
+
+				if (async_cached_conn == NULL)
+					goto done;	
+
+				*async_cached_conn = amqp_new_connection();
+				amqp_socket_t *socket = amqp_tcp_socket_new(*async_cached_conn);
+
+				if (socket == NULL)
+					goto done;	
+
+				if (amqp_socket_open(socket, broker_ip , 5672))
+					goto done;	
+	
+				async_login_reply = amqp_login(
+					*async_cached_conn, 
+					"/",
+					0,
+					131072,
+					HEART_BEAT,
+					AMQP_SASL_METHOD_PLAIN,
+					id,
+					apikey
+				);
+
+				if (async_login_reply.reply_type != AMQP_RESPONSE_NORMAL)
+					goto done;	
+
+				if(! amqp_channel_open(*async_cached_conn, 1))
+					goto done;	
+
+				async_rpc_reply = amqp_get_rpc_reply(*async_cached_conn);
+				if (async_rpc_reply.reply_type != AMQP_RESPONSE_NORMAL)
+					goto done;	
+
+				ht_insert (&async_connection_ht, key, async_cached_conn);
+			}
+
+			async_props.user_id 		= amqp_cstring_bytes(id);
+			async_props.content_type 	= amqp_cstring_bytes(content_type);
+
+			amqp_basic_publish (
+				*async_cached_conn,
+				1,
+				amqp_cstring_bytes(async_exchange),
+        			amqp_cstring_bytes(async_topic_to_publish),
+				0,
+				0,
+				&async_props,
+				amqp_cstring_bytes(message)
+			);
+
+done:
+			free (data);
 		}
 
 		sleep (1);
@@ -287,7 +399,7 @@ retry:
 	kore_pgsql_register("db",conn_str);
 
 	memset(&props, 0, sizeof props);
-	props._flags = AMQP_BASIC_CONTENT_TYPE_FLAG | AMQP_BASIC_USER_ID_FLAG ;
+	props._flags = AMQP_BASIC_CONTENT_TYPE_FLAG | AMQP_BASIC_USER_ID_FLAG;
 
 ///// chroot and drop priv /////
 
@@ -890,7 +1002,7 @@ publish_async (struct http_request *req)
 	data->to		=
 	data->message		=
 	data->exchange		=
-	data->topic		=
+	data->subject		=
 	data->content_type	= NULL;
 
 	if (!(data->id 			= strdup(id)))			ERROR("out of memmory");
@@ -898,7 +1010,7 @@ publish_async (struct http_request *req)
 	if (!(data->to 			= strdup(to)))			ERROR("out of memmory");
 	if (!(data->message		= strdup(message)))		ERROR("out of memmory");
 	if (!(data->exchange 		= strdup(exchange)))		ERROR("out of memmory");
-	if (!(data->topic 		= strdup(topic_to_publish)))	ERROR("out of memmory");
+	if (!(data->subject		= strdup(topic_to_publish)))	ERROR("out of memmory");
 	if (!(data->content_type	= strdup(content_type)))	ERROR("out of memmory");
 
 	// TODO push "data" in any of the queue 
@@ -924,7 +1036,7 @@ done:
 			if (data->to)		free (data->to);
 			if (data->message)	free (data->message);
 			if (data->exchange)	free (data->exchange);
-			if (data->topic)	free (data->topic);
+			if (data->subject)	free (data->subject);
 			if (data->content_type)	free (data->content_type);
 
 			free (data);
