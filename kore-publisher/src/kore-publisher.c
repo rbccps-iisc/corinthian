@@ -1,10 +1,31 @@
 #include "kore-publisher.h"
 
-char password_chars[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-";
+char password_chars[] = "abcdefghijklmnopqrstuvwxyz"
+			"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+			"0123456789"
+			"-";
 
 // variables for exchanges and queues
-char *_e[] = {".public",".private",".protected",".notification",".publish",".diagnostics",".public.validated",".protected.validated",NULL};
-char *_q[] = {"\0", ".private", ".priority", ".command", ".notification", NULL};
+char *_e[] = {
+		".public",
+		".private",
+		".protected",
+		".notification",
+		".publish",
+		".diagnostics",
+		".public.validated",
+		".protected.validated",
+		NULL
+};
+
+char *_q[] = {
+		"\0",
+		".private",
+		".priority",
+		".command",
+		".notification",
+		NULL
+};
 
 struct kore_pgsql sql;
 
@@ -84,7 +105,9 @@ init (int state)
 //////////////
 
 	lazy_queue_table.num_entries = 3;
-	lazy_queue_table.entries = malloc(lazy_queue_table.num_entries * sizeof(amqp_table_entry_t));
+	lazy_queue_table.entries = malloc (
+		lazy_queue_table.num_entries * sizeof(amqp_table_entry_t)
+	);
 
 	if (! lazy_queue_table.entries)
 		exit(-1);
@@ -177,7 +200,16 @@ retry:
 		goto retry;
 	}
 
-	login_reply = amqp_login(cached_admin_conn, "/", 0, 131072, HEART_BEAT, AMQP_SASL_METHOD_PLAIN, "admin", admin_apikey);
+	login_reply = amqp_login(
+			cached_admin_conn,
+			"/",
+			0,
+			131072,
+			HEART_BEAT,
+			AMQP_SASL_METHOD_PLAIN,
+			"admin",
+			admin_apikey
+	);
 
 	if (login_reply.reply_type != AMQP_RESPONSE_NORMAL)
 	{
@@ -194,7 +226,7 @@ retry:
 	rpc_reply = amqp_get_rpc_reply(cached_admin_conn);
 	if (rpc_reply.reply_type != AMQP_RESPONSE_NORMAL)
 	{
-		fprintf(stderr,"did not receive expected response from the broker\n");
+		fprintf(stderr,"broker did not send AMQP_RESPONSE_NORMAL\n");
 		return KORE_RESULT_ERROR;
 	}
 
@@ -223,7 +255,13 @@ retry:
 		response = kore_buf_alloc(1024*1024);
 
 	char conn_str[129];
-        snprintf(conn_str,129,"host = %s user = postgres password = %s", pgsql_ip, postgres_pwd);
+        snprintf (
+			conn_str,
+			129,
+			"host = %s user = postgres password = %s",
+			pgsql_ip,
+			postgres_pwd
+	);
 	kore_pgsql_register("db",conn_str);
 
 	memset(&props, 0, sizeof props);
@@ -254,7 +292,14 @@ retry:
 	{
 		q_init(&async_q[i]);
 
-		if (pthread_create(&async_thread[i],NULL,async_publish_function,(void *)&async_q[i]) != 0)
+		if (
+			pthread_create(
+				&async_thread[i],
+				NULL,
+				async_publish_function,(
+				void *)&async_q[i]
+			) != 0
+		)
 		{
 			perror("could not create async thread");
 			return KORE_RESULT_ERROR;
@@ -390,21 +435,29 @@ looks_like_a_valid_resource (const char *str)
 	}
 
 	// there should be only one front slash. Dot may or may not exist
-	if ( (front_slash_count != 1) || (dot_count > 1) )
+	if ( (front_slash_count != 1) || (dot_count > 1) ) {
 		return false;
+	}
   	   
 	return true;
 }
 
 void
-gen_salt_password_and_apikey (const char *entity, char *salt, char *password_hash, char *apikey)
+gen_salt_password_and_apikey (
+	const 	char *entity,
+		char *salt,
+		char *password_hash,
+		char *apikey
+)
 {
 	int i;
 
+	int n_passwd_chars = sizeof(password_chars) - 1;
+
 	for (i = 0; i < 32; ++i)
 	{
-		salt	[i] 	= password_chars[arc4random_uniform(sizeof(password_chars) - 1)]; 
-		apikey	[i]  	= password_chars[arc4random_uniform(sizeof(password_chars) - 1)]; 
+		salt  [i] = password_chars[arc4random_uniform(n_passwd_chars)]; 
+		apikey[i] = password_chars[arc4random_uniform(n_passwd_chars)]; 
 	}
 	salt	[32] = '\0';
 	apikey	[32] = '\0';
@@ -413,7 +466,11 @@ gen_salt_password_and_apikey (const char *entity, char *salt, char *password_has
 	strlcat(string_to_be_hashed, salt,   65);
 	strlcat(string_to_be_hashed, entity, 250);
 
-	SHA256((const uint8_t*)string_to_be_hashed,strlen(string_to_be_hashed),binary_hash);
+	SHA256 (
+		(const uint8_t*)string_to_be_hashed,
+		strlen(string_to_be_hashed),
+		binary_hash
+	);
 
 	debug_printf("gen STRING TO BE HASHED = {%s}\n",string_to_be_hashed);
 
@@ -429,14 +486,14 @@ gen_salt_password_and_apikey (const char *entity, char *salt, char *password_has
 		"%02x%02x%02x%02x"
 		"%02x%02x%02x%02x"
 		"%02x%02x%02x%02x",
-		binary_hash[ 0], binary_hash[ 1], binary_hash[ 2], binary_hash[ 3],
-		binary_hash[ 4], binary_hash[ 5], binary_hash[ 6], binary_hash[ 7],
-		binary_hash[ 8], binary_hash[ 9], binary_hash[10], binary_hash[11],
-		binary_hash[12], binary_hash[13], binary_hash[14], binary_hash[15],
-		binary_hash[16], binary_hash[17], binary_hash[18], binary_hash[19],
-		binary_hash[20], binary_hash[21], binary_hash[22], binary_hash[23],
-		binary_hash[24], binary_hash[25], binary_hash[26], binary_hash[27],
-		binary_hash[28], binary_hash[29], binary_hash[30], binary_hash[31]
+		binary_hash[ 0],binary_hash[ 1],binary_hash[ 2],binary_hash[ 3],
+		binary_hash[ 4],binary_hash[ 5],binary_hash[ 6],binary_hash[ 7],
+		binary_hash[ 8],binary_hash[ 9],binary_hash[10],binary_hash[11],
+		binary_hash[12],binary_hash[13],binary_hash[14],binary_hash[15],
+		binary_hash[16],binary_hash[17],binary_hash[18],binary_hash[19],
+		binary_hash[20],binary_hash[21],binary_hash[22],binary_hash[23],
+		binary_hash[24],binary_hash[25],binary_hash[26],binary_hash[27],
+		binary_hash[28],binary_hash[29],binary_hash[30],binary_hash[31]
 	);
 
 	password_hash [64] = '\0';
@@ -457,7 +514,8 @@ login_success (const char *id, const char *apikey, bool *is_autonomous)
 	sanitize(id);
 
 	CREATE_STRING (query,
-			"SELECT salt,password_hash,is_autonomous FROM users WHERE id='%s' and blocked='f'",
+		"SELECT salt,password_hash,is_autonomous FROM users "
+			"WHERE id='%s' AND blocked='f'",
 				id
 	);
 
@@ -500,10 +558,14 @@ login_success (const char *id, const char *apikey, bool *is_autonomous)
 	strlcat(string_to_be_hashed, salt,   65);
 	strlcat(string_to_be_hashed, id,    250);
 
-	SHA256((const uint8_t*)string_to_be_hashed,strlen(string_to_be_hashed),binary_hash);
+	SHA256 (
+		(const uint8_t*)string_to_be_hashed,
+		strlen(string_to_be_hashed),
+		binary_hash
+	);
 
-	debug_printf("login success STRING TO BE HASHED = {%s}\n",string_to_be_hashed);
-
+	debug_printf("login success STRING TO BE HASHED = {%s}\n",
+			string_to_be_hashed);
 	snprintf
 	(
 		hash_string,
@@ -516,19 +578,22 @@ login_success (const char *id, const char *apikey, bool *is_autonomous)
 		"%02x%02x%02x%02x"
 		"%02x%02x%02x%02x"
 		"%02x%02x%02x%02x",
-		binary_hash[ 0], binary_hash[ 1], binary_hash[ 2], binary_hash[ 3],
-		binary_hash[ 4], binary_hash[ 5], binary_hash[ 6], binary_hash[ 7],
-		binary_hash[ 8], binary_hash[ 9], binary_hash[10], binary_hash[11],
-		binary_hash[12], binary_hash[13], binary_hash[14], binary_hash[15],
-		binary_hash[16], binary_hash[17], binary_hash[18], binary_hash[19],
-		binary_hash[20], binary_hash[21], binary_hash[22], binary_hash[23],
-		binary_hash[24], binary_hash[25], binary_hash[26], binary_hash[27],
-		binary_hash[28], binary_hash[29], binary_hash[30], binary_hash[31]
+		binary_hash[ 0],binary_hash[ 1],binary_hash[ 2],binary_hash[ 3],
+		binary_hash[ 4],binary_hash[ 5],binary_hash[ 6],binary_hash[ 7],
+		binary_hash[ 8],binary_hash[ 9],binary_hash[10],binary_hash[11],
+		binary_hash[12],binary_hash[13],binary_hash[14],binary_hash[15],
+		binary_hash[16],binary_hash[17],binary_hash[18],binary_hash[19],
+		binary_hash[20],binary_hash[21],binary_hash[22],binary_hash[23],
+		binary_hash[24],binary_hash[25],binary_hash[26],binary_hash[27],
+		binary_hash[28],binary_hash[29],binary_hash[30],binary_hash[31]
 	);
 
 	hash_string[64] = '\0';
 
-	debug_printf("Expecting it to be {%s} got {%s}\n",password_hash, hash_string);
+	debug_printf("Expecting it to be {%s} got {%s}\n",
+			password_hash,
+				hash_string
+	);
 
 	if (strncmp(hash_string,password_hash,64) == 0) {
 		login_result = true;
@@ -592,8 +657,8 @@ publish (struct http_request *req)
 		snprintf(exchange,129,"%s.%s",id,message_type);
 		strlcpy(topic_to_publish,subject,129);
 
-		debug_printf("------------------> exchange = %s\n",exchange);
-		debug_printf("------------------> topic = %s\n",topic_to_publish);
+		debug_printf("==> exchange = %s\n",exchange);
+		debug_printf("==> topic = %s\n",topic_to_publish);
 	}
 	else
 	{
@@ -605,8 +670,8 @@ publish (struct http_request *req)
 		snprintf(topic_to_publish,129,"%s.%s.%s",to,message_type,subject);
 		snprintf(exchange,129,"%s.publish",id);
 
-		debug_printf("------------------> exchange = %s\n",exchange);
-		debug_printf("------------------> topic = %s\n",topic_to_publish);
+		debug_printf("==> exchange = %s\n",exchange);
+		debug_printf("==> topic = %s\n",topic_to_publish);
 	}
 
 	if (http_request_header(req, "message", &message) != KORE_RESULT_OK)
@@ -616,7 +681,7 @@ publish (struct http_request *req)
 	}
 
 	// get content-type and set in props
-	if (http_request_header(req, "content-type", &content_type) != KORE_RESULT_OK)
+	if (http_request_header(req,"content-type",&content_type) != KORE_RESULT_OK)
 	{
 		content_type = "";
 	}
@@ -659,8 +724,16 @@ publish (struct http_request *req)
 		if (amqp_socket_open(socket, broker_ip , 5672))
 			ERROR("could not open a socket");
 
-		login_reply = amqp_login(*cached_conn, 
-			"/", 0, 131072, HEART_BEAT, AMQP_SASL_METHOD_PLAIN, id, apikey);
+		login_reply = amqp_login(
+				*cached_conn, 
+				"/",
+				0,
+				131072,
+				HEART_BEAT,
+				AMQP_SASL_METHOD_PLAIN,
+				id,
+				apikey
+		);
 
 		if (login_reply.reply_type != AMQP_RESPONSE_NORMAL)
 			FORBIDDEN("broker: invalid id or apkey");
@@ -764,8 +837,8 @@ publish_async (struct http_request *req)
 		snprintf(exchange,129,"%s.%s",id,message_type);
 		strlcpy(topic_to_publish,subject,129);
 
-		debug_printf("------------------> exchange = %s\n",exchange);
-		debug_printf("------------------> topic = %s\n",topic_to_publish);
+		debug_printf("==> exchange = %s\n",exchange);
+		debug_printf("==> topic = %s\n",topic_to_publish);
 	}
 	else
 	{
@@ -777,8 +850,8 @@ publish_async (struct http_request *req)
 		snprintf(topic_to_publish,129,"%s.%s.%s",to,message_type,subject);
 		snprintf(exchange,129,"%s.publish",id);
 
-		debug_printf("------------------> exchange = %s\n",exchange);
-		debug_printf("------------------> topic = %s\n",topic_to_publish);
+		debug_printf("==> exchange = %s\n",exchange);
+		debug_printf("==> topic = %s\n",topic_to_publish);
 	}
 
 	if (http_request_header(req, "message", &message) != KORE_RESULT_OK)
@@ -790,45 +863,45 @@ publish_async (struct http_request *req)
 	if (http_request_header(req, "content-type", &content_type) != KORE_RESULT_OK)
 		content_type = "";
 
-	publish_async_data_t *d = malloc (sizeof(publish_async_data_t));
+	publish_async_data_t *data = malloc (sizeof(publish_async_data_t));
 
-	if (d == NULL)
+	if (data == NULL)
 		ERROR("out of memory");
 
-	d->id 		=
-	d->apikey 	=
-	d->to		=
-	d->message	=
-	d->exchange	=
-	d->topic	=
-	d->content_type	= NULL;
+	data->id 		=
+	data->apikey 		=
+	data->to		=
+	data->message		=
+	data->exchange		=
+	data->topic		=
+	data->content_type	= NULL;
 
-	if (!(d->id 		= strdup(id)))			ERROR("out of memmory");
-	if (!(d->apikey		= strdup(apikey)))		ERROR("out of memmory");
-	if (!(d->to 		= strdup(to)))			ERROR("out of memmory");
-	if (!(d->message	= strdup(message)))		ERROR("out of memmory");
-	if (!(d->exchange 	= strdup(exchange)))		ERROR("out of memmory");
-	if (!(d->topic 		= strdup(topic_to_publish)))	ERROR("out of memmory");
-	if (!(d->content_type	= strdup(content_type)))	ERROR("out of memmory");
+	if (!(data->id 			= strdup(id)))			ERROR("out of memmory");
+	if (!(data->apikey		= strdup(apikey)))		ERROR("out of memmory");
+	if (!(data->to 			= strdup(to)))			ERROR("out of memmory");
+	if (!(data->message		= strdup(message)))		ERROR("out of memmory");
+	if (!(data->exchange 		= strdup(exchange)))		ERROR("out of memmory");
+	if (!(data->topic 		= strdup(topic_to_publish)))	ERROR("out of memmory");
+	if (!(data->content_type	= strdup(content_type)))	ERROR("out of memmory");
 
-	// TODO push d in any of the queue 
+	// TODO push "data" in any of the queue 
 
 	OK_202();
 
 done:
 	if (req->status == 500)
 	{
-		if (d)
+		if (data)
 		{
-			if (d->id)		free (d->id);
-			if (d->apikey)		free (d->apikey);
-			if (d->to)		free (d->to);
-			if (d->message)		free (d->message);
-			if (d->exchange)	free (d->exchange);
-			if (d->topic)		free (d->topic);
-			if (d->content_type)	free (d->content_type);
+			if (data->id)		free (data->id);
+			if (data->apikey)	free (data->apikey);
+			if (data->to)		free (data->to);
+			if (data->message)	free (data->message);
+			if (data->exchange)	free (data->exchange);
+			if (data->topic)	free (data->topic);
+			if (data->content_type)	free (data->content_type);
 
-			free (d);
+			free (data);
 		}
 	}
 
@@ -928,8 +1001,16 @@ subscribe (struct http_request *req)
 		if (amqp_socket_open(socket, broker_ip , 5672))
 			ERROR("could not open a socket");
 
-		login_reply = amqp_login(*cached_conn, 
-			"/", 0, 131072, HEART_BEAT, AMQP_SASL_METHOD_PLAIN, id, apikey);
+		login_reply = amqp_login(
+				*cached_conn, 
+				"/",
+				0,
+				131072,
+				HEART_BEAT,
+				AMQP_SASL_METHOD_PLAIN,
+				id,
+				apikey
+		);
 
 		if (login_reply.reply_type != AMQP_RESPONSE_NORMAL)
 			FORBIDDEN("broker: invalid id or apkey");
@@ -939,7 +1020,7 @@ subscribe (struct http_request *req)
 
 		rpc_reply = amqp_get_rpc_reply(*cached_conn);
 		if (rpc_reply.reply_type != AMQP_RESPONSE_NORMAL)
-			ERROR("did not receive expected response from the broker");
+			ERROR("error from broker");
 
 		ht_insert (&connection_ht, key, cached_conn);
 	}
@@ -1008,19 +1089,28 @@ subscribe (struct http_request *req)
 			kore_buf_append(response,message.properties.content_type.bytes,
 				message.properties.content_type.len);
 
-			if (strncmp(message.properties.content_type.bytes,"application/json", message.properties.content_type.len) == 0)
+			if (
+				strncmp (
+					message.properties.content_type.bytes,
+					"application/json",
+					message.properties.content_type.len
+				) == 0
+			)
+			{
 				is_json = true;
+			}
 
 		}
 
 		kore_buf_append(response,"\",\"body\":",9);
 		
-		
 		if (is_json)
 		{
-			printf("is-json = true\n");
-
-			kore_buf_append(response,message.body.bytes, message.body.len);
+			kore_buf_append (
+				response,
+				message.body.bytes,
+				message.body.len
+			);
 		}
 		else
 		{
@@ -1147,7 +1237,7 @@ register_entity (struct http_request *req)
 	// conflict if entity_name already exist
 
 	CREATE_STRING(query,
-		 	"SELECT id from users WHERE id='%s'",
+		 	"SELECT id FROM users WHERE id='%s'",
 				entity_name
 	);
 
@@ -1163,8 +1253,8 @@ register_entity (struct http_request *req)
 		// use parameterized query for inserting json
 
 		CREATE_STRING (query,
-			"INSERT INTO users (id,password_hash,schema,salt,blocked,is_autonomous) "
-			"values('%s','%s',$1,'%s','f','%s')",	// $1 is the schema (in body) 
+			"INSERT INTO users(id,password_hash,schema,salt,blocked,is_autonomous) "
+			"VALUES('%s','%s',$1,'%s','f','%s')",	// $1 is the schema (in body) 
 			entity_name,
 			password_hash,
 			salt,
@@ -1187,8 +1277,8 @@ register_entity (struct http_request *req)
 	else
 	{
 		CREATE_STRING (query,
-			"INSERT INTO users (id,password_hash,schema,salt,blocked,is_autonomous) "
-			"values('%s','%s','%s',NULL,'f','%s')",
+			"INSERT INTO users(id,password_hash,schema,salt,blocked,is_autonomous) "
+			"VALUES('%s','%s','%s',NULL,'f','%s')",
 			entity_name,
 			password_hash,
 			salt,
@@ -1284,7 +1374,7 @@ deregister_entity (struct http_request *req)
 		delete_exchanges_and_queues((const void *)entity);
 
 	CREATE_STRING (query,
-		"DELETE FROM acl WHERE from_id = '%s' or exchange LIKE '%s.%%'",
+		"DELETE FROM acl WHERE from_id = '%s' OR exchange LIKE '%s.%%'",
 		entity,
 		entity
 	);
@@ -1293,7 +1383,7 @@ deregister_entity (struct http_request *req)
 
 	CREATE_STRING (
 		query,
-		"DELETE FROM follow WHERE requested_by = '%s' or exchange LIKE '%s.%%'",
+		"DELETE FROM follow WHERE requested_by = '%s' OR exchange LIKE '%s.%%'",
 		entity,
 		entity
 	);
@@ -1335,14 +1425,14 @@ cat (struct http_request *req)
 		sanitize(entity);
 
 		CREATE_STRING (query,
-				"SELECT schema FROM users WHERE schema is NOT NULL AND id='%s'",
+				"SELECT schema FROM users WHERE schema IS NOT NULL AND id='%s'",
 					entity
 		);
 	}
 	else
 	{
 		entity = NULL;
-		CREATE_STRING (query,"SELECT id,schema FROM users WHERE schema is NOT NULL LIMIT 50");
+		CREATE_STRING (query,"SELECT id,schema FROM users WHERE schema IS NOT NULL LIMIT 50");
 	}
 
 	RUN_QUERY (query,"unable to query catalog data");
@@ -1426,7 +1516,7 @@ register_owner(struct http_request *req)
 
 	str_to_lower(owner);
 
-	// cannot create an admin
+	// cannot create an admin, validator or database
 	if (strcmp(owner,"admin") == 0 || strcmp(owner,"validator") == 0 || strcmp(owner,"database") == 0)
 		FORBIDDEN("cannot create the user");
 
@@ -1462,7 +1552,7 @@ register_owner(struct http_request *req)
 
 	CREATE_STRING (query,
 			"INSERT INTO users (id,password_hash,schema,salt,blocked,is_autonomous) "
-				"values('%s','%s',NULL,'%s','f','t')",
+				"VALUES('%s','%s',NULL,'%s','f','t')",
 				owner,
 				password_hash,
 				salt
@@ -1652,13 +1742,21 @@ queue_bind (struct http_request *req)
 		FORBIDDEN("'to' is not a valid entity");
 
 	if (
-		(strcmp(message_type,"public") != 0) &&
-		(strcmp(message_type,"private") != 0) &&
-		(strcmp(message_type,"protected") != 0) &&
-		(strcmp(message_type,"diagnostics") != 0)
+		(strcmp(message_type,"public") 		!= 0) &&
+		(strcmp(message_type,"private") 	!= 0) &&
+		(strcmp(message_type,"protected") 	!= 0) &&
+		(strcmp(message_type,"diagnostics") 	!= 0)
 	)
 	{
 		BAD_REQUEST("message-type is invalid");
+	}
+
+	if(strcmp(message_type,"private") == 0)
+	{
+		if (! is_owner(id,to))
+		{
+			FORBIDDEN("you are not the owner of 'to'");
+		}
 	}
 
 	snprintf (exchange,128,"%s.%s", to,message_type); 
@@ -1792,6 +1890,14 @@ queue_unbind (struct http_request *req)
 	)
 	{
 		BAD_REQUEST("message-type is invalid");
+	}
+
+	if(strcmp(message_type,"private") == 0)
+	{
+		if (! is_owner(id,to))
+		{
+			FORBIDDEN("you are not the owner of 'to'");
+		}
 	}
 
 	snprintf (exchange,128,"%s.%s", to,message_type); 
@@ -1980,7 +2086,7 @@ follow (struct http_request *req)
 		CREATE_STRING (query, 
 			"INSERT INTO follow "
 			"(follow_id,requested_by,from_id,exchange,time,permission,topic,validity,status) "
-			"values(DEFAULT,'%s','%s','%s.%s',now(),'read','%s','%d','%s')",
+			"VALUES(DEFAULT,'%s','%s','%s.%s',now(),'read','%s','%d','%s')",
 				id,
 				from,
 				to,	// .message_type is appended to it
@@ -2004,7 +2110,7 @@ follow (struct http_request *req)
 		CREATE_STRING (query,
 			"INSERT INTO follow "
 			"(follow_id,requested_by,from_id,exchange,time,permission,topic,validity,status) "
-			"values(DEFAULT,'%s','%s','%s.command',now(),'write','%s','%d','%s')",
+			"VALUES(DEFAULT,'%s','%s','%s.command',now(),'write','%s','%d','%s')",
 				id,
 				from,
 				to,	// .command is appended to it
@@ -2031,7 +2137,7 @@ follow (struct http_request *req)
 			CREATE_STRING (query,
 			"INSERT INTO acl "
 			"(acl_id,from_id,exchange,follow_id,permission,topic,valid_till) "
-			"values(DEFAULT,'%s','%s.%s','%s','%s', '%s', now() + interval '%d hours')",
+			"VALUES(DEFAULT,'%s','%s.%s','%s','%s', '%s', now() + interval '%d hours')",
 			        	from,
 					to,		// .message_type is appended to it
 					message_type,
@@ -2069,7 +2175,7 @@ follow (struct http_request *req)
 			CREATE_STRING (query,
 			"INSERT INTO acl "
 			"(acl_id,from_id,exchange,follow_id,permission,topic,valid_till) "
-			"values(DEFAULT,'%s','%s.command','%s','%s', '%s', now() + interval '%d hours')",
+			"VALUES(DEFAULT,'%s','%s.command','%s','%s', '%s', now() + interval '%d hours')",
 			        	from,
 					to,		// .command is appended to it
 					read_follow_id,
@@ -2410,7 +2516,7 @@ share (struct http_request *req)
 	// add entry in acl
 	CREATE_STRING (query,
 		"INSERT INTO acl (acl_id,from_id,exchange,follow_id,permission,topic,valid_till) "
-		"values(DEFAULT,'%s','%s','%s','%s','%s',now() + interval '%s hours')",
+		"VALUES(DEFAULT,'%s','%s','%s','%s','%s',now() + interval '%s hours')",
 	        	from_id,
 			exchange,
 			follow_id,
@@ -2493,7 +2599,7 @@ reject_follow (struct http_request *req)
 	{
 		CREATE_STRING (query, 
 			"SELECT from_id FROM follow "
-			"WHERE follow_id = '%s' AND exchange LIKE '%s/%%.%%' and status='pending'",
+			"WHERE follow_id = '%s' AND exchange LIKE '%s/%%.%%' AND status='pending'",
 				follow_id,
 				id
 		);
@@ -2502,7 +2608,7 @@ reject_follow (struct http_request *req)
 	{
 		CREATE_STRING (query, 
 			"SELECT from_id FROM follow "
-			"WHERE follow_id = '%s' AND exchange LIKE '%s.%%' and status='pending'",
+			"WHERE follow_id = '%s' AND exchange LIKE '%s.%%' AND status='pending'",
 				follow_id,
 				id
 		);
@@ -2663,7 +2769,7 @@ get_follow_requests (struct http_request *req)
 			"SELECT "
 			"follow_id,requested_by,exchange,time,permission,topic,validity "
 			"FROM follow "
-			"WHERE exchange LIKE '%s/%%.%%' and status='pending' "
+			"WHERE exchange LIKE '%s/%%.%%' AND status='pending' "
 			"ORDER BY time",
 				id
 		);
@@ -2674,7 +2780,7 @@ get_follow_requests (struct http_request *req)
 			"SELECT "
 			"follow_id,requested_by,exchange,time,permission,topic,validity "
 			"FROM follow "
-			"WHERE exchange LIKE '%s.%%' and status='pending' "
+			"WHERE exchange LIKE '%s.%%' AND status='pending' "
 			"ORDER BY time",
 				id
 		);
