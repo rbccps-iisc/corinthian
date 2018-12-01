@@ -57,6 +57,14 @@ amqp_rpc_reply_t 	rpc_reply;
 amqp_table_entry_t 	*entry;
 amqp_basic_properties_t	props;
 
+
+#define MAX_ASYNC_THREADS (1)
+
+int async_queue_index = 0;
+
+Q 		async_q		[MAX_ASYNC_THREADS];
+pthread_t 	async_thread	[MAX_ASYNC_THREADS];
+
 static int
 hostname_to_ip(char * hostname , char* ip)
 {
@@ -86,7 +94,21 @@ hostname_to_ip(char * hostname , char* ip)
 void*
 async_publish_function (const void *v)
 {
-	return NULL;	
+	int queue_id = (int *)v;
+
+	void *data = NULL;
+
+	while (1)
+	{
+		while (data = q_delete(&async_q[queue_id]))
+		{
+			// TODO publish
+		}
+
+		sleep (1);
+	}
+
+	return NULL;
 }
 
 int
@@ -282,11 +304,6 @@ retry:
 		perror("setuid ");
 
 /////////////////////////////////
-
-#define MAX_ASYNC_THREADS (1)
-
-	Q 		async_q		[MAX_ASYNC_THREADS];
-	pthread_t 	async_thread	[MAX_ASYNC_THREADS];
 
 	for (i = 0; i < MAX_ASYNC_THREADS; ++i)
 	{
@@ -885,6 +902,15 @@ publish_async (struct http_request *req)
 	if (!(data->content_type	= strdup(content_type)))	ERROR("out of memmory");
 
 	// TODO push "data" in any of the queue 
+
+	/*
+
+	if (q_insert (async_q[async_queue_index], data) < 0)
+		ERROR("inserting into queue failed");
+
+	async_queue_index = (async_queue_index + 1) % MAX_ASYNC_THREADS;
+
+	*/
 
 	OK_202();
 
@@ -3321,6 +3347,7 @@ sanitize (const char *string)
 bool
 is_request_from_localhost (struct http_request *req)
 {
+	//switch (req->owner->family)
 	switch (req->owner->addrtype)
 	{
 		case AF_INET:

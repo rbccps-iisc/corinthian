@@ -11,17 +11,20 @@ void q_init (Q *q)
 	pthread_mutex_init(&q->mutex, NULL);
 }
 
-void q_insert (Q *q)
+int q_insert (Q *q, void *v)
 {
 	node *new_node = malloc(sizeof(node));
 
 	if (new_node == NULL)
 	{
 		perror("Malloc failed ");
-		exit (-1);
+		return -1;	
 	}
 
-	new_node->next = new_node->prev = NULL;
+	new_node->next 	= new_node->prev = NULL;
+
+	new_node->key 	= NULL; // unused
+	new_node->value	= v;
 
 	pthread_mutex_lock(&q->mutex);
 
@@ -38,16 +41,18 @@ void q_insert (Q *q)
 		}
 
 	pthread_mutex_unlock(&q->mutex);
+
+	return 0;
 }
 
 void* q_delete (Q *q)
 {
-	void *v;
+	void *v = NULL;
 
 	pthread_mutex_lock(&q->mutex);
 
 		if (q->head == NULL || q->tail == NULL)
-			return NULL;		
+			goto done;
 
 		v = q->tail->value;
 
@@ -55,7 +60,7 @@ void* q_delete (Q *q)
 		q->tail->next 	= NULL;
 
 		free (q->tail);
-
+done:
 	pthread_mutex_unlock(&q->mutex);
 	
 	return v;

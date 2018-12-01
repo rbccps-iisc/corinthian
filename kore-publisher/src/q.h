@@ -14,7 +14,7 @@ typedef struct Q {
 } Q; 
 
 void 	q_init		(Q *q);
-void 	q_insert 	(Q *q);
+void 	q_insert 	(Q *q, void *v);
 void* 	q_delete 	(Q *q);
 
 #endif
