@@ -94,13 +94,13 @@ hostname_to_ip(char * hostname , char* ip)
 void*
 async_publish_function (const void *v)
 {
-	int queue_id = (int *)v;
+	Q *q = (int *)v;
 
 	void *data = NULL;
 
 	while (1)
 	{
-		while (data = q_delete(&async_q[queue_id]))
+		while (data = q_delete(q))
 		{
 			// TODO publish
 		}
@@ -313,8 +313,8 @@ retry:
 			pthread_create(
 				&async_thread[i],
 				NULL,
-				async_publish_function,(
-				void *)&async_q[i]
+				async_publish_function,
+				(void *)&async_q[i]
 			) != 0
 		)
 		{

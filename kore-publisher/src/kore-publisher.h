@@ -37,8 +37,6 @@
 #include<sys/socket.h>
 #include<errno.h>
 
-//#define TEST (1)
-
 #define HEART_BEAT (0)
 
 #if 1
