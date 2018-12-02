@@ -1,5 +1,7 @@
 #include "kore-publisher.h"
 
+#define UNPRIVILEGED_USER ("nobody")
+
 char password_chars[] = "abcdefghijklmnopqrstuvwxyz"
 			"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 			"0123456789"
@@ -399,14 +401,26 @@ retry:
 	explicit_bzero(admin_apikey,33);
 	explicit_bzero(postgres_pwd,33);
 
-	if (chroot("./jail") < 0)
-		perror("chroot ");
-	
-	if (setgid(65534) < 0)
-		perror("setgid ");
+	struct passwd *p;
+	if ((p = getpwnam(UNPRIVILEGED_USER)) == NULL) {
+		perror("getpwnam failed ");
+		return KORE_RESULT_ERROR;
+	}
 
-	if (setuid(65534) < 0)
-		perror("setuid ");
+	if (chroot("./jail") < 0) {
+		perror("chroot failed ");
+		return KORE_RESULT_ERROR;
+	}
+
+	if (setgid(p->pw_gid) < 0) {
+		perror("setgid failed ");
+		return KORE_RESULT_ERROR;
+	}
+
+	if (setuid(p->pw_uid) < 0) {
+		perror("setuid failed ");
+		return KORE_RESULT_ERROR;
+	}
 
 /////////////////////////////////
 

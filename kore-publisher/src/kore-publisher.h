@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <pthread.h>
+#include <pwd.h>
 
 #include <kore/kore.h>
 #include <kore/http.h>
