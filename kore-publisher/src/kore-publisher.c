@@ -97,22 +97,19 @@ hostname_to_ip(char * hostname , char* ip)
 void
 init_admin_conn ()
 {
-
 	cached_admin_conn = amqp_new_connection();
 	amqp_socket_t *socket = amqp_tcp_socket_new(cached_admin_conn);
 
 	if (socket == NULL)
 	{
-		fprintf(stderr,"Could not open a socket ");
-		return KORE_RESULT_ERROR;
+		fprintf(stderr,"Could not open a socket\n");
+		exit(-1);
 	}
 
-retry:
-	if (amqp_socket_open(socket, broker_ip, 5672))
+	while (amqp_socket_open(socket, broker_ip, 5672))
 	{
 		fprintf(stderr,"Could not connect to broker\n");
 		sleep(1);
-		goto retry;
 	}
 
 	login_reply = amqp_login(
@@ -129,23 +126,22 @@ retry:
 	if (login_reply.reply_type != AMQP_RESPONSE_NORMAL)
 	{
 		fprintf(stderr,"invalid id or apikey\n");
-		return KORE_RESULT_ERROR;
+		exit (-1);
 	}
 
 	if(! amqp_channel_open(cached_admin_conn, 1))
 	{
 		fprintf(stderr,"could not open an AMQP connection\n");
-		return KORE_RESULT_ERROR;
+		exit (-1);
 	}
 
 	rpc_reply = amqp_get_rpc_reply(cached_admin_conn);
 	if (rpc_reply.reply_type != AMQP_RESPONSE_NORMAL)
 	{
 		fprintf(stderr,"broker did not send AMQP_RESPONSE_NORMAL\n");
-		return KORE_RESULT_ERROR;
+		exit (-1);
 	}
 }
-
 
 void*
 async_publish_function (const void *v)
@@ -327,7 +323,7 @@ init (int state)
 	admin_apikey[32] = '\0';
 	int strlen_admin_apikey = strlen(admin_apikey);
 
-	for (int i = 0; i < strlen_admin_apikey; ++i)
+	for (i = 0; i < strlen_admin_apikey; ++i)
 	{
 		if (isspace(admin_apikey[i]))
 		{
@@ -354,7 +350,7 @@ init (int state)
 	postgres_pwd[32] = '\0';
 	int strlen_postgres_pwd = strlen(postgres_pwd);
 
-	for (int i = 0; i < strlen_postgres_pwd; ++i)
+	for (i = 0; i < strlen_postgres_pwd; ++i)
 	{
 		if (isspace(postgres_pwd[i]))
 		{
@@ -380,7 +376,6 @@ init (int state)
 	))
 	{
 		fprintf(stderr,"amqp_queue_declare failed for {DATABASE}\n");
-		init_admin_conn();
 		return KORE_RESULT_ERROR;
 	}
 
@@ -1969,13 +1964,17 @@ queue_bind (struct http_request *req)
 		amqp_empty_table
 	))
 	{
-		init_admin_conn();
 		ERROR("bind failed");
 	}
 
 	OK();
 
 done:
+	if (req->status == 500)
+	{
+		init_admin_conn();
+	}
+
 	END();
 }
 
@@ -2114,13 +2113,17 @@ queue_unbind (struct http_request *req)
 	if (r.reply_type != AMQP_RESPONSE_NORMAL)
 	{
 		snprintf(error_string,1024,"unbind failed %d e={%s} q={%s} t={%s}\n",r.reply_type,exchange,queue,topic);
-		init_admin_conn();
 		ERROR(error_string);
 	}
 
 	OK();
 
 done:
+	if (req->status == 500)
+	{
+		init_admin_conn();
+	}
+
 	END();
 }
 
@@ -2318,7 +2321,6 @@ follow (struct http_request *req)
 				amqp_empty_table
 			))
 			{
-				init_admin_conn();	
 				ERROR("bind failed for app.publish with device.command");
 			}
 
@@ -2364,6 +2366,11 @@ follow (struct http_request *req)
 	kore_buf_append(response,"}\n",2);
 
 done:
+	if (req->status == 500)
+	{
+		init_admin_conn();
+	}
+
 	END();
 }
 
@@ -2491,7 +2498,6 @@ unfollow (struct http_request *req)
 		if (r.reply_type != AMQP_RESPONSE_NORMAL)
 		{
 			snprintf(error_string,1024,"unbind failed %d e={%s} q={%s} t={%s}\n",r.reply_type,write_exchange,command_queue,write_topic);
-			init_admin_conn();
 			ERROR(error_string);
 		}
 
@@ -2563,7 +2569,6 @@ unfollow (struct http_request *req)
 	if (r.reply_type != AMQP_RESPONSE_NORMAL)
 	{
 		snprintf(error_string,1024,"unbind failed %d e={%s} q={%s} t={%s}\n",r.reply_type,exchange,from,topic);
-		init_admin_conn();	
 		ERROR(error_string);
 	}
 
@@ -2581,13 +2586,17 @@ unfollow (struct http_request *req)
 	if (r.reply_type != AMQP_RESPONSE_NORMAL)
 	{
 		snprintf(error_string,1024,"unbind priority failed %d e={%s} q={%s} t={%s}\n",r.reply_type,exchange,priority_queue,topic);
-		init_admin_conn();	
 		ERROR(error_string);
 	}
 
 	OK();
 
 done:
+	if (req->status == 500)
+	{
+		init_admin_conn();
+	}
+
 	END();
 }
 
@@ -2701,7 +2710,6 @@ share (struct http_request *req)
 			amqp_empty_table
 		))
 		{
-			init_admin_conn();	
 			ERROR("bind failed for app.publish with device.command");
 		}
 	}
@@ -2709,6 +2717,11 @@ share (struct http_request *req)
 	OK();
 
 done:
+	if (req->status == 500)
+	{
+		init_admin_conn();
+	}
+
 	END();
 }
 
@@ -3197,7 +3210,6 @@ create_exchanges_and_queues (const void *v)
 			amqp_empty_table
 		))
 		{
-			init_admin_conn();	
 			fprintf(stderr,"amqp_exchange_declare failed {%s}\n",my_exchange);
 			goto done;
 		}
@@ -3217,7 +3229,6 @@ create_exchanges_and_queues (const void *v)
 			lazy_queue_table
 		))
 		{
-			init_admin_conn();	
 			fprintf(stderr,"amqp_queue_declare failed {%s}\n",my_queue);
 			goto done;
 		}
@@ -3233,7 +3244,6 @@ create_exchanges_and_queues (const void *v)
 			amqp_empty_table
 		))
 		{
-			init_admin_conn();	
 			fprintf(stderr,"bind failed for {%s} -> {%s}\n",my_queue,my_exchange);
 			goto done;
 		}
@@ -3249,7 +3259,6 @@ create_exchanges_and_queues (const void *v)
 			amqp_empty_table
 		))
 		{
-			init_admin_conn();	
 			fprintf(stderr,"failed to bind {%s} to DATABASE queue for\n",my_exchange);
 			goto done;
 		}
@@ -3277,7 +3286,6 @@ create_exchanges_and_queues (const void *v)
 			)
 			{
 				fprintf(stderr,"something went wrong with exchange creation {%s}\n",my_exchange);
-				init_admin_conn();	
 				goto done;
 			}
 			debug_printf("[entity] DONE creating exchange {%s}\n",my_exchange);
@@ -3292,7 +3300,6 @@ create_exchanges_and_queues (const void *v)
 			))
 			{
 				fprintf(stderr,"failed to bind {%s} to DATABASE queue for\n",my_exchange);
-				init_admin_conn();	
 				goto done;
 			}
 		}
@@ -3315,7 +3322,6 @@ create_exchanges_and_queues (const void *v)
 			))
 			{
 				fprintf(stderr,"amqp_queue_declare failed {%s}\n",my_queue);
-				init_admin_conn();
 				goto done;
 			}
 			debug_printf("[entity] DONE creating queue {%s}\n",my_queue);
@@ -3336,7 +3342,6 @@ create_exchanges_and_queues (const void *v)
 				))
 				{
 					fprintf(stderr,"failed to bind {%s} to {%s}\n",my_queue,my_exchange);
-					init_admin_conn(); 
 					goto done;
 				}
 			}
@@ -3346,6 +3351,11 @@ create_exchanges_and_queues (const void *v)
 	is_success = true;
 
 done:
+	if (! is_success)
+	{
+		init_admin_conn(); 
+	}
+
 	return &is_success;
 }
 
@@ -3359,6 +3369,8 @@ delete_exchanges_and_queues (const void *v)
 	// local variables
 	char my_queue	[129];
 	char my_exchange[129];
+
+	is_success = false;
 
 	if (looks_like_a_valid_owner(id))
 	{
@@ -3375,7 +3387,6 @@ delete_exchanges_and_queues (const void *v)
 		))
 		{
 			fprintf(stderr,"amqp_exchange_delete failed {%s}\n",my_exchange);
-			init_admin_conn();	
 			goto done;
 		}
 		debug_printf("[owner] done deleting exchange {%s}\n",my_exchange);
@@ -3392,7 +3403,6 @@ delete_exchanges_and_queues (const void *v)
 		))
 		{
 			fprintf(stderr,"amqp_queue_delete failed {%s}\n",my_queue);
-			init_admin_conn(); 
 			goto done;
 		}
 		debug_printf("[owner] DONE deleting queue {%s}\n",my_queue);
@@ -3414,7 +3424,6 @@ delete_exchanges_and_queues (const void *v)
 			)
 			{
 				fprintf(stderr,"something went wrong with exchange deletion {%s}\n",my_exchange);
-				init_admin_conn();	 
 				goto done;
 			}
 			debug_printf("[entity] DONE deleting exchange {%s}\n",my_exchange);
@@ -3435,14 +3444,19 @@ delete_exchanges_and_queues (const void *v)
 			))
 			{
 				fprintf(stderr,"amqp_queue_delete failed {%s}\n",my_queue);
-				init_admin_conn();	
 				goto done;
 			}
 			debug_printf("[entity] DONE deleting queue {%s}\n",my_queue);
 		}
 	}
 
+	is_success = true;
+
 done:
+	if (! is_success)
+	{
+		init_admin_conn(); 
+	}
 
 	return NULL;
 }
