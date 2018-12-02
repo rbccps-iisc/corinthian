@@ -1,0 +1,16 @@
+@startuml
+hide footbox
+
+entity -> middleware: **HTTPS GET /publish**\r**id**: string\r**apikey**: string\r**to**: string\r**subject**: string\r**message-type**: string\r**content-type**: string\r**message**: string
+group 200 OK
+middleware -> entity:
+end
+
+...
+
+entity -> middleware: **HTTPS POST /publish**\r**id**: string\r**apikey**: string\r**to**: string\r**subject**: string\r**message-type**: string\r**content-type**: string\r\r**<message in body>**
+group 200 OK
+middleware -> entity:
+end
+
+@enduml

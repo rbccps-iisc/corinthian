@@ -38,3 +38,11 @@ Quickstart
 #. Test the middleware using::
 
     ./tests/test fxnl --random
+
+API
+===
+#. Register
+<img src="./DOCS/register.svg">
+
+#. Publish 
+<img src="./DOCS/publish.svg">
