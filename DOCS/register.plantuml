@@ -3,18 +3,23 @@ hide footbox
 
 admin -> middleware: **HTTPS GET /register-owner**\r**id**: string\r**apikey**: string\r**owner**: string
 
+create owner
+middleware -> owner : new
+
 group 201 CREATED
 middleware -> admin: {"id": string, "apikey": string}
 end
 
-create owner
-middleware -> owner : new
+...
+
 
 owner -> middleware: **HTTPS GET /register**\r**id**: string\r**apikey**: string\r**entity**: string
+
+create entity
+middleware -> entity : new
+
 group 201 CREATED
 middleware -> owner: {"id": string, "apikey": string}
 end
 
-create entity
-middleware -> entity : new
 @enduml

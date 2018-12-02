@@ -43,8 +43,8 @@ API
 ===
 #. Register
 
-![Register](./DOCS/register.svg)
+.. image:: https://raw.githubusercontent.com/rbccps-iisc/corinthian/master/DOCS/register.svg 
 
 #. Publish 
 
-![Register](./DOCS/publish.svg)
+.. image:: https://raw.githubusercontent.com/rbccps-iisc/corinthian/master/DOCS/publish.svg 
