@@ -42,7 +42,9 @@ Quickstart
 API
 ===
 #. Register
-<img src="./DOCS/register.svg">
+
+![Register](https://raw.githubusercontent.com/rbccps-iisc/corinthian/master/DOCS/register.png)
 
 #. Publish 
-<img src="./DOCS/publish.svg">
+
+![Register](https://raw.githubusercontent.com/rbccps-iisc/corinthian/master/DOCS/publish.png)
