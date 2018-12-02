@@ -41,10 +41,10 @@ Quickstart
 
 API
 ===
-#. Register
+- Register
 
-.. image:: https://raw.githubusercontent.com/rbccps-iisc/corinthian/master/DOCS/register.svg 
+.. image:: https://raw.githubusercontent.com/rbccps-iisc/corinthian/master/DOCS/register.svg?sanitize=true
 
-#. Publish 
+- Publish 
 
-.. image:: https://raw.githubusercontent.com/rbccps-iisc/corinthian/master/DOCS/publish.svg 
+.. image:: https://raw.githubusercontent.com/rbccps-iisc/corinthian/master/DOCS/publish.svg?sanitize=true
