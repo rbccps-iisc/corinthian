@@ -32,7 +32,7 @@ middleware -> owner2
 end
 
 ...
-group HTTPS POST /entity/follow-status
+group HTTPS GET /entity/follow-status
 entity1 -> middleware: **id**: string\r**apikey**: string
 end
 

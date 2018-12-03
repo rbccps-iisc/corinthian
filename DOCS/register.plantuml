@@ -5,7 +5,7 @@ hnote over admin : on localhost
 ...
 
 group HTTPS POST /admin/register-owner
-admin -> middleware: **id**: string\r**apikey**: string\r**owner**: string
+admin -> middleware: **apikey**: string\r**owner**: string
 end
 
 create owner
@@ -17,7 +17,7 @@ end
 
 ...
 
-group HTTPS POST /admin/register-owner
+group HTTPS POST /admin/register-entity
 
 owner -> middleware: **id**: string\r**apikey**: string\r**entity**: string
 
@@ -31,3 +31,4 @@ middleware -> owner: {"id": string, "apikey": string}
 end
 
 @enduml
+
