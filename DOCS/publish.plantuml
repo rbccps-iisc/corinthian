@@ -1,16 +1,62 @@
 @startuml
 hide footbox
 
-entity -> middleware: **HTTPS GET /publish**\r**id**: string\r**apikey**: string\r**to**: string\r**subject**: string\r**message-type**: string\r**content-type**: string\r**message**: string
+
+...
+group HTTPS POST /entity/follow
+entity1 -> middleware: **id**: string\r**apikey**: string\r**to**: string\r**topic**: string\r**permission**: string\r**validity**: string
+end
+
 group 202 ACCEPTED
-middleware -> entity:
+middleware -> entity1: {"follow-id-read": string, "follow-id-write": string}
 end
 
 ...
 
-entity -> middleware: **HTTPS POST /publish**\r**id**: string\r**apikey**: string\r**to**: string\r**subject**: string\r**message-type**: string\r**content-type**: string\r\r**<message in body>**
+actor owner2
+
+group HTTPS GET /owner/follow-requests
+owner2 -> middleware:**id**: string\r**apikey**: string
+end
+
+group 200 OK
+middleware -> owner2: [\l\t{\t\r\t\t"follow-id": string,\r\t\t"from": string,\r\t\t"to": string,\r\t\t"time": string,\r\t\t"permission": string,\r\t\t"topic": string,\r\t\t"validity": string\r\t},\l\t ...\l]
+end
+
+group HTTPS POST /owner/share
+owner2 -> middleware : **id**: string\r**apikey**: string\r**follow-id**: string
+end
+
+group 200 OK
+middleware -> owner2
+end
+
+...
+group HTTPS POST /entity/follow-status
+entity1 -> middleware: **id**: string\r**apikey**: string
+end
+
+group 200 OK
+middleware -> entity1: [\l\t{\t\r\t\t"follow-id": string,\r\t\t"from": string,\r\t\t"to": string,\r\t\t"time": string,\r\t\t"permission": string,\r\t\t"topic": string,\r\t\t"validity": string,\r\t\t"status": string\r\t},\l\t ...\l]
+end
+
+
+group HTTPS POST /entity/publish
+entity2 -> middleware: **id**: string\r**apikey**: string\r**to**: string\r**subject**: string\r**message-type**: string\r**content-type**: string\r\r**<message in body>**
+end
+
 group 202 ACCEPTED
-middleware -> entity:
+middleware -> entity2:
+end
+
+...
+group HTTPS GET /entity/subscribe
+
+entity1 -> middleware: **id**: string\r**apikey**: string\r**to**: string\r**num-messages**: string\r**message-type**: string
+end
+
+group 200 OK
+middleware -> entity1: **<array of messages in json format>**
 end
 
 @enduml

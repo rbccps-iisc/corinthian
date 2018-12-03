@@ -1,7 +1,12 @@
 actor admin
 hide footbox
 
-admin -> middleware: **HTTPS GET /register-owner**\r**id**: string\r**apikey**: string\r**owner**: string
+hnote over admin : on localhost
+...
+
+group HTTPS POST /admin/reguster-owner
+admin -> middleware: **id**: string\r**apikey**: string\r**owner**: string
+end
 
 create owner
 middleware -> owner : new
@@ -12,8 +17,11 @@ end
 
 ...
 
+group HTTPS POST /admin/reguster-owner
 
-owner -> middleware: **HTTPS GET /register**\r**id**: string\r**apikey**: string\r**entity**: string
+owner -> middleware: **id**: string\r**apikey**: string\r**entity**: string
+
+end
 
 create entity
 middleware -> entity : new
