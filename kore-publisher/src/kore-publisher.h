@@ -40,7 +40,7 @@
 
 #define HEART_BEAT (0)
 
-#if 1
+#if 0
 	#define debug_printf(...)
 #else
 	#define debug_printf(...) (void)printf(__VA_ARGS__)
