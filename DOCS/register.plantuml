@@ -4,7 +4,7 @@ hide footbox
 hnote over admin : on localhost
 ...
 
-group HTTPS POST /admin/reguster-owner
+group HTTPS POST /admin/register-owner
 admin -> middleware: **id**: string\r**apikey**: string\r**owner**: string
 end
 
@@ -17,7 +17,7 @@ end
 
 ...
 
-group HTTPS POST /admin/reguster-owner
+group HTTPS POST /admin/register-owner
 
 owner -> middleware: **id**: string\r**apikey**: string\r**entity**: string
 
