@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 base_url = "https://localhost"
 
 s = requests.Session();
-s.mount('https://localhost/', HTTPAdapter(pool_connections=1))
+s.mount('https://localhost/', HTTPAdapter(pool_connections=10))
 
 output = mp.Queue()
 
@@ -71,7 +71,15 @@ def log(message, clr, modifier=""):
 
 def check(response, code):
 	
-	assert(response.status_code == code), "Message = "+response.text+" Status code = "+str(response.status_code)
+	assert_exit(response.status_code == code, "Message = "+response.text+" Status code ="+str(response.status_code))
+
+def assert_exit(condition, error_message):
+    
+    try:
+	assert condition
+    
+    except AssertionError:
+	sys.exit(error_message)
 
 def gen_rand(size, prefix=""):
 
@@ -288,7 +296,7 @@ message_type="protected", is_priority="false", admin_id="", admin_key=""):
 				if entry['status'] == "approved":
 					approved = approved + 1
 
-			assert (approved == expected)
+			assert_exit(approved == expected, "Approved = "+str(approved)+"Expected = "+str(expected))
 			log("APP " + app + " HAS RECEIVED " + str(approved) + " APPROVALS",'')
 			approved = 0
 
@@ -315,7 +323,7 @@ message_type="protected", is_priority="false", admin_id="", admin_key=""):
 				if entry['status'] == "approved":
 					approved = approved + 1
 
-			assert (approved == expected)
+			assert_exit(approved == expected, "Approved = "+str(approved)+"Expected = "+str(expected))
 			log("APP ADMIN HAS RECEIVED " + str(approved) + " APPROVALS",'')
 			approved = 0
 
@@ -368,7 +376,7 @@ def app_subscribe(devices, app_keys, expected, message_type=""):
 			actual = actual + len(response)
 			check(sub_req, 200)
 		
-		assert (actual == expected)
+		assert_exit(actual == expected, "Actual = "+str(actual)+"Expected = "+str(expected))
 		actual = 0
 		log("APP " + app + " has successfully received " + str(expected) + " messages",'')
 
@@ -424,7 +432,7 @@ def share_dev(expected, admin_id, admin_key):
 		share_req = share(admin_id, admin_key, str(follow_req['follow-id']))
 		check(share_req, 200)
 
-	assert(count == expected)
+	assert_exit(count == expected, "Count= "+str(count)+"Expected = "+str(expected))
 
 def app_publish(device_keys, app_keys, expected_code):
 
@@ -452,7 +460,7 @@ def dev_subscribe(apps, device_keys, expected):
 			actual = actual + len(response)
 			check(sub_req, 200)
 		
-		assert (actual == expected)
+		assert_exit(actual == expected, "Actual= "+str(actual)+"Expected = "+str(expected))
 		actual = 0
 		log("DEVICE " + device + " HAS RECEIVED " + str(expected) + " COMMAND MESSAGES",'')
 
