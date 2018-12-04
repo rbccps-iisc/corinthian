@@ -60,7 +60,7 @@ typedef struct publish_async_data {
 
 /////////////////////// APIs /////////////////////////////////
 
-int cat			(struct http_request *);
+int catalog		(struct http_request *);
 
 int publish		(struct http_request *);
 int publish_async	(struct http_request *);
