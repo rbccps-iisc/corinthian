@@ -13,3 +13,4 @@ sudo chmod +x /usr/local/bin/docker-compose
 
 python -m pip install requests
 python -m pip install urllib3
+python -m pip install pika
