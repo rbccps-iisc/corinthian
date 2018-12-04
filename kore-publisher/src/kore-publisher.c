@@ -3508,8 +3508,8 @@ sanitize (const char *string)
 bool
 is_request_from_localhost (struct http_request *req)
 {
-	switch (req->owner->family)
-	//switch (req->owner->addrtype)
+	//switch (req->owner->family)
+	switch (req->owner->addrtype)
 	{
 		case AF_INET:
 			if (req->owner->addr.ipv4.sin_addr.s_addr == htonl(INADDR_LOOPBACK))
