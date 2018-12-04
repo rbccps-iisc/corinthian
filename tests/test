@@ -12,6 +12,7 @@ import logging
 import time
 import sys
 import warnings
+import pika
 import requests
 import urllib3
 import subprocess
@@ -417,9 +418,9 @@ def app_subscribe_amqp(devices, app_keys, expected, message_type=""):
 		if message_type:
 		    messages = amqp_subscribe(app, apikey, devices, message_type)
 		else:
-		    messages = amqp_subscribe(app, apikey, devices)
+		    messages = amqp_subscribe(app, apikey, devices, message_type="")
 
-		assert_exit(len(messages) == expected, "Received = " + str(messages) + " Expected = " + expected)
+		assert_exit(len(messages) == expected, "Received = " + str(messages) + " Expected = " + str(expected))
 
 
 def follow_dev(device_keys, app_keys, as_admin="", permission="", message_type="protected",
@@ -489,7 +490,7 @@ def app_publish_amqp(device_keys, app_keys):
 	for app, apikey in app_keys.items():
 		for device in device_keys:
 			log("APP "+ app +" PUBLISHING TO DEVICE "+ device +".command EXCHANGE",'')
-			amqp_publish(app, apikey, "publish", device+".command.#", "data")
+			amqp_publish(app, apikey, "publish", device+".command.test", "data")
 
 def dev_subscribe_amqp(apps, device_keys, expected):
 
@@ -524,19 +525,27 @@ def dev_subscribe(apps, device_keys, expected):
 		log("DEVICE " + device + " HAS RECEIVED " + str(expected) + " COMMAND MESSAGES",'')
 
 def amqp_publish(ID, apikey, message_type, routing_key, body):
+
+    credentials = pika.PlainCredentials(ID, apikey)
+    parameters = pika.ConnectionParameters(host='localhost',port=5671, credentials=credentials, ssl=True)
+    connection = pika.BlockingConnection(parameters)
+    channel = connection.channel()
     
-    assert(get_channel(ID+":"+apikey).basic_publish(exchange=ID + "." + message_type, routing_key=routing_key, body=body,mandatory=True))
+    assert(channel.basic_publish(exchange=ID + "." + message_type, routing_key=routing_key, body=body,mandatory=True))
 
 def amqp_subscribe(ID, apikey, num_messages, message_type=""):
 
-    channel = get_channel(ID + ":" + apikey)
+    credentials = pika.PlainCredentials(ID, apikey)
+    parameters = pika.ConnectionParameters(host='localhost',port=5671, credentials=credentials, ssl=True)
+    connection = pika.BlockingConnection(parameters)
+    channel = connection.channel()
 
     if message_type:
 	message_type = "." + message_type
     
     messages = []
 
-    for i in range(0, num_messages):
+    for i in range(num_messages):
 
 	method_frame, header_frame, body = channel.basic_get(ID+message_type)
   
@@ -596,11 +605,14 @@ def deregistrations(device_keys, app_keys, dev_admin_id, dev_admin_key, app_admi
 		dereg = deregister(app_admin_id, app_admin_key, app)
 		check(dereg,200)
 
-def invalid_apikey(devices, apps, device_keys, app_keys):
+def invalid_apikey(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key):
 
 	#=========================================Invalid API key===============================================
 	print("\n\n")
 	log("------------------------- INVALID APIKEY -------------------------\n\n", 'GREEN')
+
+	dummy_key = gen_rand(32) 
+	dummy_id  = gen_rand(8) 
 
 	#Owner registration ( should not go through with the right apikey anyway ) 
 	
@@ -837,7 +849,7 @@ def invalid_apikey(devices, apps, device_keys, app_keys):
 	check(r,403)
 	log("Received 403: OK",'')
 
-def invalid_id(devices, apps, device_keys, app_keys):
+def invalid_id(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key):
 
 	#=========================================Invalid ID===============================================
 	
@@ -1084,7 +1096,7 @@ def invalid_id(devices, apps, device_keys, app_keys):
 	check(r,403)
 	log("Received 403: OK",'')
 
-def invalid_publish(devices, apps, device_keys, app_keys):
+def invalid_publish(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key):
 
 	print("\n\n")
 	log("------------------------- PUBLISH -------------------------\n\n", 'GREEN')
@@ -1155,7 +1167,7 @@ def invalid_publish(devices, apps, device_keys, app_keys):
 	check(r,400)
 	log("Received 400: OK",'')
 
-def invalid_subscribe(devices, apps, device_keys, app_keys):
+def invalid_subscribe(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key):
 
 	print("\n\n")
 	log("------------------------- SUBSCRIBE -------------------------\n\n", 'GREEN')
@@ -1183,7 +1195,7 @@ def invalid_subscribe(devices, apps, device_keys, app_keys):
 	check(r,400)
 	log("Received 400: OK ",'')
 
-def invalid_bind(devices, apps, device_keys, app_keys):
+def invalid_bind(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key):
 
 	print("\n\n")
 	log("------------------------- BIND -------------------------\n\n", 'GREEN')
@@ -1324,7 +1336,7 @@ def invalid_bind(devices, apps, device_keys, app_keys):
 	except Exception as e:
 		pass
 
-def invalid_unbind(devices, apps, device_keys, app_keys):
+def invalid_unbind(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key):
 
 	print("\n\n")
 	log("------------------------- UNBIND -------------------------\n\n", 'GREEN')
@@ -1478,7 +1490,7 @@ def invalid_unbind(devices, apps, device_keys, app_keys):
 	except Exception as e:
 		pass
 
-def invalid_share(devices, apps, device_keys, app_keys):
+def invalid_share(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key):
 
 	print("\n\n")
 	log("------------------------- SHARE -------------------------\n\n", 'GREEN')
@@ -1574,7 +1586,7 @@ def invalid_share(devices, apps, device_keys, app_keys):
 	except Exception as e:
 		pass
 
-def invalid_follow(devices, apps, device_keys, app_keys):
+def invalid_follow(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key):
 
 	print("\n\n")
 	log("------------------------- FOLLOW -------------------------\n\n", 'GREEN')
@@ -1616,10 +1628,6 @@ def invalid_follow(devices, apps, device_keys, app_keys):
 
 	validity = gen_rand(8) 
 	r = follow(app_name, app_key, dev_name, "read", validity=validity)
-	check(r, 400)
-	log("Received 400: OK",'')
-
-	r = share(dev_name, dev_key, follow_id)
 	check(r, 400)
 	log("Received 400: OK",'')
 
@@ -1679,7 +1687,7 @@ def invalid_follow(devices, apps, device_keys, app_keys):
 	check(r, 400)
 	log("Received 400: OK",'')
 
-def invalid_unfollow(devices, apps, device_keys, app_keys):
+def invalid_unfollow(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key):
 
 	print("\n\n")
 	log("------------------------- UNFOLLOW -------------------------\n\n", 'GREEN')
@@ -1841,7 +1849,7 @@ def invalid_unfollow(devices, apps, device_keys, app_keys):
 	except Exception as e:
 		pass
 
-def invalid_deregistrations(devices, apps, device_keys, app_keys):
+def invalid_deregistrations(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key):
 
 	print("\n\n")
 	log("------------------------- DEREGISTRATION -------------------------\n\n", 'GREEN')
@@ -1866,9 +1874,6 @@ def security_tests():
 	print("\n\n")
 	log("========================= SECURITY TESTS =========================\n\n", 'GREEN', modifier='BOLD')
 	
-	dummy_key = gen_rand(32) 
-	dummy_id  = gen_rand(8) 
-
 	devices = random.randint(2,5)
 	apps 	= random.randint(2,5)
 
@@ -1891,31 +1896,31 @@ def security_tests():
 	test_time = time.time()
 
 	#Invalid apikey tests
-	invalid_apikey(devices, apps, device_keys, app_keys)
+	invalid_apikey(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
 
 	#Invalid ID tests
-	invalid_id(devices, apps, device_keys, app_keys)
+	invalid_id(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
 
 	#Invalid publish
-	invalid_publish(devices, apps, device_keys, app_keys)
+	invalid_publish(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
 
 	#Invalid subscribe
-	invalid_subscribe(devices, apps, device_keys, app_keys)
+	invalid_subscribe(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
 
 	#Invalid bind
-	invalid_bind(devices, apps, device_keys, app_keys)
+	invalid_bind(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
 
 	#Invalid unbind
-	invalid_unbind(devices, apps, device_keys, app_keys)
+	invalid_unbind(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
 
 	#Invalid follow
-	invalid_follow(devices, apps, device_keys, app_keys)
+	invalid_follow(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
 
 	#Invalid unfollow
-	invalid_unfollow(devices, apps, device_keys, app_keys)
+	invalid_unfollow(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
 
 	#Invalid deregistrations
-	invalid_deregistrations(devices, apps, device_keys, app_keys)
+	invalid_deregistrations(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
 
 	test_time = time.time() - test_time
 
@@ -2407,7 +2412,7 @@ def functional_tests(*args):
 	priority_tests(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
 
 	#AMQP tests
-	#amqp_tests(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
+	amqp_tests(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
 
 	test_time = time.time() - test_time
 
@@ -2527,5 +2532,6 @@ if __name__ == '__main__':
 						datefmt='%Y-%m-%d %H:%M:%S')
 	logging.getLogger("requests").setLevel(logging.WARNING)
 	logging.getLogger("urllib3").setLevel(logging.WARNING)
+	logging.getLogger("pika").setLevel(logging.WARNING)
 
 	start_tests(devices, apps, args)
