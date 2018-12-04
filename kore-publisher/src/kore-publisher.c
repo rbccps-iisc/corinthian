@@ -1548,7 +1548,7 @@ done:
 }
 
 int
-cat (struct http_request *req)
+catalog (struct http_request *req)
 {
 	int i, num_rows;
 
@@ -1859,6 +1859,8 @@ queue_bind (struct http_request *req)
 			,
 		"inputs missing in headers"
 	);
+
+	debug_printf("id = %s\n, apikey = %s\n, to =%s\n, topic = %s\n, message-type = %s\n", id, apikey, to, topic, message_type);
 
 
 	if (looks_like_a_valid_owner(id))

@@ -29,6 +29,9 @@ s.mount('https://localhost/', HTTPAdapter(pool_connections=10))
 
 output = mp.Queue()
 
+#Connection pool for amqp connections
+pool={}
+
 colour ={}
 
 colour['HEADER'] 		= '\033[95m'
@@ -40,6 +43,25 @@ colour['ENDC'] 			= '\033[0m'
 colour['BOLD'] 			= '\033[1m'
 colour['UNDERLINE'] 		= '\033[4m'
 colour[''] 			= ''
+
+def get_channel(token):
+
+    global pool
+
+    username=token.split(":")[0]
+    apikey=token.split(":")[1]
+
+    if ((pool.get(username, "not found") == "not found") or (not pool.get(username).is_open)):
+
+	credentials = pika.PlainCredentials(username, apikey)
+	parameters = pika.ConnectionParameters(host='localhost',port=5671, credentials=credentials, ssl=True)
+	connection = pika.BlockingConnection(parameters)
+	channel = connection.channel()
+
+        pool[username] = channel
+
+    return pool.get(username)
+
 
 def gen_admin():
     
@@ -79,7 +101,8 @@ def assert_exit(condition, error_message):
 	assert condition
     
     except AssertionError:
-	sys.exit(error_message)
+	print(error_message)
+	raise
 
 def gen_rand(size, prefix=""):
 
@@ -106,16 +129,16 @@ def register_owner(ID, apikey, owner):
 
 def register(ID, apikey, entity_id):
 	
-	url = base_url + "/register"
+	url = base_url + "/owner/register-entity"
 	headers = {"id": ID, "apikey": apikey, "entity": entity_id, "is-autonomous": "true"}
 	r = s.post(url=url, headers=headers, data="{\"test\":\"schema\"}", verify=False)
 	return r
 
 def deregister(ID, apikey, entity_id):
 
-	url = base_url + "/deregister"
+	url = base_url + "/owner/deregister-entity"
 	headers = {"id": ID, "apikey": apikey, "entity": entity_id}
-	r = s.get(url=url, headers=headers, verify=False)
+	r = s.post(url=url, headers=headers, verify=False)
 	return r
 
 def block_unblock(ID, apikey, entity_id, req_type):
@@ -123,17 +146,17 @@ def block_unblock(ID, apikey, entity_id, req_type):
 	url = base_url 
 	
 	if req_type == "block":
-		url = url + "/block"
+		url = url + "/owner/block"
 	elif req_type == "unblock":
-		url = url + "/unblock"
+		url = url + "/owner/unblock"
 
 	headers = {"id": ID, "apikey": apikey, "entity": entity_id}
-	r = s.get(url=url, headers=headers, verify=False)
+	r = s.post(url=url, headers=headers, verify=False)
 	return r
 
 def permissions(ID, apikey, entity_id=""):
 
-	url = base_url + "/permissions"
+	url = base_url + "/entity/permissions"
 
 	headers = {}
 
@@ -148,14 +171,14 @@ def permissions(ID, apikey, entity_id=""):
 
 def publish(ID, apikey, to, topic, message_type, data):
 
-	url = base_url + "/publish"
+	url = base_url + "/entity/publish"
 	headers = {"id": ID, "apikey": apikey, "to": to, "subject": topic, "message-type": message_type, "content-type": "text/plain"}
 	r = s.post(url=url,headers=headers,data=data,verify=False)
 	return r
 
 def follow(ID, apikey, to_id, permission, from_id="", topic ="", validity = "", message_type=""):
 
-	url = base_url + "/follow"
+	url = base_url + "/entity/follow"
 	headers = {}
 
 	if from_id:
@@ -180,20 +203,20 @@ def follow(ID, apikey, to_id, permission, from_id="", topic ="", validity = "", 
 
 	headers['permission'] = permission
 	
-	r = s.get(url=url,headers=headers,verify=False)
+	r = s.post(url=url,headers=headers,verify=False)
 	return r
 
 def reject_follow(ID, apikey, follow_id):
 	
-	url =base_url + "/reject-follow"
+	url =base_url + "/owner/reject-follow"
 	headers = {"id": ID, "apikey": apikey, "follow-id": follow_id}
-	r = s.get(url=url, headers=headers, verify=False)
+	r = s.post(url=url, headers=headers, verify=False)
 	return r
 	
 
 def unfollow(ID, apikey, to, topic, permission, message_type, from_id=""):
 
-	url = base_url + "/unfollow"
+	url = base_url + "/entity/unfollow"
 	headers = {}
 
 	if from_id:
@@ -206,14 +229,14 @@ def unfollow(ID, apikey, to, topic, permission, message_type, from_id=""):
 	headers['permission'] = permission
 	headers['message-type'] = message_type 
 	
-	r = s.get(url=url,headers=headers,verify=False)
+	r = s.post(url=url,headers=headers,verify=False)
 	return r
 
 def share(ID, apikey, follow_id):
 
-	url =base_url + "/share"
+	url =base_url + "/owner/share"
 	headers = {"id": ID, "apikey": apikey, "follow-id": follow_id}
-	r = s.get(url=url, headers=headers, verify=False)
+	r = s.post(url=url, headers=headers, verify=False)
 	return r
 
 def bind_unbind(ID, apikey, to, topic, req_type, message_type, from_id="", is_priority="false"):
@@ -222,9 +245,9 @@ def bind_unbind(ID, apikey, to, topic, req_type, message_type, from_id="", is_pr
 	headers = {}
 
 	if req_type == "bind":
-		url = url + "/bind"
+		url = url + "/entity/bind"
 	elif req_type == "unbind":
-		url = url + "/unbind"
+		url = url + "/entity/unbind"
 
 	if from_id:
 		headers['from'] = from_id
@@ -237,13 +260,12 @@ def bind_unbind(ID, apikey, to, topic, req_type, message_type, from_id="", is_pr
 	headers['topic'] = topic
 	headers['is-priority'] = is_priority 
 
-	r = s.get(url=url, headers=headers, verify=False)
+	r = s.post(url=url, headers=headers, verify=False)
 	return r
-
 
 def subscribe(ID, apikey, message_type="", num_messages=""):
 
-	url = base_url + "/subscribe"
+	url = base_url + "/entity/subscribe"
 	headers = {}
 
 	if message_type:
@@ -263,9 +285,9 @@ def follow_requests(ID, apikey, request_type):
 	url = base_url
 
 	if request_type == "requests":
-		url = url + "/follow-requests"
+		url = url + "/owner/follow-requests"
 	elif request_type == "status":
-		url = url + "/follow-status"
+		url = url + "/owner/follow-status"
 
 	headers = {"id": ID, "apikey": apikey}
 
@@ -278,6 +300,12 @@ def dev_publish(device_keys, message_type="protected"):
 		log("PUBLISHING MESSAGE FROM " + device,'')
 		pub_req = publish(device, apikey, device, "test", message_type, "test message from " + device)
 		check(pub_req, 202)
+
+def dev_publish_amqp(device_keys, message_type="protected"):
+    
+	for device, apikey in device_keys.items():
+		log("PUBLISHING MESSAGE FROM " + device,'')
+		amqp_publish(device, apikey, message_type, "test", "test message from " + device)
 
 def bind_unbind_dev(device_keys, app_keys, expected=0, as_admin="", req_type="",
 message_type="protected", is_priority="false", admin_id="", admin_key=""):
@@ -296,7 +324,7 @@ message_type="protected", is_priority="false", admin_id="", admin_key=""):
 				if entry['status'] == "approved":
 					approved = approved + 1
 
-			assert_exit(approved == expected, "Approved = "+str(approved)+"Expected = "+str(expected))
+			assert_exit(approved == expected, "Approved = "+str(approved)+" Expected = "+str(expected))
 			log("APP " + app + " HAS RECEIVED " + str(approved) + " APPROVALS",'')
 			approved = 0
 
@@ -323,7 +351,7 @@ message_type="protected", is_priority="false", admin_id="", admin_key=""):
 				if entry['status'] == "approved":
 					approved = approved + 1
 
-			assert_exit(approved == expected, "Approved = "+str(approved)+"Expected = "+str(expected))
+			assert_exit(approved == expected, "Approved = "+str(approved)+" Expected = "+str(expected))
 			log("APP ADMIN HAS RECEIVED " + str(approved) + " APPROVALS",'')
 			approved = 0
 
@@ -376,9 +404,22 @@ def app_subscribe(devices, app_keys, expected, message_type=""):
 			actual = actual + len(response)
 			check(sub_req, 200)
 		
-		assert_exit(actual == expected, "Actual = "+str(actual)+"Expected = "+str(expected))
+		assert_exit(actual == expected, "Actual = "+str(actual)+" Expected = "+str(expected))
 		actual = 0
 		log("APP " + app + " has successfully received " + str(expected) + " messages",'')
+
+def app_subscribe_amqp(devices, app_keys, expected, message_type=""):
+
+    for app, apikey in app_keys.items():
+
+		log("APP " + app + " SUBSCRIBING TO ITS QUEUE",'')
+
+		if message_type:
+		    messages = amqp_subscribe(app, apikey, devices, message_type)
+		else:
+		    messages = amqp_subscribe(app, apikey, devices)
+
+		assert_exit(len(messages) == expected, "Received = " + str(messages) + " Expected = " + expected)
 
 
 def follow_dev(device_keys, app_keys, as_admin="", permission="", message_type="protected",
@@ -432,7 +473,7 @@ def share_dev(expected, admin_id, admin_key):
 		share_req = share(admin_id, admin_key, str(follow_req['follow-id']))
 		check(share_req, 200)
 
-	assert_exit(count == expected, "Count= "+str(count)+"Expected = "+str(expected))
+	assert_exit(count == expected, "Count= "+str(count)+" Expected = "+str(expected))
 
 def app_publish(device_keys, app_keys, expected_code):
 
@@ -443,6 +484,24 @@ def app_publish(device_keys, app_keys, expected_code):
 
 			check(publish_req, expected_code)
 
+def app_publish_amqp(device_keys, app_keys):
+
+	for app, apikey in app_keys.items():
+		for device in device_keys:
+			log("APP "+ app +" PUBLISHING TO DEVICE "+ device +".command EXCHANGE",'')
+			amqp_publish(app, apikey, "publish", device+".command.#", "data")
+
+def dev_subscribe_amqp(apps, device_keys, expected):
+
+	actual = 0
+
+	for device, apikey in device_keys.items():
+
+	    log("DEVICE " + device + " SUBSCRIBING TO ITS COMMAND QUEUE",'')
+
+	    messages = amqp_subscribe(device, apikey, apps, message_type="command")
+	    assert_exit(len(messages) == expected, "Actual= "+str(actual)+" Expected = "+str(expected))
+	    log("DEVICE " + device + " HAS RECEIVED " + str(expected) + " COMMAND MESSAGES",'')
 
 def dev_subscribe(apps, device_keys, expected):
 
@@ -460,9 +519,32 @@ def dev_subscribe(apps, device_keys, expected):
 			actual = actual + len(response)
 			check(sub_req, 200)
 		
-		assert_exit(actual == expected, "Actual= "+str(actual)+"Expected = "+str(expected))
+		assert_exit(actual == expected, "Actual= "+str(actual)+" Expected = "+str(expected))
 		actual = 0
 		log("DEVICE " + device + " HAS RECEIVED " + str(expected) + " COMMAND MESSAGES",'')
+
+def amqp_publish(ID, apikey, message_type, routing_key, body):
+    
+    assert(get_channel(ID+":"+apikey).basic_publish(exchange=ID + "." + message_type, routing_key=routing_key, body=body,mandatory=True))
+
+def amqp_subscribe(ID, apikey, num_messages, message_type=""):
+
+    channel = get_channel(ID + ":" + apikey)
+
+    if message_type:
+	message_type = "." + message_type
+    
+    messages = []
+
+    for i in range(0, num_messages):
+
+	method_frame, header_frame, body = channel.basic_get(ID+message_type)
+  
+	if method_frame:
+            channel.basic_ack(method_frame.delivery_tag)
+            messages.append(body)
+    
+    return messages
 
 def registrations(devices, apps, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key):
 	
@@ -514,34 +596,8 @@ def deregistrations(device_keys, app_keys, dev_admin_id, dev_admin_key, app_admi
 		dereg = deregister(app_admin_id, app_admin_key, app)
 		check(dereg,200)
 
-def security_tests():
+def invalid_apikey(devices, apps, device_keys, app_keys):
 
-	print("\n\n")
-	log("========================= SECURITY TESTS =========================\n\n", 'GREEN', modifier='BOLD')
-	
-	dummy_key = gen_rand(32) 
-	dummy_id  = gen_rand(8) 
-
-	devices = random.randint(2,5)
-	apps 	= random.randint(2,5)
-
-	dev_admin_id, dev_admin_key = gen_admin()
-	app_admin_id, app_admin_key = gen_admin()
-
-	reg_time = time.time()
-	device_keys, app_keys = registrations(devices, apps, dev_admin_id, dev_admin_key,
-	app_admin_id, app_admin_key)	
-	reg_time = time.time() - reg_time
-
-	#Trying to register an owner from outside the localhost
-	
-	#logger.info(colour.HEADER + "---------------> OWNER REGISTRATION FROM OUTSIDE LOCALHOST " + colour.ENDC)
-
-	#r = register_owner("admin", admin_key, "owner"+dummy_id)
-	#check(r,403)
-	#logger.info("Received 403: OK")
-
-	test_time = time.time()
 	#=========================================Invalid API key===============================================
 	print("\n\n")
 	log("------------------------- INVALID APIKEY -------------------------\n\n", 'GREEN')
@@ -780,6 +836,8 @@ def security_tests():
 	r = deregister(dev_admin_id, dummy_key, dev_name)
 	check(r,403)
 	log("Received 403: OK",'')
+
+def invalid_id(devices, apps, device_keys, app_keys):
 
 	#=========================================Invalid ID===============================================
 	
@@ -1026,6 +1084,8 @@ def security_tests():
 	check(r,403)
 	log("Received 403: OK",'')
 
+def invalid_publish(devices, apps, device_keys, app_keys):
+
 	print("\n\n")
 	log("------------------------- PUBLISH -------------------------\n\n", 'GREEN')
 
@@ -1095,6 +1155,8 @@ def security_tests():
 	check(r,400)
 	log("Received 400: OK",'')
 
+def invalid_subscribe(devices, apps, device_keys, app_keys):
+
 	print("\n\n")
 	log("------------------------- SUBSCRIBE -------------------------\n\n", 'GREEN')
 
@@ -1120,6 +1182,8 @@ def security_tests():
 	r = subscribe(app_name, app_key, num_messages= dummy_nm)
 	check(r,400)
 	log("Received 400: OK ",'')
+
+def invalid_bind(devices, apps, device_keys, app_keys):
 
 	print("\n\n")
 	log("------------------------- BIND -------------------------\n\n", 'GREEN')
@@ -1231,7 +1295,6 @@ def security_tests():
 
 	#Cross-device binding 
 	log("---------------> CROSS DEVICE BINDING", 'HEADER') 
-	
 
 	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
 	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
@@ -1260,6 +1323,8 @@ def security_tests():
 		p = subprocess.check_output(cmd, shell=True)
 	except Exception as e:
 		pass
+
+def invalid_unbind(devices, apps, device_keys, app_keys):
 
 	print("\n\n")
 	log("------------------------- UNBIND -------------------------\n\n", 'GREEN')
@@ -1413,6 +1478,8 @@ def security_tests():
 	except Exception as e:
 		pass
 
+def invalid_share(devices, apps, device_keys, app_keys):
+
 	print("\n\n")
 	log("------------------------- SHARE -------------------------\n\n", 'GREEN')
 
@@ -1506,6 +1573,8 @@ def security_tests():
 		p = subprocess.check_output(cmd, shell=True)
 	except Exception as e:
 		pass
+
+def invalid_follow(devices, apps, device_keys, app_keys):
 
 	print("\n\n")
 	log("------------------------- FOLLOW -------------------------\n\n", 'GREEN')
@@ -1609,6 +1678,8 @@ def security_tests():
 	r = follow(app_name, app_key, dev_name, "read", message_type=gen_rand(8))
 	check(r, 400)
 	log("Received 400: OK",'')
+
+def invalid_unfollow(devices, apps, device_keys, app_keys):
 
 	print("\n\n")
 	log("------------------------- UNFOLLOW -------------------------\n\n", 'GREEN')
@@ -1769,7 +1840,9 @@ def security_tests():
 		p = subprocess.check_output(cmd, shell=True)
 	except Exception as e:
 		pass
-	
+
+def invalid_deregistrations(devices, apps, device_keys, app_keys):
+
 	print("\n\n")
 	log("------------------------- DEREGISTRATION -------------------------\n\n", 'GREEN')
 
@@ -1787,6 +1860,63 @@ def security_tests():
 	check(r, 403)
 	log("Received 403: OK",'')
 
+
+def security_tests():
+
+	print("\n\n")
+	log("========================= SECURITY TESTS =========================\n\n", 'GREEN', modifier='BOLD')
+	
+	dummy_key = gen_rand(32) 
+	dummy_id  = gen_rand(8) 
+
+	devices = random.randint(2,5)
+	apps 	= random.randint(2,5)
+
+	dev_admin_id, dev_admin_key = gen_admin()
+	app_admin_id, app_admin_key = gen_admin()
+
+	reg_time = time.time()
+	device_keys, app_keys = registrations(devices, apps, dev_admin_id, dev_admin_key,
+	app_admin_id, app_admin_key)	
+	reg_time = time.time() - reg_time
+
+	#Trying to register an owner from outside the localhost
+	
+	#logger.info(colour.HEADER + "---------------> OWNER REGISTRATION FROM OUTSIDE LOCALHOST " + colour.ENDC)
+
+	#r = register_owner("admin", admin_key, "owner"+dummy_id)
+	#check(r,403)
+	#logger.info("Received 403: OK")
+
+	test_time = time.time()
+
+	#Invalid apikey tests
+	invalid_apikey(devices, apps, device_keys, app_keys)
+
+	#Invalid ID tests
+	invalid_id(devices, apps, device_keys, app_keys)
+
+	#Invalid publish
+	invalid_publish(devices, apps, device_keys, app_keys)
+
+	#Invalid subscribe
+	invalid_subscribe(devices, apps, device_keys, app_keys)
+
+	#Invalid bind
+	invalid_bind(devices, apps, device_keys, app_keys)
+
+	#Invalid unbind
+	invalid_unbind(devices, apps, device_keys, app_keys)
+
+	#Invalid follow
+	invalid_follow(devices, apps, device_keys, app_keys)
+
+	#Invalid unfollow
+	invalid_unfollow(devices, apps, device_keys, app_keys)
+
+	#Invalid deregistrations
+	invalid_deregistrations(devices, apps, device_keys, app_keys)
+
 	test_time = time.time() - test_time
 
 	dereg_time = time.time()
@@ -1798,28 +1928,8 @@ def security_tests():
 
 	output.put(time_list)
 
+def follow_with_read(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key):
 
-def functional_tests(*args):
-	
-	if type(args[0]) is list:
-	    devices = args[0][0]
-	    apps    = args[0][1]
-
-	else:
-	    devices = args[0]
-	    apps    = args[1]
-
-	dev_admin_id, dev_admin_key = gen_admin()
-	app_admin_id, app_admin_key = gen_admin()
-
-	print("\n\n")
-	log("========================= FUNCTIONAL TESTS =========================\n\n", 'GREEN', modifier='BOLD')
-
-	reg_time = time.time()
-	device_keys, app_keys = registrations(devices, apps, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
-	reg_time = time.time() - reg_time
-
-	test_time = time.time()
 	print("\n\n")
 	log("------------------------- SIMPLE READ FOLLOW-SHARE -------------------------\n\n", 'GREEN')
 	
@@ -1856,42 +1966,12 @@ def functional_tests(*args):
 	log("---------------> APPS TRY TO READ PUBLISHED DATA", 'HEADER')
 	app_subscribe(devices, app_keys, 0)
 
-	# Apps bind to devices again but this time using admin apikey
-	log("---------------> APPS BIND TO DEVICES USING ADMIN APIKEY", 'HEADER')
-
-	bind_unbind_dev(device_keys, app_keys, expected=devices*apps, as_admin=True,
-	req_type="bind", admin_id = app_admin_id, admin_key = app_admin_key)
-
-	# Devices publish again
-	log("---------------> DEVICES PUBLISH DATA", 'HEADER')
-	dev_publish(device_keys)
-
-	# Apps subscribe to messages
-	log("---------------> APPS TRY TO READ PUBLISHED DATA", 'HEADER')
-	app_subscribe(devices, app_keys, devices)
-
-	# Unbind from devices as admin
-	log("---------------> APPS UNBIND FROM DEVICES USING ADMIN APIKEY", 'HEADER')
-
-	bind_unbind_dev(device_keys, app_keys, expected=(devices*apps), as_admin=True,
-	req_type="unbind", admin_id = app_admin_id, admin_key = app_admin_key)
-
-	# Devices now publish data
-	log("---------------> DEVICES PUBLISH DATA", 'HEADER')
-	dev_publish(device_keys)
-
-	# Apps try to subscribe but get 0 messages
-	log("---------------> APPS TRY TO READ PUBLISHED DATA", 'HEADER')
-	app_subscribe(devices, app_keys, 0)
-
-	# Apps unfollow all devices
-	log("---------------> APPS UNFOLLOW ALL DEVICES USING THEIR RESPECTIVE APIKEYS", 'HEADER')
+	# Apps unfollow devices
+	log("---------------> APPS WITH READ ACCESS UNFOLLOW DEVICES", 'HEADER')
 	unfollow_dev(device_keys, app_keys, as_admin=False, permission="read")
 
-	# Apps try to bind to unfollowed devices
-	log("---------------> APPS TRY TO BIND TO UNFOLLOWED DEVICES", 'HEADER')
-	bind_unbind_without_follow(device_keys, app_keys, as_admin=False, req_type="bind")
 
+def follow_as_admin(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key):
 
 	print("\n\n")
 	log("------------------------- FOLLOW REQUESTS AS ADMIN -------------------------\n\n", 'GREEN')
@@ -1926,6 +2006,8 @@ def functional_tests(*args):
 	bind_unbind_without_follow(device_keys, app_keys, as_admin=False, req_type="bind")
 
 
+def follow_with_write(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key):
+
 	print("\n\n")
 	log("------------------------- FOLLOW REQUESTS WITH WRITE PERMISSION -------------------------\n\n", 'GREEN')
 
@@ -1953,6 +2035,7 @@ def functional_tests(*args):
 	log("---------------> APPS TRY TO PUBLISH TO COMMAND EXCHANGE OF UNFOLLOWED DEVICES", 'HEADER')
 	app_publish(device_keys, app_keys, 202)
 
+def follow_with_read_write(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key):
 
 	print("\n\n")
 	log("------------------------- FOLLOW REQUESTS WITH READ-WRITE PERMISSIONS -------------------------\n\n", 'GREEN')
@@ -1986,7 +2069,7 @@ def functional_tests(*args):
 	app_subscribe(devices, app_keys, devices)
 
 	#Apps relinquish write permission
-	log("---------------> APPS WITH WRITE ACCESS UNFOLLOW DEVICES", 'HEADER')
+	log("---------------> APPS UNFOLLOW DEVICES FOR WRITE PERMISSION", 'HEADER')
 	unfollow_dev(device_keys, app_keys, as_admin=False, permission="write")
 
 	#Apps publish to command queue of devices
@@ -2002,12 +2085,16 @@ def functional_tests(*args):
 	app_subscribe(devices, app_keys, devices)
 
 	# Apps unfollow with read permissions
-	log("---------------> APPS UNFOLLOW DEVICES WITH READ ACCESS", 'HEADER')
+	log("---------------> APPS UNFOLLOW DEVICES WITH READ PERMISSION", 'HEADER')
 	unfollow_dev(device_keys, app_keys, as_admin=True, permission="read", admin_id = app_admin_id, admin_key = app_admin_key)
 
 	# Apps try to bind to unfollowed devices
 	log("---------------> APPS TRY TO BIND TO UNFOLLOWED DEVICES", 'HEADER')
 	bind_unbind_without_follow(device_keys, app_keys, as_admin=False, req_type="bind")
+
+def bind_as_admin(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key):
+
+	print(device_keys, app_keys)
 
 	print("\n\n")
 	log("------------------------- BIND USING ADMIN APIKEY -------------------------\n\n", 'GREEN')
@@ -2020,9 +2107,11 @@ def functional_tests(*args):
 	log("---------------> DEVICES APPROVE READ-WRITE FOLLOW REQUESTS WITH SHARE", 'HEADER')
 	share_dev((devices*apps*2), dev_admin_id, dev_admin_key)
 
-	# Apps bind to devices' queues
-	log("---------------> APPS BIND TO DEVICES WITH ADMIN APIKEY", 'HEADER')
-	bind_unbind_dev(device_keys, app_keys, expected=(2*devices*apps), as_admin=True, req_type="bind", admin_id = app_admin_id, admin_key = app_admin_key)
+	# Apps bind to devices again but this time using admin apikey
+	log("---------------> APPS BIND TO DEVICES USING ADMIN APIKEY", 'HEADER')
+
+	bind_unbind_dev(device_keys, app_keys, expected=(devices*apps*2), as_admin=True,
+	req_type="bind", admin_id = app_admin_id, admin_key = app_admin_key)
 
 	# Devices publish again
 	log("---------------> DEVICES PUBLISH DATA", 'HEADER')
@@ -2032,9 +2121,29 @@ def functional_tests(*args):
 	log("---------------> APPS TRY TO READ PUBLISHED DATA", 'HEADER')
 	app_subscribe(devices, app_keys, devices)
 
-	# Apps unfollow with read permissions
-	log("---------------> APPS UNFOLLOW DEVICES WITH READ-WRITE ACCESS", 'HEADER')
-	unfollow_dev(device_keys, app_keys, as_admin=True, permission="read-write", admin_id = app_admin_id, admin_key = app_admin_key)
+	# Unbind from devices as admin
+	log("---------------> APPS UNBIND FROM DEVICES USING ADMIN APIKEY", 'HEADER')
+
+	bind_unbind_dev(device_keys, app_keys, expected=(devices*apps*2), as_admin=True,
+	req_type="unbind", admin_id = app_admin_id, admin_key = app_admin_key)
+
+	# Devices now publish data
+	log("---------------> DEVICES PUBLISH DATA", 'HEADER')
+	dev_publish(device_keys)
+
+	# Apps try to subscribe but get 0 messages
+	log("---------------> APPS TRY TO READ PUBLISHED DATA", 'HEADER')
+	app_subscribe(devices, app_keys, 0)
+
+	# Apps unfollow all devices
+	log("---------------> APPS UNFOLLOW ALL DEVICES USING THEIR RESPECTIVE APIKEYS", 'HEADER')
+	unfollow_dev(device_keys, app_keys, as_admin=False, permission="read-write")
+
+	# Apps try to bind to unfollowed devices
+	log("---------------> APPS TRY TO BIND TO UNFOLLOWED DEVICES", 'HEADER')
+	bind_unbind_without_follow(device_keys, app_keys, as_admin=True, req_type="bind", admin_id= app_admin_id, admin_key = app_admin_key)
+
+def diagnostic_tests(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key):
 
 	# ===============================Diagnostics channel ===============================
 
@@ -2110,6 +2219,8 @@ def functional_tests(*args):
 	# Apps try to bind to unfollowed devices' diagnostics channel
 	log("---------------> APPS TRY TO BIND TO UNFOLLOWED DEVICES' DIAGNOSTICS CHANNEL", 'HEADER')
 	bind_unbind_without_follow(device_keys, app_keys, as_admin=False, req_type="bind", message_type="diagnostics")
+
+def priority_tests(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key):
 
 	# ===============================Priority queue ===============================
 
@@ -2188,12 +2299,123 @@ def functional_tests(*args):
 	bind_unbind_without_follow(device_keys, app_keys, as_admin=False, req_type="bind",
 	is_priority = "true")
 
+def amqp_tests(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key):
+
+	# =============================== AMQP TESTS===============================
+
+	print("\n\n")
+	log("------------------------- AMQP TESTS -------------------------\n\n", 'GREEN')
+
+	#Apps request follow with read-write permissions
+	log("---------------> APPS REQUEST FOLLOW WITH READ-WRITE PERMISSIONS", 'HEADER')
+	follow_dev(device_keys, app_keys, as_admin=False, permission="read-write")
+
+	#Devices approve issue share to apps
+	log("---------------> DEVICES APPROVE READ-WRITE FOLLOW REQUESTS WITH SHARE", 'HEADER')
+	share_dev((devices*apps*2), dev_admin_id, dev_admin_key)
+
+	#Apps publish to command queue of devices
+	log("---------------> APPS PUBLISH TO COMMAND EXCHANGE OF DEVICES", 'HEADER')
+	app_publish_amqp(device_keys, app_keys)
+
+	#Devices subscribe to their command queue
+	log("---------------> DEVICES SUBSCRIBE TO THEIR COMMAND QUEUES", 'HEADER')
+	dev_subscribe_amqp(apps, device_keys, apps)
+	
+	# Apps bind to devices' queues
+	log("---------------> APPS BIND TO DEVICES", 'HEADER')
+	bind_unbind_dev(device_keys, app_keys, expected=(2*devices), as_admin=False, req_type="bind")
+
+	# Devices publish again
+	log("---------------> DEVICES PUBLISH DATA", 'HEADER')
+	dev_publish_amqp(device_keys)
+
+	# Apps subscribe to messages
+	log("---------------> APPS TRY TO READ PUBLISHED DATA", 'HEADER')
+	app_subscribe_amqp(devices, app_keys, devices)
+
+	#Apps relinquish write permission
+	log("---------------> APPS WITH WRITE ACCESS UNFOLLOW DEVICES", 'HEADER')
+	unfollow_dev(device_keys, app_keys, as_admin=False, permission="write")
+
+	#Apps publish to command queue of devices
+	log("---------------> APPS TRY TO PUBLISH TO COMMAND EXCHANGE OF UNFOLLOWED DEVICES", 'HEADER')
+	app_publish_amqp(device_keys, app_keys)
+
+	#Devices subscribe to their command queue after write unfollow by apps
+	log("---------------> DEVICES SUBSCRIBE TO THEIR COMMAND QUEUES AFTER WRITE UNFOLLOW BY APPS", 'HEADER')
+	dev_subscribe_amqp(apps, device_keys, 0)
+
+	# Devices publish again
+	log("---------------> DEVICES PUBLISH DATA AFTER WRITE UNFOLLOW", 'HEADER')
+	dev_publish_amqp(device_keys)
+
+	# Apps subscribe to messages
+	log("---------------> APPS TRY TO READ PUBLISHED DATA AFTER WRITE UNFOLLOW", 'HEADER')
+	app_subscribe_amqp(devices, app_keys, devices)
+
+	# Apps unfollow with read permissions
+	log("---------------> APPS UNFOLLOW DEVICES WITH READ ACCESS", 'HEADER')
+	unfollow_dev(device_keys, app_keys, as_admin=True, permission="read", admin_id = app_admin_id, admin_key = app_admin_key)
+
+	# Apps try to bind to unfollowed devices
+	log("---------------> APPS TRY TO BIND TO UNFOLLOWED DEVICES", 'HEADER')
+	bind_unbind_without_follow(device_keys, app_keys, as_admin=False, req_type="bind")
+
+
+def functional_tests(*args):
+	
+	if type(args[0]) is list:
+	    devices = args[0][0]
+	    apps    = args[0][1]
+
+	else:
+	    devices = args[0]
+	    apps    = args[1]
+
+	dev_admin_id, dev_admin_key = gen_admin()
+	app_admin_id, app_admin_key = gen_admin()
+
+	print("\n\n")
+	log("========================= FUNCTIONAL TESTS =========================\n\n", 'GREEN', modifier='BOLD')
+
+	reg_time = time.time()
+	device_keys, app_keys = registrations(devices, apps, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
+	reg_time = time.time() - reg_time
+
+	test_time = time.time()
+
+	#Read follow requests. Also tests bind using admin keys
+	follow_with_read(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
+
+	#Follow requests as admin
+	follow_as_admin(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
+
+	#Follow with write
+	follow_with_write(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
+
+	#Follow requests with read-write permissions
+	follow_with_read_write(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
+
+	#Bind and unbind as admin
+	bind_as_admin(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
+
+	#Diagnostic channel tests
+	diagnostic_tests(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
+
+	#Priority queue tests
+	priority_tests(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
+
+	#AMQP tests
+	#amqp_tests(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
+
 	test_time = time.time() - test_time
 
-
 	dereg_time = time.time()
-	deregistrations(device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id,
-	app_admin_key)
+
+	#Deregister all devices and apps
+	deregistrations(device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
+
 	dereg_time = time.time() - dereg_time
 
 	time_list = [reg_time, test_time, dereg_time]
