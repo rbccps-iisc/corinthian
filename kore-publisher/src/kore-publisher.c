@@ -53,7 +53,7 @@ char pgsql_ip	[100];
 
 char error_string [1025];
 
-amqp_connection_state_t	*cached_admin_conn = NULL;
+amqp_connection_state_t	cached_admin_conn;
 amqp_table_t 		lazy_queue_table;
 amqp_rpc_reply_t 	login_reply;
 amqp_rpc_reply_t 	rpc_reply;
@@ -96,12 +96,8 @@ hostname_to_ip(char * hostname , char* ip)
 void
 init_admin_conn ()
 {
-	cached_admin_conn = malloc (sizeof(amqp_connection_state_t));
-	if (cached_admin_conn == NULL)
-		exit (-1);
-
-	*cached_admin_conn = amqp_new_connection();
-	amqp_socket_t *socket = amqp_tcp_socket_new(*cached_admin_conn);
+	cached_admin_conn = amqp_new_connection();
+	amqp_socket_t *socket = amqp_tcp_socket_new(cached_admin_conn);
 
 	if (socket == NULL)
 	{
@@ -116,7 +112,7 @@ init_admin_conn ()
 	}
 
 	login_reply = amqp_login(
-			*cached_admin_conn,
+			cached_admin_conn,
 			"/",
 			0,
 			131072,
@@ -132,13 +128,13 @@ init_admin_conn ()
 		exit (-1);
 	}
 
-	if(! amqp_channel_open(*cached_admin_conn, 1))
+	if(! amqp_channel_open(cached_admin_conn, 1))
 	{
 		fprintf(stderr,"could not open an AMQP connection\n");
 		exit (-1);
 	}
 
-	rpc_reply = amqp_get_rpc_reply(*cached_admin_conn);
+	rpc_reply = amqp_get_rpc_reply(cached_admin_conn);
 	if (rpc_reply.reply_type != AMQP_RESPONSE_NORMAL)
 	{
 		fprintf(stderr,"broker did not send AMQP_RESPONSE_NORMAL\n");
@@ -368,7 +364,7 @@ init (int state)
 
 	// declare the "DATABASE" queue if it does not exist
 	if (! amqp_queue_declare (
-		*cached_admin_conn,
+		cached_admin_conn,
 		1,
 		amqp_cstring_bytes("DATABASE"),
 		0,
@@ -1959,7 +1955,7 @@ queue_bind (struct http_request *req)
 	}
 
 	if (! amqp_queue_bind (
-		*cached_admin_conn,
+		cached_admin_conn,
 		1,
 		amqp_cstring_bytes(queue),
 		amqp_cstring_bytes(exchange),
@@ -2103,7 +2099,7 @@ queue_unbind (struct http_request *req)
 	}
 
 	amqp_queue_unbind (
-		*cached_admin_conn,
+		cached_admin_conn,
 		1,
 		amqp_cstring_bytes(queue),
 		amqp_cstring_bytes(exchange),
@@ -2111,7 +2107,7 @@ queue_unbind (struct http_request *req)
 		amqp_empty_table
 	);
 
-	amqp_rpc_reply_t r = amqp_get_rpc_reply(*cached_admin_conn);
+	amqp_rpc_reply_t r = amqp_get_rpc_reply(cached_admin_conn);
 
 	if (r.reply_type != AMQP_RESPONSE_NORMAL)
 	{
@@ -2316,7 +2312,7 @@ follow (struct http_request *req)
 			snprintf(write_topic,129,"%s.command.%s",to,topic);
 
 			if (! amqp_queue_bind (
-				*cached_admin_conn,
+				cached_admin_conn,
 				1,
 				amqp_cstring_bytes(command_queue),
 				amqp_cstring_bytes(write_exchange),
@@ -2488,7 +2484,7 @@ unfollow (struct http_request *req)
 		snprintf(write_topic,129,"%s.command.%s",to,topic);
 
 		amqp_queue_unbind (
-			*cached_admin_conn,
+			cached_admin_conn,
 			1,
 			amqp_cstring_bytes(command_queue),
 			amqp_cstring_bytes(write_exchange),
@@ -2496,7 +2492,7 @@ unfollow (struct http_request *req)
 			amqp_empty_table
 		);
 
-		amqp_rpc_reply_t r = amqp_get_rpc_reply(*cached_admin_conn);
+		amqp_rpc_reply_t r = amqp_get_rpc_reply(cached_admin_conn);
 
 		if (r.reply_type != AMQP_RESPONSE_NORMAL)
 		{
@@ -2559,7 +2555,7 @@ unfollow (struct http_request *req)
 
 
 	amqp_queue_unbind (
-		*cached_admin_conn,
+		cached_admin_conn,
 		1,
 		amqp_cstring_bytes(from),
 		amqp_cstring_bytes(exchange),
@@ -2567,7 +2563,7 @@ unfollow (struct http_request *req)
 		amqp_empty_table
 	);
 
-	r = amqp_get_rpc_reply(*cached_admin_conn);
+	r = amqp_get_rpc_reply(cached_admin_conn);
 
 	if (r.reply_type != AMQP_RESPONSE_NORMAL)
 	{
@@ -2576,7 +2572,7 @@ unfollow (struct http_request *req)
 	}
 
 	amqp_queue_unbind (
-		*cached_admin_conn,
+		cached_admin_conn,
 		1,
 		amqp_cstring_bytes(priority_queue),
 		amqp_cstring_bytes(exchange),
@@ -2584,7 +2580,7 @@ unfollow (struct http_request *req)
 		amqp_empty_table
 	);
 
-	r = amqp_get_rpc_reply(*cached_admin_conn);
+	r = amqp_get_rpc_reply(cached_admin_conn);
 
 	if (r.reply_type != AMQP_RESPONSE_NORMAL)
 	{
@@ -2692,32 +2688,29 @@ share (struct http_request *req)
 
 	RUN_QUERY (query,"could not run insert query on acl");
 
-
-	char real_topic [129];
-
-	if (strcmp(permission,"read") == 0)
+	if (strcmp(permission,"write") == 0)
 	{
-		snprintf(exchange,129,"%s",my_exchange);
-		snprintf(real_topic,129,"%s",topic);
-	}
-	else
-	{
-		snprintf(exchange,129,"%s.publish",from_id);
-		snprintf(real_topic,129,"%s.%s",my_exchange,topic); // routing key will be dev.command.topic
-	}
+		char write_exchange 	[129];
+		char command_queue	[129];
+		char write_topic	[129];
 
-	debug_printf("\n--->binding {%s} with {%s} {%s}\n",my_exchange,queue,topic);
+		snprintf(write_exchange,129,"%s.publish",from_id);
+		snprintf(command_queue,129,"%s",my_exchange);	// exchange in follow is device.command
+		snprintf(write_topic,129,"%s.%s",my_exchange,topic); // routing key will be dev.command.topic
 
-	if (! amqp_queue_bind (
-		*cached_admin_conn,
-		1,
-		amqp_cstring_bytes(my_exchange),
-		amqp_cstring_bytes(exchange),
-		amqp_cstring_bytes(write_topic),
-		amqp_empty_table
-	))
-	{
-		ERROR("bind failed for app.publish with device.command");
+		debug_printf("\n--->binding {%s} with {%s} {%s}\n",command_queue,write_exchange,write_topic);
+
+		if (! amqp_queue_bind (
+			cached_admin_conn,
+			1,
+			amqp_cstring_bytes(command_queue),
+			amqp_cstring_bytes(write_exchange),
+			amqp_cstring_bytes(write_topic),
+			amqp_empty_table
+		))
+		{
+			ERROR("bind failed for app.publish with device.command");
+		}
 	}
 
 	OK();
@@ -2725,8 +2718,7 @@ share (struct http_request *req)
 done:
 	if (req->status == 500)
 	{
-		free (cached_admin_conn);
-		cached_admin_conn = NULL;	
+		init_admin_conn();
 	}
 
 	END();
@@ -3206,7 +3198,7 @@ create_exchanges_and_queues (const void *v)
 		debug_printf("[owner] creating exchange {%s}\n",my_exchange);
 
 		if (! amqp_exchange_declare (
-			*cached_admin_conn,
+			cached_admin_conn,
 			1,
 			amqp_cstring_bytes(my_exchange),
 			amqp_cstring_bytes("topic"),
@@ -3226,7 +3218,7 @@ create_exchanges_and_queues (const void *v)
 		snprintf(queue,129,"%s.notification",id);
 		debug_printf("[owner] creating queue {%s}\n",my_queue);
 		if (! amqp_queue_declare (
-			*cached_admin_conn,
+			cached_admin_conn,
 			1,
 			amqp_cstring_bytes(my_queue),
 			0,
@@ -3243,7 +3235,7 @@ create_exchanges_and_queues (const void *v)
 		debug_printf("done creating queue {%s}\n",my_queue);
 
 		if (! amqp_queue_bind (
-			*cached_admin_conn,
+			cached_admin_conn,
 			1,
 			amqp_cstring_bytes(my_queue),
 			amqp_cstring_bytes(my_exchange),
@@ -3258,7 +3250,7 @@ create_exchanges_and_queues (const void *v)
 		debug_printf("bound queue {%s} to exchange {%s}\n",my_queue,my_exchange);
 
 		if (! amqp_queue_bind (
-			*cached_admin_conn,
+			cached_admin_conn,
 			1,
 			amqp_cstring_bytes("DATABASE"),
 			amqp_cstring_bytes(my_exchange),
@@ -3280,7 +3272,7 @@ create_exchanges_and_queues (const void *v)
 			debug_printf("[entity] creating exchange {%s}\n",my_exchange);
 
 			if (! amqp_exchange_declare (
-					*cached_admin_conn,
+					cached_admin_conn,
 					1,
 					amqp_cstring_bytes(my_exchange),
 					amqp_cstring_bytes("topic"),
@@ -3298,7 +3290,7 @@ create_exchanges_and_queues (const void *v)
 			debug_printf("[entity] DONE creating exchange {%s}\n",my_exchange);
 
 			if (! amqp_queue_bind (
-				*cached_admin_conn,
+				cached_admin_conn,
 				1,
 				amqp_cstring_bytes("DATABASE"),
 				amqp_cstring_bytes(my_exchange),
@@ -3318,7 +3310,7 @@ create_exchanges_and_queues (const void *v)
 			debug_printf("[entity] creating queue {%s}\n",my_queue);
 
 			if (! amqp_queue_declare (
-				*cached_admin_conn,
+				cached_admin_conn,
 				1,
 				amqp_cstring_bytes(my_queue),
 				0,
@@ -3340,7 +3332,7 @@ create_exchanges_and_queues (const void *v)
 				debug_printf("[entity] binding {%s} -> {%s}\n",my_queue,my_exchange);
 
 				if (! amqp_queue_bind (
-					*cached_admin_conn,
+					cached_admin_conn,
 					1,
 					amqp_cstring_bytes(my_queue),
 					amqp_cstring_bytes(my_exchange),
@@ -3387,7 +3379,7 @@ delete_exchanges_and_queues (const void *v)
 		debug_printf("[owner] deleting exchange {%s}\n",my_exchange);
 
 		if (! amqp_exchange_delete (
-			*cached_admin_conn,
+			cached_admin_conn,
 			1,
 			amqp_cstring_bytes(my_exchange),
 			0
@@ -3402,7 +3394,7 @@ delete_exchanges_and_queues (const void *v)
 		snprintf(my_queue,129,"%s.notification",id);
 		debug_printf("[owner] deleting queue {%s}\n",my_queue);
 		if (! amqp_queue_delete (
-			*cached_admin_conn,
+			cached_admin_conn,
 			1,
 			amqp_cstring_bytes(my_queue),
 			0,
@@ -3423,7 +3415,7 @@ delete_exchanges_and_queues (const void *v)
 			debug_printf("[entity] deleting exchange {%s}\n",my_exchange);
 
 			if (! amqp_exchange_delete (
-					*cached_admin_conn,
+					cached_admin_conn,
 					1,
 					amqp_cstring_bytes(my_exchange),
 					0
@@ -3443,7 +3435,7 @@ delete_exchanges_and_queues (const void *v)
 			debug_printf("[entity] deleting queue {%s}\n",my_queue);
 
 			if (! amqp_queue_delete (
-				*cached_admin_conn,
+				cached_admin_conn,
 				1,
 				amqp_cstring_bytes(my_queue),
 				0,
