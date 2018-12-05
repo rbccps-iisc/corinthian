@@ -121,10 +121,10 @@ def get_entity(device_keys, app_keys, entity_type=""):
 	    
     return name, key
 
-def register_owner(ID, apikey, owner):
+def register_owner(apikey, owner):
 	
 	url = base_url + "/register-owner"
-	headers = {"id": ID, "apikey": apikey, "owner": owner}
+	headers = {"id": "admin", "apikey": apikey, "owner": owner}
 	r = s.post(url=url, headers=headers, verify=False)
 	return r
 
@@ -617,7 +617,7 @@ def invalid_apikey(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin
 	#Owner registration ( should not go through with the right apikey anyway ) 
 	
 	#logger.info(colour.HEADER + "---------------> OWNER REGISTRATION USING INVALID APIKEY " + colour.ENDC)
-	#r = register_owner("admin", dummy_key, "owner"+dummy_id)
+	#r = register_owner(dummy_key, "owner"+dummy_id)
 	#check(r,403)
 	#logger.info("Received 403: OK")
 
@@ -863,7 +863,7 @@ def invalid_id(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key
 	#Owner registration ( should not go through with the right apikey anyway ) 
 	
 	#logger.info(colour.HEADER + "---------------> OWNER REGISTRATION USING INVALID APIKEY " + colour.ENDC)
-	#r = register_owner("admin", dummy_key, "owner"+dummy_id)
+	#r = register_owner(dummy_key, "owner"+dummy_id)
 	#check(r,403)
 	#logger.info("Received 403: OK")
 
@@ -1889,7 +1889,7 @@ def security_tests():
 	
 	#logger.info(colour.HEADER + "---------------> OWNER REGISTRATION FROM OUTSIDE LOCALHOST " + colour.ENDC)
 
-	#r = register_owner("admin", admin_key, "owner"+dummy_id)
+	#r = register_owner(admin_key, "owner"+dummy_id)
 	#check(r,403)
 	#logger.info("Received 403: OK")
 
@@ -2412,7 +2412,7 @@ def functional_tests(*args):
 	priority_tests(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
 
 	#AMQP tests
-	amqp_tests(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
+	#amqp_tests(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
 
 	test_time = time.time() - test_time
 
