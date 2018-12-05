@@ -1,5 +1,6 @@
 #include <stdbool.h>
 #include <string.h>
+#include <ctype.h>
 
 bool
 looks_like_a_valid_entity (const char *str)
