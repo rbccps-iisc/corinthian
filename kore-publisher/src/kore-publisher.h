@@ -1,5 +1,5 @@
-#ifndef __APIs_H
-#define __APIs_H_
+#ifndef __KORE_PUBLISHER_H
+#define __KORE_PUBLISHER_H
 
 #include <stdio.h>
 #include <stdbool.h>
@@ -30,17 +30,17 @@
 #include <ctype.h>
 #include <pthread.h>
 
-#include "../utils/ht.h"
-#include "../utils/q.h"
+#include "ht.h"
+#include "q.h"
 
-#include <arpa/inet.h>
-#include <netdb.h>
-#include <sys/socket.h>
-#include <errno.h>
+#include<arpa/inet.h>
+#include<netdb.h>
+#include<sys/socket.h>
+#include<errno.h>
 
 #define HEART_BEAT (0)
 
-#if 1
+#if 0
 	#define debug_printf(...)
 #else
 	#define debug_printf(...) (void)printf(__VA_ARGS__)
@@ -109,7 +109,7 @@ bool is_alpha_numeric 	(const char *str);
 bool is_owner		(const char *, const char *);
 
 // threads
-void *async_publish_thread		(const void *);
+void *async_publish_function		(const void *);
 void *create_exchanges_and_queues 	(const void *);
 void *delete_exchanges_and_queues 	(const void *);
 
@@ -221,44 +221,4 @@ bool is_request_from_localhost (struct http_request *);
 	kore_buf_stringify(buf,NULL);			\
 }
 
-	#define MAX_ASYNC_THREADS (2)
-	#define EXTERN
-
-
-	#define UNPRIVILEGED_USER ("nobody")
-#else
-	#define EXTERN extern
-
-#endif /* __APIs_H */
-
-EXTERN struct kore_pgsql sql;
-
-EXTERN char queue	[129];
-EXTERN char exchange	[129];
-
-EXTERN struct kore_buf *query;
-EXTERN struct kore_buf *response;
-
-EXTERN ht connection_ht;
-EXTERN ht async_connection_ht;
-
-EXTERN bool is_success;
-EXTERN char admin_apikey[33];
-EXTERN char postgres_pwd[33];
-
-EXTERN char broker_ip	[100];
-EXTERN char pgsql_ip	[100];
-
-EXTERN char error_string [1025];
-
-EXTERN amqp_connection_state_t	cached_admin_conn;
-EXTERN amqp_table_t 		lazy_queue_table;
-EXTERN amqp_rpc_reply_t 	login_reply;
-EXTERN amqp_rpc_reply_t 	rpc_reply;
-EXTERN amqp_table_entry_t 	*entry;
-EXTERN amqp_basic_properties_t	props;
-
-EXTERN int async_queue_index;
-
-EXTERN Q 		async_q		[MAX_ASYNC_THREADS];
-EXTERN pthread_t 	async_thread	[MAX_ASYNC_THREADS];
+#endif /* __KORE_PUBLISHER_H */
