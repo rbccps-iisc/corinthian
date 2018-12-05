@@ -1,0 +1,18 @@
+actor admin
+hide footbox
+
+hnote over admin : on localhost
+...
+
+group HTTPS POST /admin/register-owner
+admin -> middleware: **apikey**: string\r**owner**: string
+end
+
+create owner
+middleware -> owner : new account
+
+group 201 CREATED
+middleware -> admin: {"id": string, "apikey": string}
+end
+
+@enduml

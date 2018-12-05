@@ -13,7 +13,13 @@ end
 
 ...
 
-actor owner2
+
+
+box " "
+    actor owner2
+
+	participant entity2
+end box
 
 group HTTPS GET /owner/follow-requests
 owner2 -> middleware:**id**: string\r**apikey**: string
