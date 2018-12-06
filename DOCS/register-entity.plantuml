@@ -11,7 +11,7 @@ create entity
 middleware -> entity : new account
 
 group 201 CREATED
-middleware -> owner: {"id": string, "apikey": string}
+middleware -> owner: {"**id**": string, "**apikey**": string}
 end
 
 @enduml
