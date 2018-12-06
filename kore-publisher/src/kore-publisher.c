@@ -3504,7 +3504,19 @@ sanitize (const char *string)
 void
 json_sanitize (const char *string)
 {
-	// TODO
+	char *p = (char *)string;
+
+	while (*p)
+	{
+		if (*p == '\'' || *p == '\\')
+		{
+			*p = '\0';
+			return;
+		}
+
+		++p;
+	}
+
 	return;
 }
 
