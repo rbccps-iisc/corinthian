@@ -1355,9 +1355,8 @@ register_entity (struct http_request *req)
 
 	sanitize(entity);
 
-	// TODO maybe body needs a different sanitizer
 	if (body)
-		sanitize(body);
+		json_sanitize(body);
 
 /////////////////////////////////////////////////
 
@@ -3482,29 +3481,31 @@ sanitize (const char *string)
 	{
 		/* wipe out anything that looks suspicious */
 	
-		if (! isprint(*p))
+		if (! isalnum (*p))
 		{
-			*p = '\0';
-			return;
-		}
-		
-		switch(*p)
-		{
-			case '\'':
-			case '\\':
-			case '_' :
-			case '%' :
-			case '(' :
-			case ')' :
-			case '|' :
-			case ';' :
-			case '&' :
-				*p = '\0';
-				return;
+			switch (*p)
+			{
+				/* allow these chars */
+				case '-':
+				case '/':
+				case '.':
+					break;
+
+				default:
+					*p = '\0';
+					return;
+			}
 		}
 
 		++p;
 	}
+}
+
+void
+json_sanitize (const char *string)
+{
+	// TODO
+	return;
 }
 
 bool

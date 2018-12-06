@@ -522,26 +522,21 @@ sanitize (char *string)
 	while (*p)
 	{
 		/* wipe out anything that looks suspicious */
-	
-		if (! isprint(*p))
+
+		if (! isalnum (*p))
 		{
-			*p = '\0';
-			return;
-		}
-		
-		switch(*p)
-		{
-			case '\'':
-			case '\\':
-			case '_' :
-			case '%' :
-			case '(' :
-			case ')' :
-			case '|' :
-			case ';' :
-			case '&' :
-				*p = '\0';
-				return;
+			switch (*p)
+			{
+				/* allow these chars */
+				case '-':
+				case '/':
+				case '.':
+					break;
+
+				default:
+					*p = '\0';
+					return;
+			}
 		}
 
 		++p;
