@@ -2344,6 +2344,8 @@ follow (struct http_request *req)
 	}
 	else
 	{
+		// TODO: send a notification to owner if the publisher is not autonomous !
+			
 		// we have sent the request,
 		// but the owner of the "to" device must approve
 		req->status = 202;
