@@ -60,8 +60,7 @@ amqp_rpc_reply_t 	rpc_reply;
 amqp_table_entry_t 	*entry;
 amqp_basic_properties_t	props;
 
-
-#define MAX_ASYNC_THREADS (1)
+#define MAX_ASYNC_THREADS (2)
 
 int async_queue_index = 0;
 
@@ -1218,7 +1217,7 @@ subscribe (struct http_request *req)
 		if(header->exchange.len > 0)
 			kore_buf_append(response,header->exchange.bytes, header->exchange.len);
 
-		kore_buf_append(response,"\",\"topic\":\"",11);
+		kore_buf_append(response,"\",\"subject\":\"",13);
 		if (header->routing_key.len > 0)
 			kore_buf_append(response,header->routing_key.bytes, header->routing_key.len);
 
@@ -1549,7 +1548,7 @@ done:
 }
 
 int
-cat (struct http_request *req)
+catalog (struct http_request *req)
 {
 	int i, num_rows;
 
@@ -1860,6 +1859,8 @@ queue_bind (struct http_request *req)
 			,
 		"inputs missing in headers"
 	);
+
+	debug_printf("id = %s\n, apikey = %s\n, to =%s\n, topic = %s\n, message-type = %s\n", id, apikey, to, topic, message_type);
 
 
 	if (looks_like_a_valid_owner(id))
@@ -2504,11 +2505,12 @@ unfollow (struct http_request *req)
 		CREATE_STRING 	(query, "DELETE FROM follow WHERE follow_id='%s'", follow_id);
 		RUN_QUERY	(query, "failed to delete from follow table");
 		
+		CREATE_STRING 	(query, "DELETE FROM acl WHERE follow_id='%s'", follow_id);
+		RUN_QUERY	(query, "failed to delete from acl table");
+		
 		// if its just write then stop 
 		if (strcmp(permission,"write") == 0)
 		{
-			CREATE_STRING 	(query, "DELETE FROM acl WHERE follow_id='%s'", follow_id);
-			RUN_QUERY	(query, "failed to delete from acl table");
 			OK();
 		}
 			

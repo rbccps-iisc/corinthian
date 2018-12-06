@@ -1,0 +1,17 @@
+actor owner
+hide footbox
+
+group HTTPS POST /admin/register-entity
+
+owner -> middleware: **id**: string\r**apikey**: string\r**entity**: string
+
+end
+
+create entity
+middleware -> entity : new account
+
+group 201 CREATED
+middleware -> owner: {"**id**": string, "**apikey**": string}
+end
+
+@enduml

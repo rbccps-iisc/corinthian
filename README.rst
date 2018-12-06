@@ -41,10 +41,14 @@ Quickstart
 
 API
 ===
-- Register
+- /admin/register-owner
 
-.. image:: https://raw.githubusercontent.com/rbccps-iisc/corinthian/master/DOCS/register.svg?sanitize=true
+.. image:: https://raw.githubusercontent.com/rbccps-iisc/corinthian/master/DOCS/register-owner.svg?sanitize=true
 
-- Publish 
+- /owner/register-entity
+
+.. image:: https://raw.githubusercontent.com/rbccps-iisc/corinthian/master/DOCS/register-entity.svg?sanitize=true
+
+- /entity/publish 
 
 .. image:: https://raw.githubusercontent.com/rbccps-iisc/corinthian/master/DOCS/publish.svg?sanitize=true
