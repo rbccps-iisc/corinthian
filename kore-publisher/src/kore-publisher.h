@@ -113,8 +113,8 @@ void *async_publish_function		(void *);
 void *create_exchanges_and_queues 	(void *);
 void *delete_exchanges_and_queues 	(void *);
 
-void sanitize 		(const char *str);
-void str_to_lower 	(const char *str);
+bool is_string_safe 	(const char *str);
+void string_to_lower 	(const char *str);
 
 bool is_request_from_localhost (struct http_request *);
 

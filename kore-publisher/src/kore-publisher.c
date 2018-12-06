@@ -650,7 +650,8 @@ login_success (const char *id, const char *apikey, bool *is_autonomous)
 	if (id == NULL || apikey == NULL || *id == '\0' || *apikey == '\0')
 		goto done;
 
-	sanitize(id);
+	if (! is_string_safe(id))
+		goto done;
 
 	CREATE_STRING (query,
 		"SELECT salt,password_hash,is_autonomous FROM users "
@@ -1351,9 +1352,10 @@ register_entity (struct http_request *req)
 	if (! login_success(id,apikey,NULL))
 		FORBIDDEN("invalid id or apikey");
 
-	str_to_lower(entity);
+	string_to_lower(entity);
 
-	sanitize(entity);
+	if (! is_string_safe(entity))
+		FORBIDDEN("invalid entity");
 
 	if (body)
 		json_sanitize(body);
@@ -1484,7 +1486,8 @@ deregister_entity (struct http_request *req)
 	if (! login_success(id,apikey,NULL))
 		FORBIDDEN("invalid id or apikey");
 
-	sanitize(entity);
+	if (! is_string_safe(entity))
+		FORBIDDEN("invalid entity");
 
 /////////////////////////////////////////////////
 
@@ -1557,7 +1560,8 @@ catalog (struct http_request *req)
 		if (! looks_like_a_valid_entity(entity))
 			FORBIDDEN("id is not a valid entity");
 
-		sanitize(entity);
+		if (! is_string_safe(entity))
+			FORBIDDEN("invalid entity");
 
 		CREATE_STRING (query,
 				"SELECT schema FROM users WHERE schema IS NOT NULL AND id='%s'",
@@ -1649,7 +1653,7 @@ register_owner(struct http_request *req)
 	if (strcmp(id,"admin") != 0)
 		FORBIDDEN("only admin can call this api");
 
-	str_to_lower(owner);
+	string_to_lower(owner);
 
 	// cannot create an admin, validator or database
 	if (strcmp(owner,"admin") == 0 || strcmp(owner,"validator") == 0 || strcmp(owner,"database") == 0)
@@ -1664,7 +1668,8 @@ register_owner(struct http_request *req)
 	if (! login_success("admin",apikey,NULL))
 		FORBIDDEN("invalid id or apikey");
 
-	sanitize(owner);
+	if (! is_string_safe(owner))
+		FORBIDDEN("invalid owner");
 
 /////////////////////////////////////////////////
 
@@ -1764,7 +1769,8 @@ deregister_owner(struct http_request *req)
 	if (! login_success("admin",apikey,NULL))
 		FORBIDDEN("invalid id or apikey");
 
-	sanitize(owner);
+	if (! is_string_safe(owner))
+		FORBIDDEN("invalid owner");
 
 /////////////////////////////////////////////////
 
@@ -1908,9 +1914,14 @@ queue_bind (struct http_request *req)
 	if (! is_autonomous)
 		FORBIDDEN("unauthorized");
 
-	sanitize(from);
-	sanitize(to);
-	sanitize(topic);
+	if (! is_string_safe(from))
+		FORBIDDEN("invalid from");
+
+	if (! is_string_safe(to))
+		FORBIDDEN("invalid to");
+
+	if (! is_string_safe(topic))
+		FORBIDDEN("invalid topic");
 
 /////////////////////////////////////////////////
 
@@ -2054,9 +2065,15 @@ queue_unbind (struct http_request *req)
 	if (! is_autonomous)
 		FORBIDDEN("unauthorized");
 
-	sanitize(from);
-	sanitize(to);
-	sanitize(topic);
+
+	if (! is_string_safe(from))
+		FORBIDDEN("invalid from");
+
+	if (! is_string_safe(to))
+		FORBIDDEN("invalid to");
+
+	if (! is_string_safe(topic))
+		FORBIDDEN("invalid topic");
 
 /////////////////////////////////////////////////
 
@@ -2203,10 +2220,17 @@ follow (struct http_request *req)
 	if (! is_autonomous)
 		FORBIDDEN("unauthorized");
 
-	sanitize (from);
-	sanitize (to);
-	sanitize (validity);
-	sanitize (topic);
+	if (! is_string_safe(from))
+		FORBIDDEN("invalid from");
+
+	if (! is_string_safe(to))
+		FORBIDDEN("invalid to");
+
+	if (! is_string_safe(validity))
+		FORBIDDEN("invalid validity");
+
+	if (! is_string_safe(topic))
+		FORBIDDEN("invalid topic");
 
 /////////////////////////////////////////////////
 
@@ -2442,9 +2466,14 @@ unfollow (struct http_request *req)
 	if (! is_autonomous)
 		FORBIDDEN("unauthorized");
 
-	sanitize(from);
-	sanitize(to);
-	sanitize(topic);
+	if (! is_string_safe(from))
+		FORBIDDEN("invalid from");
+
+	if (! is_string_safe(to))
+		FORBIDDEN("invalid to");
+
+	if (! is_string_safe(topic))
+		FORBIDDEN("invalid topic");
 
 /////////////////////////////////////////////////
 
@@ -2630,7 +2659,8 @@ share (struct http_request *req)
 	if (! is_autonomous)
 		FORBIDDEN("unauthorized");
 
-	sanitize(follow_id);
+	if (! is_string_safe(follow_id))
+		FORBIDDEN("invalid follow-id");
 
 /////////////////////////////////////////////////
 
@@ -2766,7 +2796,8 @@ reject_follow (struct http_request *req)
 	if (! is_autonomous)
 		FORBIDDEN("unauthorized");
 
-	sanitize(follow_id);
+	if (! is_string_safe(follow_id))
+		FORBIDDEN("invalid follow-id");
 
 /////////////////////////////////////////////////
 
@@ -3039,7 +3070,8 @@ block (struct http_request *req)
 	if (! login_success(id,apikey,NULL))
 		FORBIDDEN("invalid id or apikey");
 
-	sanitize (entity);
+	if (! is_string_safe(entity))
+		FORBIDDEN("invalid entity");
 
 /////////////////////////////////////////////////
 
@@ -3093,7 +3125,8 @@ unblock (struct http_request *req)
 	if (! login_success(id,apikey,NULL))
 		FORBIDDEN("invalid id or apikey");
 
-	sanitize(entity);
+	if (! is_string_safe(entity))
+		FORBIDDEN("invalid entity");
 
 /////////////////////////////////////////////////
 
@@ -3146,7 +3179,8 @@ permissions (struct http_request *req)
 	if (! login_success(id,apikey,NULL))
 		FORBIDDEN("invalid id or apikey");
 
-	sanitize(entity);
+	if (! is_string_safe(entity))
+		FORBIDDEN("invalid entity");
 
 /////////////////////////////////////////////////
 
@@ -3469,11 +3503,11 @@ done:
 	return NULL;
 }
 
-void
-sanitize (const char *string)
+bool
+is_string_safe (const char *string)
 {
 	// string should not be NULL. let it crash if it is 
-	char *p = (char *)string;
+	const char *p = (char *)string;
 
 	// assumption is that 'string' is in single quotes
 
@@ -3489,16 +3523,19 @@ sanitize (const char *string)
 				case '-':
 				case '/':
 				case '.':
+				case '*':
+				case '#':
 					break;
 
 				default:
-					*p = '\0';
-					return;
+					return false;	
 			}
 		}
 
 		++p;
 	}
+
+	return true;
 }
 
 void
@@ -3540,7 +3577,7 @@ is_request_from_localhost (struct http_request *req)
 }
 
 void
-str_to_lower (const char *str)
+string_to_lower (const char *str)
 {
 	char *p = (char *)str;
 
