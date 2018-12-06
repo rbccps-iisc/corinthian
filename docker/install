@@ -1,5 +1,8 @@
 #!/bin/bash
 
+directory=`dirname $0`
+cd $directory
+
 sudo chown -R 0:0 ../kore-publisher/jail
 sudo chmod 1111 ../kore-publisher/jail
 sudo chmod 000 ../kore-publisher/jail/etc

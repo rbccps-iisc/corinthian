@@ -109,9 +109,9 @@ bool is_alpha_numeric 	(const char *str);
 bool is_owner		(const char *, const char *);
 
 // threads
-void *async_publish_function		(const void *);
-void *create_exchanges_and_queues 	(const void *);
-void *delete_exchanges_and_queues 	(const void *);
+void *async_publish_function		(void *);
+void *create_exchanges_and_queues 	(void *);
+void *delete_exchanges_and_queues 	(void *);
 
 void sanitize 		(const char *str);
 void str_to_lower 	(const char *str);
