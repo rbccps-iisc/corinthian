@@ -650,6 +650,9 @@ login_success (const char *id, const char *apikey, bool *is_autonomous)
 	if (id == NULL || apikey == NULL || *id == '\0' || *apikey == '\0')
 		goto done;
 
+	if (id[0] < 'a' || id[0] > 'z')
+		goto done;	
+
 	if (! is_string_safe(id))
 		goto done;
 
