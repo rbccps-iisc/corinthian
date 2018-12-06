@@ -1217,7 +1217,7 @@ subscribe (struct http_request *req)
 		if(header->exchange.len > 0)
 			kore_buf_append(response,header->exchange.bytes, header->exchange.len);
 
-		kore_buf_append(response,"\",\"subject\":\"",11);
+		kore_buf_append(response,"\",\"subject\":\"",13);
 		if (header->routing_key.len > 0)
 			kore_buf_append(response,header->routing_key.bytes, header->routing_key.len);
 
