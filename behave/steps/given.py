@@ -8,10 +8,18 @@ def f(context,host):
 	context.url = "http://" + host
 	return True
 
-@given('the middleware allows owner registration')
+@given('the middleware allows owner registration as admin')
 def f(context):
 	return True
 
-@given('the middleware allows owner deregistration')
+@given('the middleware doesn\'t allow owner registration without admin')
+def f(context):
+	return True
+
+@given('the middleware allows owner deregistration as admin')
+def f(context):
+	return True
+
+@given('the middleware doesn\'t allow owner deregistration without admin')
 def f(context):
 	return True
