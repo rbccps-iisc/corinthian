@@ -143,7 +143,7 @@ init_admin_conn ()
 }
 
 void*
-async_publish_function (const void *v)
+async_publish_function (void *v)
 {
 	Q *q = (Q *)v;
 
@@ -650,7 +650,11 @@ login_success (const char *id, const char *apikey, bool *is_autonomous)
 	if (id == NULL || apikey == NULL || *id == '\0' || *apikey == '\0')
 		goto done;
 
-	sanitize(id);
+	if (id[0] < 'a' || id[0] > 'z')
+		goto done;	
+
+	if (! is_string_safe(id))
+		goto done;
 
 	CREATE_STRING (query,
 		"SELECT salt,password_hash,is_autonomous FROM users "
@@ -689,9 +693,6 @@ login_success (const char *id, const char *apikey, bool *is_autonomous)
 
 	if (is_autonomous)
 		*is_autonomous = str_is_autonomous[0] == 't'; 
-
-	debug_printf("strlen of salt = %d (%s)\n",strlen(salt),salt);
-	debug_printf("strlen of apikey = %d (%s)\n",strlen(apikey),apikey);
 
 	strlcpy(string_to_be_hashed, apikey, 33);
 	strlcat(string_to_be_hashed, salt,   65);
@@ -1020,8 +1021,6 @@ publish_async (struct http_request *req)
 	if (!(data->exchange 		= strdup(exchange)))		ERROR("out of memmory");
 	if (!(data->subject		= strdup(topic_to_publish)))	ERROR("out of memmory");
 	if (!(data->content_type	= strdup(content_type)))	ERROR("out of memmory");
-
-	// TODO push "data" in any of the queue 
 
 	if (q_insert (&async_q[async_queue_index], data) < 0)
 		ERROR("inserting into queue failed");
@@ -1356,13 +1355,13 @@ register_entity (struct http_request *req)
 	if (! login_success(id,apikey,NULL))
 		FORBIDDEN("invalid id or apikey");
 
-	str_to_lower(entity);
+	string_to_lower(entity);
 
-	sanitize(entity);
+	if (! is_string_safe(entity))
+		FORBIDDEN("invalid entity");
 
-	// TODO maybe body needs a different sanitizer
 	if (body)
-		sanitize(body);
+		json_sanitize(body);
 
 /////////////////////////////////////////////////
 
@@ -1370,10 +1369,10 @@ register_entity (struct http_request *req)
 
 	// create entries in to RabbitMQ
 
-	if (0 == pthread_create(&thread,NULL,create_exchanges_and_queues,(const void *)entity_name)) 
+	if (0 == pthread_create(&thread,NULL,create_exchanges_and_queues,(void *)entity_name)) 
 		thread_started = true;
 	else
-		create_exchanges_and_queues((const void *)entity_name);
+		create_exchanges_and_queues((void *)entity_name);
 
 	// conflict if entity_name already exist
 
@@ -1490,7 +1489,8 @@ deregister_entity (struct http_request *req)
 	if (! login_success(id,apikey,NULL))
 		FORBIDDEN("invalid id or apikey");
 
-	sanitize(entity);
+	if (! is_string_safe(entity))
+		FORBIDDEN("invalid entity");
 
 /////////////////////////////////////////////////
 
@@ -1509,10 +1509,10 @@ deregister_entity (struct http_request *req)
 		BAD_REQUEST("invalid entity");
 
 	// delete entries in to RabbitMQ
-	if (0 == pthread_create(&thread,NULL,delete_exchanges_and_queues,(const void *)entity))
+	if (0 == pthread_create(&thread,NULL,delete_exchanges_and_queues,(void *)entity))
 		thread_started = true;
 	else
-		delete_exchanges_and_queues((const void *)entity);
+		delete_exchanges_and_queues((void *)entity);
 
 	CREATE_STRING (query,
 		"DELETE FROM acl WHERE from_id = '%s' OR exchange LIKE '%s.%%'",
@@ -1563,7 +1563,8 @@ catalog (struct http_request *req)
 		if (! looks_like_a_valid_entity(entity))
 			FORBIDDEN("id is not a valid entity");
 
-		sanitize(entity);
+		if (! is_string_safe(entity))
+			FORBIDDEN("invalid entity");
 
 		CREATE_STRING (query,
 				"SELECT schema FROM users WHERE schema IS NOT NULL AND id='%s'",
@@ -1655,7 +1656,7 @@ register_owner(struct http_request *req)
 	if (strcmp(id,"admin") != 0)
 		FORBIDDEN("only admin can call this api");
 
-	str_to_lower(owner);
+	string_to_lower(owner);
 
 	// cannot create an admin, validator or database
 	if (strcmp(owner,"admin") == 0 || strcmp(owner,"validator") == 0 || strcmp(owner,"database") == 0)
@@ -1670,7 +1671,8 @@ register_owner(struct http_request *req)
 	if (! login_success("admin",apikey,NULL))
 		FORBIDDEN("invalid id or apikey");
 
-	sanitize(owner);
+	if (! is_string_safe(owner))
+		FORBIDDEN("invalid owner");
 
 /////////////////////////////////////////////////
 
@@ -1684,10 +1686,10 @@ register_owner(struct http_request *req)
 	if(kore_pgsql_ntuples(&sql) > 0)
 		CONFLICT("id already used");
 
-	if (0 == pthread_create(&thread,NULL,create_exchanges_and_queues,(const void *)owner))
+	if (0 == pthread_create(&thread,NULL,create_exchanges_and_queues,(void *)owner))
 		thread_started = true;
 	else
-		create_exchanges_and_queues((const void *)owner);
+		create_exchanges_and_queues((void *)owner);
 
 	gen_salt_password_and_apikey (owner, salt, password_hash, owner_apikey);
 
@@ -1770,7 +1772,8 @@ deregister_owner(struct http_request *req)
 	if (! login_success("admin",apikey,NULL))
 		FORBIDDEN("invalid id or apikey");
 
-	sanitize(owner);
+	if (! is_string_safe(owner))
+		FORBIDDEN("invalid owner");
 
 /////////////////////////////////////////////////
 
@@ -1792,10 +1795,10 @@ deregister_owner(struct http_request *req)
 	}
 
 	// delete entries in to RabbitMQ
-	if (0 == pthread_create(&thread,NULL,delete_exchanges_and_queues,(const void *)owner))
+	if (0 == pthread_create(&thread,NULL,delete_exchanges_and_queues,(void *)owner))
 		thread_started = true;
 	else
-		delete_exchanges_and_queues((const void *)owner);
+		delete_exchanges_and_queues((void *)owner);
 
 	// delete from acl
 	CREATE_STRING (query,
@@ -1914,9 +1917,14 @@ queue_bind (struct http_request *req)
 	if (! is_autonomous)
 		FORBIDDEN("unauthorized");
 
-	sanitize(from);
-	sanitize(to);
-	sanitize(topic);
+	if (! is_string_safe(from))
+		FORBIDDEN("invalid from");
+
+	if (! is_string_safe(to))
+		FORBIDDEN("invalid to");
+
+	if (! is_string_safe(topic))
+		FORBIDDEN("invalid topic");
 
 /////////////////////////////////////////////////
 
@@ -2060,9 +2068,15 @@ queue_unbind (struct http_request *req)
 	if (! is_autonomous)
 		FORBIDDEN("unauthorized");
 
-	sanitize(from);
-	sanitize(to);
-	sanitize(topic);
+
+	if (! is_string_safe(from))
+		FORBIDDEN("invalid from");
+
+	if (! is_string_safe(to))
+		FORBIDDEN("invalid to");
+
+	if (! is_string_safe(topic))
+		FORBIDDEN("invalid topic");
 
 /////////////////////////////////////////////////
 
@@ -2209,10 +2223,17 @@ follow (struct http_request *req)
 	if (! is_autonomous)
 		FORBIDDEN("unauthorized");
 
-	sanitize (from);
-	sanitize (to);
-	sanitize (validity);
-	sanitize (topic);
+	if (! is_string_safe(from))
+		FORBIDDEN("invalid from");
+
+	if (! is_string_safe(to))
+		FORBIDDEN("invalid to");
+
+	if (! is_string_safe(validity))
+		FORBIDDEN("invalid validity");
+
+	if (! is_string_safe(topic))
+		FORBIDDEN("invalid topic");
 
 /////////////////////////////////////////////////
 
@@ -2344,6 +2365,8 @@ follow (struct http_request *req)
 	}
 	else
 	{
+		// TODO: send a notification to owner if the publisher is not autonomous !
+			
 		// we have sent the request,
 		// but the owner of the "to" device must approve
 		req->status = 202;
@@ -2446,9 +2469,14 @@ unfollow (struct http_request *req)
 	if (! is_autonomous)
 		FORBIDDEN("unauthorized");
 
-	sanitize(from);
-	sanitize(to);
-	sanitize(topic);
+	if (! is_string_safe(from))
+		FORBIDDEN("invalid from");
+
+	if (! is_string_safe(to))
+		FORBIDDEN("invalid to");
+
+	if (! is_string_safe(topic))
+		FORBIDDEN("invalid topic");
 
 /////////////////////////////////////////////////
 
@@ -2634,7 +2662,8 @@ share (struct http_request *req)
 	if (! is_autonomous)
 		FORBIDDEN("unauthorized");
 
-	sanitize(follow_id);
+	if (! is_string_safe(follow_id))
+		FORBIDDEN("invalid follow-id");
 
 /////////////////////////////////////////////////
 
@@ -2691,29 +2720,39 @@ share (struct http_request *req)
 
 	RUN_QUERY (query,"could not run insert query on acl");
 
-	if (strcmp(permission,"write") == 0)
+	char bind_exchange	[129];
+	char bind_queue		[129];
+	char bind_topic		[129];
+
+	if (strcmp(permission,"read") == 0)
 	{
-		char write_exchange 	[129];
-		char command_queue	[129];
-		char write_topic	[129];
+		snprintf(bind_exchange,	129,"%s",		my_exchange);
+		snprintf(bind_queue,	129,"%s",		from_id); 		// TODO: what about priority queue
+		snprintf(bind_topic,	129,"%s",		topic);
+	}
+	else if (strcmp(permission,"write") == 0)
+	{
+		snprintf(bind_exchange,	129,"%s.publish",	from_id);
+		snprintf(bind_queue,	129,"%s",		my_exchange);		// exchange in follow is "device.command"
+		snprintf(bind_topic,	129,"%s.%s",		my_exchange,topic); 	// binding routing is "dev.command.topic"
+	}
+	else
+	{
+		ERROR ("wrong value of permission in db");
+	}
 
-		snprintf(write_exchange,129,"%s.publish",from_id);
-		snprintf(command_queue,129,"%s",my_exchange);	// exchange in follow is device.command
-		snprintf(write_topic,129,"%s.%s",my_exchange,topic); // routing key will be dev.command.topic
+	debug_printf("\n--->binding {%s} with {%s} {%s}\n",bind_queue,bind_exchange,bind_topic);
 
-		debug_printf("\n--->binding {%s} with {%s} {%s}\n",command_queue,write_exchange,write_topic);
-
-		if (! amqp_queue_bind (
-			cached_admin_conn,
-			1,
-			amqp_cstring_bytes(command_queue),
-			amqp_cstring_bytes(write_exchange),
-			amqp_cstring_bytes(write_topic),
-			amqp_empty_table
-		))
-		{
-			ERROR("bind failed for app.publish with device.command");
-		}
+	if (! amqp_queue_bind (
+		cached_admin_conn,
+		1,
+		amqp_cstring_bytes(bind_queue),
+		amqp_cstring_bytes(bind_exchange),
+		amqp_cstring_bytes(bind_topic),
+		amqp_empty_table
+	))
+	{
+		ERROR("bind failed for app.publish with device.command");
 	}
 
 	OK();
@@ -2760,7 +2799,8 @@ reject_follow (struct http_request *req)
 	if (! is_autonomous)
 		FORBIDDEN("unauthorized");
 
-	sanitize(follow_id);
+	if (! is_string_safe(follow_id))
+		FORBIDDEN("invalid follow-id");
 
 /////////////////////////////////////////////////
 
@@ -3033,7 +3073,8 @@ block (struct http_request *req)
 	if (! login_success(id,apikey,NULL))
 		FORBIDDEN("invalid id or apikey");
 
-	sanitize (entity);
+	if (! is_string_safe(entity))
+		FORBIDDEN("invalid entity");
 
 /////////////////////////////////////////////////
 
@@ -3087,7 +3128,8 @@ unblock (struct http_request *req)
 	if (! login_success(id,apikey,NULL))
 		FORBIDDEN("invalid id or apikey");
 
-	sanitize(entity);
+	if (! is_string_safe(entity))
+		FORBIDDEN("invalid entity");
 
 /////////////////////////////////////////////////
 
@@ -3140,7 +3182,8 @@ permissions (struct http_request *req)
 	if (! login_success(id,apikey,NULL))
 		FORBIDDEN("invalid id or apikey");
 
-	sanitize(entity);
+	if (! is_string_safe(entity))
+		FORBIDDEN("invalid entity");
 
 /////////////////////////////////////////////////
 
@@ -3181,7 +3224,7 @@ done:
 }
 
 void *
-create_exchanges_and_queues (const void *v)
+create_exchanges_and_queues (void *v)
 {
 	int i;
 
@@ -3362,7 +3405,7 @@ done:
 }
 
 void *
-delete_exchanges_and_queues (const void *v)
+delete_exchanges_and_queues (void *v)
 {
 	int i;
 
@@ -3463,11 +3506,11 @@ done:
 	return NULL;
 }
 
-void
-sanitize (const char *string)
+bool
+is_string_safe (const char *string)
 {
 	// string should not be NULL. let it crash if it is 
-	char *p = (char *)string;
+	const char *p = (char *)string;
 
 	// assumption is that 'string' is in single quotes
 
@@ -3475,29 +3518,46 @@ sanitize (const char *string)
 	{
 		/* wipe out anything that looks suspicious */
 	
-		if (! isprint(*p))
+		if (! isalnum (*p))
 		{
-			*p = '\0';
-			return;
-		}
-		
-		switch(*p)
-		{
-			case '\'':
-			case '\\':
-			case '_' :
-			case '%' :
-			case '(' :
-			case ')' :
-			case '|' :
-			case ';' :
-			case '&' :
-				*p = '\0';
-				return;
+			switch (*p)
+			{
+				/* allow these chars */
+				case '-':
+				case '/':
+				case '.':
+				case '*':
+				case '#':
+					break;
+
+				default:
+					return false;	
+			}
 		}
 
 		++p;
 	}
+
+	return true;
+}
+
+void
+json_sanitize (const char *string)
+{
+	char *p = (char *)string;
+
+	while (*p)
+	{
+		if (*p == '\'' || *p == '\\')
+		{
+			*p = '\0';
+			return;
+		}
+
+		++p;
+	}
+
+	return;
 }
 
 bool
@@ -3520,7 +3580,7 @@ is_request_from_localhost (struct http_request *req)
 }
 
 void
-str_to_lower (const char *str)
+string_to_lower (const char *str)
 {
 	char *p = (char *)str;
 
