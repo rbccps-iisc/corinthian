@@ -1,7 +1,8 @@
 actor owner
 hide footbox
+...
 
-group HTTPS POST /admin/register-entity
+group HTTPS POST /owner/register-entity
 
 owner -> middleware: **id**: string\r**apikey**: string\r**entity**: string
 
