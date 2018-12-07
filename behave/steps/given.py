@@ -11,3 +11,7 @@ def f(context,host):
 @given('the middleware allows owner registration')
 def f(context):
 	return True
+
+@given('the middleware allows owner deregistration')
+def f(context):
+	return True

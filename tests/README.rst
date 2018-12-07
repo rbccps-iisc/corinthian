@@ -7,8 +7,8 @@ Functional test cases
 Accessible only to admins
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-* Register owner
-* Deregister owner
+* Register owner (INCLUDED and TESTED in Behave)
+* Deregister owner (INCLUDED and TESTED in Behave)
 
 Accessible only to owners
 ^^^^^^^^^^^^^^^^^^^^^^^^
