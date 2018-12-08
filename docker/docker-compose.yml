@@ -56,8 +56,6 @@ services:
       - kore-net
     cap_add:
       - ALL
-    ports:           
-      - "5432:5432"
     volumes:
       - pgsql-data:/var/lib/postgresql
       - ../setup/pgsql:/scripts/
