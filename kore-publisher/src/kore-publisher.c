@@ -1759,8 +1759,8 @@ deregister_owner(struct http_request *req)
 	if (strcmp(id,"admin") != 0)
 		FORBIDDEN("only admin can call this api");
 
-	// cannot delete admin
-	if (strcmp(owner,"admin") == 0 || strcmp(owner,"DATABASE") == 0 || strcmp(owner,"database") == 0)
+	// cannot delete an admin, validator or database
+	if (strcmp(owner,"admin") == 0 || strcmp(owner,"validator") == 0 || strcmp(owner,"database") == 0)
 		FORBIDDEN("cannot delete user");
 
 	// it should look like an owner
@@ -2275,6 +2275,30 @@ follow (struct http_request *req)
 		RUN_QUERY 	(query,"failed pg_get_serial read");
 
 		strlcpy(read_follow_id,kore_pgsql_getvalue(&sql,0,0),10);
+
+		/*
+		// notify owner
+
+		strlcpy (exchange, 128, "owner.notification");
+		strlcpy (subject,  128, "Read follow-request",);
+		strlcpy (message,  128, "User %s requested for read access on %s",id,ID);
+
+		ERROR_if
+		(
+			AMQP_STATUS_OK != amqp_basic_publish (
+				*cached_conn,
+				1,
+				amqp_cstring_bytes(exchange),
+        			amqp_cstring_bytes(topic_to_publish),
+				0,
+				0,
+				&props,
+				amqp_cstring_bytes(message)
+			),
+
+			"broker refused to publish message"
+		);
+		*/
 	}
 
 	if (strcmp(permission,"write") == 0 || strcmp(permission,"read-write") == 0)
@@ -2298,6 +2322,8 @@ follow (struct http_request *req)
 		RUN_QUERY 	(query,"failed pg_get_serial write");
 
 		strlcpy(write_follow_id,kore_pgsql_getvalue(&sql,0,0),10);
+
+		// TODO notify owner
 	}
 
 	if (! valid_permission)
@@ -2726,9 +2752,9 @@ share (struct http_request *req)
 
 	if (strcmp(permission,"read") == 0)
 	{
-		snprintf(bind_exchange,	129,"%s",		my_exchange);
-		snprintf(bind_queue,	129,"%s",		from_id); 		// TODO: what about priority queue
-		snprintf(bind_topic,	129,"%s",		topic);
+	//	snprintf(bind_exchange,	129,"%s",		my_exchange);
+	//	snprintf(bind_queue,	129,"%s",		from_id); 		// TODO: what about priority queue
+	//	snprintf(bind_topic,	129,"%s",		topic);
 	}
 	else if (strcmp(permission,"write") == 0)
 	{
