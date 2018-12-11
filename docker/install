@@ -4,12 +4,12 @@ directory=`dirname $0`
 cd $directory
 
 sudo chown -R 0:0 ../kore-publisher/jail
-sudo chmod 1111 ../kore-publisher/jail
-sudo chmod 000 ../kore-publisher/jail/etc
+sudo chmod 1555 ../kore-publisher/jail
+sudo chmod 1555 ../kore-publisher/jail/etc
 
 sudo chown -R 0:0 ../authenticator/jail
-sudo chmod 1111 ../authenticator/jail
-sudo chmod 000 ../authenticator/jail/etc
+sudo chmod 1555 ../authenticator/jail
+sudo chmod 1555 ../authenticator/jail/etc
 
 docker-compose down -v
 docker-compose up -d
