@@ -1,7 +1,10 @@
 #!/bin/ash
 cd kore-publisher 
 
-rm random.data
+if [ -e "random.data" ]
+then
+    rm random.data
+fi
 cat /dev/urandom | head -c1024 > random.data
 chmod 400 random.data
 

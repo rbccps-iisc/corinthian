@@ -48,9 +48,6 @@ bool is_success = false;
 char admin_apikey[33];
 char postgres_pwd[33];
 
-char broker_ip	[100];
-char pgsql_ip	[100];
-
 char error_string [1025];
 
 amqp_connection_state_t	cached_admin_conn;
@@ -79,7 +76,7 @@ init_admin_conn ()
 		exit(-1);
 	}
 
-	while (amqp_socket_open(socket, broker_ip, 5672))
+	while (amqp_socket_open(socket, "broker", 5672))
 	{
 		fprintf(stderr,"Could not connect to broker\n");
 		sleep(1);
@@ -189,7 +186,7 @@ async_publish_function (void *v)
 				if (socket == NULL)
 					goto done;	
 
-				if (amqp_socket_open(socket, broker_ip , 5672))
+				if (amqp_socket_open(socket, "broker" , 5672))
 					goto done;	
 	
 				async_login_reply = amqp_login(
@@ -247,9 +244,6 @@ init (int state)
 
 	// mask server name 
 	http_server_version("");
-
-	hostname_to_ip("broker", broker_ip);
-	hostname_to_ip("postgres", pgsql_ip);
 
 //////////////
 // lazy queues
@@ -365,7 +359,7 @@ init (int state)
 			conn_str,
 			129,
 			"host = %s user = postgres password = %s",
-			pgsql_ip,
+			"postgres",
 			postgres_pwd
 	);
 	kore_pgsql_register("db",conn_str);
@@ -835,7 +829,7 @@ publish (struct http_request *req)
 		if (socket == NULL)
 			ERROR("could not create a new socket");
 
-		if (amqp_socket_open(socket, broker_ip , 5672))
+		if (amqp_socket_open(socket, "broker" , 5672))
 			ERROR("could not open a socket");
 
 		login_reply = amqp_login(
@@ -1112,7 +1106,7 @@ subscribe (struct http_request *req)
 		if (socket == NULL)
 			ERROR("could not create a new socket");
 
-		if (amqp_socket_open(socket, broker_ip , 5672))
+		if (amqp_socket_open(socket, "broker" , 5672))
 			ERROR("could not open a socket");
 
 		login_reply = amqp_login(
@@ -2726,9 +2720,9 @@ share (struct http_request *req)
 
 	if (strcmp(permission,"read") == 0)
 	{
-	//	snprintf(bind_exchange,	129,"%s",		my_exchange);
-	//	snprintf(bind_queue,	129,"%s",		from_id); 		// TODO: what about priority queue
-	//	snprintf(bind_topic,	129,"%s",		topic);
+		snprintf(bind_exchange,	129,"%s",		my_exchange);
+		snprintf(bind_queue,	129,"%s",		from_id); 		// TODO: what about priority queue
+		snprintf(bind_topic,	129,"%s",		topic);
 	}
 	else if (strcmp(permission,"write") == 0)
 	{
