@@ -2233,7 +2233,7 @@ follow (struct http_request *req)
 
 	RUN_QUERY (query,"could not get info about 'to'");
 
-	if (kore_pgsql_ntuples(&sql) != 0)
+	if (kore_pgsql_ntuples(&sql) != 1)
 		FORBIDDEN("'to' does not exist OR has been blocked");
 
 	char *char_is_to_autonomous	= kore_pgsql_getvalue(&sql,0,0);
