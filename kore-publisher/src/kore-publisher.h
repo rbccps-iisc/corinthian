@@ -115,6 +115,8 @@ void *delete_exchanges_and_queues 	(void *);
 
 bool is_string_safe 	(const char *str);
 void string_to_lower 	(const char *str);
+void json_sanitize 	(const char *str);
+
 
 bool is_request_from_localhost (struct http_request *);
 

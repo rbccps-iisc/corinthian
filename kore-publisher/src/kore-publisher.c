@@ -1466,10 +1466,9 @@ deregister_entity (struct http_request *req)
 		FORBIDDEN("you are not the owner of the entity");
 
 	// check if the entity exists
-	CREATE_STRING (
-		query,
-		"SELECT 1 FROM users WHERE id = '%s'",
-		entity
+	CREATE_STRING (query,
+			"SELECT 1 FROM users WHERE id = '%s'",
+				entity
 	);
 	RUN_QUERY(query,"could no query entity");
 
@@ -1490,8 +1489,7 @@ deregister_entity (struct http_request *req)
 
 	RUN_QUERY(query,"could not delete from acl table");
 
-	CREATE_STRING (
-		query,
+	CREATE_STRING (query,
 		"DELETE FROM follow WHERE requested_by = '%s' OR exchange LIKE '%s.%%'",
 		entity,
 		entity
@@ -2205,6 +2203,14 @@ follow (struct http_request *req)
 
 /////////////////////////////////////////////////
 
+	BAD_REQUEST_if (
+		(! strcmp(permission,"read") 		== 0) &&
+		(! strcmp(permission,"write") 		== 0) &&
+		(! strcmp(permission,"read-write") 	== 0)
+		,
+		"invalid permission"
+	);
+
 	// if both from and to are owned by id
 	if (is_owner(id,to))
 		status = "approved";
@@ -2215,16 +2221,26 @@ follow (struct http_request *req)
 	read_follow_id[0] = '\0';
 	write_follow_id[0] = '\0';
 
-	bool valid_permission = false;
-
 	int int_validity = strtonum(validity,1,10000,NULL);
 	if (int_validity <= 0)
 		BAD_REQUEST("validity must be in number of hours");
 
+	CREATE_STRING (query,
+		"SELECT is_autonomous FROM users "
+			"WHERE id='%s' AND blocked='f'",
+				to	
+	);
+
+	RUN_QUERY (query,"could not get info about 'to'");
+
+	if (kore_pgsql_ntuples(&sql) != 0)
+		FORBIDDEN("'to' does not exist OR has been blocked");
+
+	char *char_is_to_autonomous	= kore_pgsql_getvalue(&sql,0,0);
+	bool is_to_autonomous		= char_is_to_autonomous[0] == 't';
+
 	if (strcmp(permission,"read") == 0 || strcmp(permission,"read-write") == 0)
 	{
-		valid_permission = true;
-
 		CREATE_STRING (query, 
 			"INSERT INTO follow "
 			"(follow_id,requested_by,from_id,exchange,time,permission,topic,validity,status) "
@@ -2243,36 +2259,10 @@ follow (struct http_request *req)
 		RUN_QUERY 	(query,"failed pg_get_serial read");
 
 		strlcpy(read_follow_id,kore_pgsql_getvalue(&sql,0,0),10);
-
-		/*
-		// notify owner
-
-		strlcpy (exchange, 128, "owner.notification");
-		strlcpy (subject,  128, "Read follow-request",);
-		strlcpy (message,  128, "User %s requested for read access on %s",id,ID);
-
-		ERROR_if
-		(
-			AMQP_STATUS_OK != amqp_basic_publish (
-				*cached_conn,
-				1,
-				amqp_cstring_bytes(exchange),
-        			amqp_cstring_bytes(topic_to_publish),
-				0,
-				0,
-				&props,
-				amqp_cstring_bytes(message)
-			),
-
-			"broker refused to publish message"
-		);
-		*/
 	}
 
 	if (strcmp(permission,"write") == 0 || strcmp(permission,"read-write") == 0)
 	{
-		valid_permission = true;
-
 		CREATE_STRING (query,
 			"INSERT INTO follow "
 			"(follow_id,requested_by,from_id,exchange,time,permission,topic,validity,status) "
@@ -2290,12 +2280,7 @@ follow (struct http_request *req)
 		RUN_QUERY 	(query,"failed pg_get_serial write");
 
 		strlcpy(write_follow_id,kore_pgsql_getvalue(&sql,0,0),10);
-
-		// TODO notify owner
 	}
-
-	if (! valid_permission)
-		BAD_REQUEST("invalid permission");
 
 	if (strcmp(status,"approved") == 0)
 	{
@@ -2359,10 +2344,40 @@ follow (struct http_request *req)
 	}
 	else
 	{
-		// TODO: send a notification to owner if the publisher is not autonomous !
-			
-		// we have sent the request,
-		// but the owner of the "to" device must approve
+		if (is_to_autonomous)
+			snprintf (exchange, 129, "%s.notification",to);
+		else
+		{
+			char *_owner = strtok(to,"/");
+			snprintf (exchange, 129, "%s.notification",_owner);
+		}
+
+		char *subject = "Follow request";
+
+		char message[1025];
+		snprintf(message,  1024, "'%s' has requested '%s' access on '%s'",id,permission,to);
+
+		props.user_id 		= amqp_cstring_bytes("admin");
+		props.content_type 	= amqp_cstring_bytes("text/plain");
+
+		ERROR_if
+		(
+			AMQP_STATUS_OK != amqp_basic_publish (
+				cached_admin_conn,
+				1,
+				amqp_cstring_bytes(exchange),
+        			amqp_cstring_bytes(subject),
+				0,
+				0,
+				&props,
+				amqp_cstring_bytes(message)
+			),
+
+			"broker refused to publish message"
+		);
+
+		/* we have sent the request,
+		   but the owner of the "to" device/app must approve */
 		req->status = 202;
 	}
 
