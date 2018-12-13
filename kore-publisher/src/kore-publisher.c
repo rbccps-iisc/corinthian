@@ -2352,7 +2352,7 @@ follow (struct http_request *req)
 			snprintf (exchange, 129, "%s.notification",_owner);
 		}
 
-		char *subject = "Follow request";
+		char *subject = "Request for follow";
 
 		char message[1025];
 		snprintf(message,  1024, "'%s' has requested '%s' access on '%s'",id,permission,to);
@@ -2708,6 +2708,20 @@ share (struct http_request *req)
 	char *validity_hours 	= kore_pgsql_getvalue(&sql,0,3); 
 	char *topic 	 	= kore_pgsql_getvalue(&sql,0,4); 
 
+	CREATE_STRING (query,
+		"SELECT is_autonomous FROM users "
+			"WHERE id='%s' AND blocked='f'",
+				from_id	
+	);
+
+	RUN_QUERY (query,"could not get info about 'from'");
+
+	if (kore_pgsql_ntuples(&sql) != 1)
+		FORBIDDEN("'from' does not exist OR has been blocked");
+
+	char *char_is_from_autonomous	= kore_pgsql_getvalue(&sql,0,0);
+	bool is_from_autonomous		= char_is_from_autonomous[0] == 't';
+
 	// NOTE: follow_id is primary key 
 	CREATE_STRING (query,
 			"UPDATE follow SET status='approved' WHERE follow_id = '%s'",
@@ -2763,6 +2777,38 @@ share (struct http_request *req)
 	{
 		ERROR("bind failed for app.publish with device.command");
 	}
+
+	if (is_from_autonomous)
+		snprintf (exchange, 129, "%s.notification",from_id);
+	else
+	{
+		char *_owner = strtok(from_id,"/");
+		snprintf (exchange, 129, "%s.notification",_owner);
+	}
+
+	char *subject = "Approved follow request";
+
+	char message[1025];
+	snprintf(message,  1024, "'%s' has approved follow request for '%s' access on '%s'",id,permission,bind_exchange);
+
+	props.user_id 		= amqp_cstring_bytes("admin");
+	props.content_type 	= amqp_cstring_bytes("text/plain");
+
+	ERROR_if
+	(
+		AMQP_STATUS_OK != amqp_basic_publish (
+			cached_admin_conn,
+			1,
+			amqp_cstring_bytes(exchange),
+        		amqp_cstring_bytes(subject),
+			0,
+			0,
+			&props,
+			amqp_cstring_bytes(message)
+		),
+
+		"broker refused to publish message"
+	);
 
 	OK();
 
