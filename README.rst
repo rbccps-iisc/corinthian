@@ -7,7 +7,7 @@ Corinthian
     
 An IoT middleware developed using https://kore.io
 
-Developers: Arun Babu and Poorna Chandra Tejasvi
+Documentation: https://iudx.readthedocs.io
 
 Quickstart
 ==========
