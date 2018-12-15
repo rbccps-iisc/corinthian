@@ -8,14 +8,12 @@ before_install:
 language: python
 
 install:
-  - cd docker
-  - ./install
+  - ./docker/install
 
 before_script:
   - sleep 10
 
 script:
-  - cd ..
   - ./tests/test fxnl --random
   - ./tests/test sec
   - ./tests/test concr
