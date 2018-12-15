@@ -2,32 +2,44 @@
 skinparam handwritten true
 left to right direction
 
-
 rectangle "Manage owners" {
-(Register owner)
-(Deregister owner)
-(Block owner)
-(Unblock owner)
 
+	(Register owner)
+	(Deregister owner)
+	(Block owner)
+	(Unblock owner)
 }
 
 rectangle "Manage entities" {
-(Register entity)
-(Deregister entity)
-(Block entity)
-(Unblock entity)
 
+	(Register entity)
+	(Deregister entity)
+	(Block entity)
+	(Unblock entity)
 }
 
 rectangle "Access control" {
-(Share)
-(Follow)
-(Unfollow)
+
+	(Send a follow\nrequest)
+	(Approve follow\nrequest)
+	(Unfollow)
+	(Get list of\nfollow requests)
+	(Reject a\nfollow request)
+	(Get follow status)
 }
 
 rectangle "Data access" {
-(Publish)
-(Subscribe)
+
+	(Publish)
+	(Subscribe)
+	(Get a list of accessible\ndata streams)
+
+	(Bind to\na data stream)
+	(Unbind from\n a data stream)
+}
+
+rectangle "Search" {
+	(Search catalog)
 }
 
 
@@ -45,17 +57,25 @@ admin --> (Block entity)
 (Block entity) <-- owner
 
 
-
-owner --> (Share)
-owner --> (Follow)
+owner --> (Approve follow\nrequest)
+owner --> (Send a follow\nrequest)
 owner --> (Unfollow)
 
+(Bind to\na data stream) <-- owner
+(Unbind from\n a data stream) <-- owner
+(Get a list of accessible\ndata streams) <-- owner
+
+owner --> (Get list of\nfollow requests)
+owner --> (Reject a\nfollow request)
+owner --> (Get follow status)
+
+owner --> (Search catalog)
 
 entity entity
 
-owner -[hidden]> entity
-
 entity --> (Publish)
 entity --> (Subscribe)
+entity --> (Get a list of accessible\ndata streams)
+
 
 @enduml
