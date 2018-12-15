@@ -5,7 +5,7 @@ Corinthian
 .. image:: https://travis-ci.org/rbccps-iisc/corinthian.svg?branch=master
     :target: https://travis-ci.org/rbccps-iisc/corinthian
     
-An IUDX compliant IoT middleware developed using https://kore.io
+An IUDX compliant IoT middleware for smart cities
 
 Documentation: https://iudx.readthedocs.io
 
