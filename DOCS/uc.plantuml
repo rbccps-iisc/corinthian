@@ -1,0 +1,61 @@
+@startuml
+skinparam handwritten true
+left to right direction
+
+
+rectangle "Manage owners" {
+(Register owner)
+(Deregister owner)
+(Block owner)
+(Unblock owner)
+
+}
+
+rectangle "Manage entities" {
+(Register entity)
+(Deregister entity)
+(Block entity)
+(Unblock entity)
+
+}
+
+rectangle "Access control" {
+(Share)
+(Follow)
+(Unfollow)
+}
+
+rectangle "Data access" {
+(Publish)
+(Subscribe)
+}
+
+
+(Unblock owner) <-- admin
+(Block owner) <-- admin
+(Deregister owner) <-- admin
+(Register owner) <-- admin
+
+admin --> (Unblock entity)
+admin --> (Block entity)
+
+(Register entity) <-- owner
+(Deregister entity) <-- owner
+(Unblock entity) <-- owner
+(Block entity) <-- owner
+
+
+
+owner --> (Share)
+owner --> (Follow)
+owner --> (Unfollow)
+
+
+entity entity
+
+owner -[hidden]> entity
+
+entity --> (Publish)
+entity --> (Subscribe)
+
+@enduml

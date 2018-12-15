@@ -5,9 +5,9 @@ Corinthian
 .. image:: https://travis-ci.org/rbccps-iisc/corinthian.svg?branch=master
     :target: https://travis-ci.org/rbccps-iisc/corinthian
     
-An IUDX compliant IoT middleware for smart cities
+An IoT middleware developed using https://kore.io
 
-Documentation: https://iudx.readthedocs.io
+Developers: Arun Babu and Poorna Chandra Tejasvi
 
 Quickstart
 ==========
@@ -38,6 +38,11 @@ Quickstart
 #. Test the middleware using::
 
     ./tests/test fxnl --random
+
+Use-case diagram
+================
+
+.. image:: https://raw.githubusercontent.com/rbccps-iisc/corinthian/master/DOCS/uc.svg?sanitize=true
 
 API
 ===
