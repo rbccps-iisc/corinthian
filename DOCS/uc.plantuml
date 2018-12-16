@@ -1,6 +1,8 @@
 @startuml
-skinparam handwritten true
 left to right direction
+
+actor owner as "Owner"
+actor admin as "Admin"
 
 rectangle "Manage owners" {
 
@@ -8,6 +10,8 @@ rectangle "Manage owners" {
 	(Deregister owner)
 	(Block owner)
 	(Unblock owner)
+	(Reset owner\ncredentials)
+
 }
 
 rectangle "Manage entities" {
@@ -16,12 +20,13 @@ rectangle "Manage entities" {
 	(Deregister entity)
 	(Block entity)
 	(Unblock entity)
+	(Reset entity\ncredentials)
 }
 
 rectangle "Access control" {
 
 	(Send a follow\nrequest)
-	(Approve follow\nrequest)
+	(Approve a follow\nrequest)
 	(Unfollow)
 	(Get list of\nfollow requests)
 	(Reject a\nfollow request)
@@ -32,10 +37,10 @@ rectangle "Data access" {
 
 	(Publish)
 	(Subscribe)
-	(Get a list of accessible\ndata streams)
 
 	(Bind to\na data stream)
 	(Unbind from\n a data stream)
+	(Get a list of accessible\ndata streams)
 }
 
 rectangle "Search" {
@@ -47,19 +52,24 @@ rectangle "Search" {
 (Block owner) <-- admin
 (Deregister owner) <-- admin
 (Register owner) <-- admin
+(Reset owner\ncredentials) <-- admin
+
 
 admin --> (Unblock entity)
 admin --> (Block entity)
 
+
+(Reset entity\ncredentials) <-- owner
 (Register entity) <-- owner
 (Deregister entity) <-- owner
 (Unblock entity) <-- owner
 (Block entity) <-- owner
 
 
-owner --> (Approve follow\nrequest)
+owner --> (Approve a follow\nrequest)
 owner --> (Send a follow\nrequest)
 owner --> (Unfollow)
+
 
 (Bind to\na data stream) <-- owner
 (Unbind from\n a data stream) <-- owner
@@ -71,11 +81,24 @@ owner --> (Get follow status)
 
 owner --> (Search catalog)
 
-entity entity
+entity entity as "Entity"
 
-entity --> (Publish)
-entity --> (Subscribe)
-entity --> (Get a list of accessible\ndata streams)
+(Publish) <-- entity
+(Subscribe) <-- entity
+(Get a list of accessible\ndata streams) <-- entity
+(Search catalog) <- entity
+
+actor "Autonomous entity" as a
+entity <|-- a : is an
+
+(Send a follow\nrequest) <--- a
+(Approve a follow\nrequest) <--- a
+(Reject a\nfollow request) <--- a
+(Get follow status) <--- a
+(Unfollow) <--- a
+(Get list of\nfollow requests) <--- a
+
+
 
 
 @enduml
