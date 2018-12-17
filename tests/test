@@ -1,5 +1,4 @@
-#!/usr/bin/python
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python
 
 import copy
 import json
@@ -777,11 +776,13 @@ def amqp_subscribe(
 
     messages = []
     i = 0
+    t = time.time()
 
     while i < num_messages:
 
-        t = time.time()
-
+	if i< 0:
+	    break
+	
         (method_frame, header_frame, body) = channel.basic_get(ID
                 + message_type)
 
@@ -3937,54 +3938,54 @@ def amqp_tests(
 
     # Apps relinquish write permission
 
-    # log('---------------> APPS WITH WRITE ACCESS UNFOLLOW DEVICES',
-    #    'HEADER')
-    # unfollow_dev(device_keys, app_keys, as_admin=False,
-    #          permission='write')
+    log('---------------> APPS WITH WRITE ACCESS UNFOLLOW DEVICES',
+        'HEADER')
+    unfollow_dev(device_keys, app_keys, as_admin=False,
+              permission='write')
 
     # Apps publish to command queue of devices
 
-    # log('---------------> APPS TRY TO PUBLISH TO COMMAND EXCHANGE OF UNFOLLOWED DEVICES'
-    #    , 'HEADER')
-    # app_publish_amqp(device_keys, app_keys)
+    log('---------------> APPS TRY TO PUBLISH TO COMMAND EXCHANGE OF UNFOLLOWED DEVICES'
+        , 'HEADER')
+    app_publish_amqp(device_keys, app_keys)
 
     # Devices subscribe to their command queue after write unfollow by apps
 
-    # log('---------------> DEVICES SUBSCRIBE TO THEIR COMMAND QUEUES AFTER WRITE UNFOLLOW BY APPS'
-    #    , 'HEADER')
-    # dev_subscribe_amqp(apps, device_keys, 0)
+    log('---------------> DEVICES SUBSCRIBE TO THEIR COMMAND QUEUES AFTER WRITE UNFOLLOW BY APPS'
+        , 'HEADER')
+    dev_subscribe_amqp(apps, device_keys, 0)
 
     # Devices publish again
 
-    # log('---------------> DEVICES PUBLISH DATA AFTER WRITE UNFOLLOW',
-    #    'HEADER')
-    # dev_publish_amqp(device_keys)
+    log('---------------> DEVICES PUBLISH DATA AFTER WRITE UNFOLLOW',
+        'HEADER')
+    dev_publish_amqp(device_keys)
 
     # Apps subscribe to messages
 
-    # log('---------------> APPS TRY TO READ PUBLISHED DATA AFTER WRITE UNFOLLOW'
-    #    , 'HEADER')
-    # app_subscribe_amqp(devices, app_keys, devices)
+    log('---------------> APPS TRY TO READ PUBLISHED DATA AFTER WRITE UNFOLLOW'
+       , 'HEADER')
+    app_subscribe_amqp(devices, app_keys, devices)
 
     # Apps unfollow with read permissions
 
-    # log('---------------> APPS UNFOLLOW DEVICES WITH READ ACCESS',
-    #    'HEADER')
-    # unfollow_dev(
-    #    device_keys,
-    #    app_keys,
-    #    as_admin=True,
-    #    permission='read',
-    #    admin_id=app_admin_id,
-    #    admin_key=app_admin_key,
-    #    )
+    log('---------------> APPS UNFOLLOW DEVICES WITH READ ACCESS',
+        'HEADER')
+    unfollow_dev(
+        device_keys,
+        app_keys,
+        as_admin=True,
+        permission='read',
+        admin_id=app_admin_id,
+        admin_key=app_admin_key,
+        )
 
     # Apps try to bind to unfollowed devices
 
-    # log('---------------> APPS TRY TO BIND TO UNFOLLOWED DEVICES',
-    #    'HEADER')
-    # bind_unbind_without_follow(device_keys, app_keys, as_admin=False,
-    #                           req_type='bind')
+    log('---------------> APPS TRY TO BIND TO UNFOLLOWED DEVICES',
+       'HEADER')
+    bind_unbind_without_follow(device_keys, app_keys, as_admin=False,
+                              req_type='bind')
 
 def functional_tests(*args):
 
