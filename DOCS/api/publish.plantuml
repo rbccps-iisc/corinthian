@@ -1,0 +1,12 @@
+@startuml
+hide footbox
+
+group HTTPS POST /entity/publish
+publisher -> IUDX: **id**: string\r**apikey**: string\r**to**: string\r**subject**: string\r**message-type**: string\r**content-type**: string\r\r**<message in body>**
+end
+
+group 202 ACCEPTED
+IUDX -> publisher:
+end
+
+@enduml

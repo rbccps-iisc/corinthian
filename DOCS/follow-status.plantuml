@@ -1,8 +1,0 @@
-...
-group HTTPS GET /entity/follow-status
-subscriber -> IUDX: **id**: string\r**apikey**: string
-end
-
-group 200 OK
-IUDX -> publisher: [\l\t{\t\r\t\t"**follow-id**": string,\r\t\t"**from**": string,\r\t\t"**to**": string,\r\t\t"**time**": string,\r\t\t"**permission**": string,\r\t\t"**topic**": string,\r\t\t"**validity**": string,\r\t\t"**status**": string\r\t},\l\t ...\l]
-end

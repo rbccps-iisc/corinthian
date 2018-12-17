@@ -23,21 +23,52 @@
 		      	      	cursor:pointer;
 		      	      	margin:5px;
 			}
-			</style>
+		</style>
+		<script language="javascript">
+			function init()
+			{
+				geid('id_field').focus();	
+				if (document.location.href.endsWith("error"))
+					geid('error').style.visibility="";
+			}
+			function validate()
+			{
+				var id=document.login_form.id.value; 
+				var ep="";
+
+				if(id === "admin") {
+					ep="/ui/admin";
+				}
+				else if(id.includes("/")) {
+					ep="/ui/entity";
+				}
+				else {
+					ep="/ui/owner";
+				}
+				 
+				document.login_form.action=ep;
+
+				return true;
+			}
+			function geid(x)
+			{
+				return document.getElementById(x);
+			}
+		</script>
 	</head>
 
-	<body onload="document.getElementById('id').focus();">
+	<body onload="init();">
 		<center>
 			<br><br><br><br><br><br><br>
-			<form>
+			<form name=login_form method=POST action="" onsubmit="validate();">
 				<table border=0 style="outline-style:solid;background-color:ivory">
-					<tr><td><input id=id type=text placeholder="ID" size=33></td></tr>
-					<tr><td><input type=password placeholder="API key" size=33></td></tr>
+					<tr><td><input id=id_field type=text placeholder="ID" size=33 name=id></td></tr>
+					<tr><td><input type=password placeholder="API key" size=33 name=apikey></td></tr>
 					<tr><td><button class="button" style="vertical-align:middle"><span>Login </span></button></td></tr>
 				</table>
 				<br><br>
 			</form><br>
-			<h3 style="visibility:collapse"><font color=red>Login failed !</font></h3>
+			<h3 id=error style="visibility:collapse"><font color=red>Login failed !</font></h3>
 		</center>
 	</body>
 </html>

@@ -160,6 +160,23 @@ bool is_request_from_localhost (struct http_request *);
 	goto done;					\
 }
 
+#define REDIRECT(x) {					\
+	req->status = 301;				\
+	kore_buf_reset(response); 			\
+	http_response_header(				\
+		req,					\
+		"Location",				\
+		x					\
+	);						\
+	http_response (					\
+		req,					\
+		req->status, 				\
+		response->data,				\
+		response->offset			\
+	);						\
+	return KORE_RESULT_OK;				\
+}
+
 #define OK_if(x) {if(x) { OK(); }}
 #define FORBIDDEN_if(x,msg) {if(x) { FORBIDDEN(msg); }}
 #define ERROR_if(x,msg) {if(x) { ERROR(msg); }}

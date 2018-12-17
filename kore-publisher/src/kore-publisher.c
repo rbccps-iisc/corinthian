@@ -3648,3 +3648,119 @@ string_to_lower (const char *str)
 		++p;
 	}
 }
+
+int
+ui_admin (struct http_request *req)
+{
+	const char *id 		= NULL;
+	const char *apikey	= NULL;
+
+	req->status = 403;
+
+	http_populate_post(req);
+
+	// TODO: check captcha 
+
+	if (
+		(! http_argument_get_string(req,"id",&id))
+			||
+		(! http_argument_get_string(req,"apikey",&apikey))
+	)
+	{
+		REDIRECT("/ui?error");
+	}
+
+/////////////////////////////////////////////////
+
+	if (strcmp(id,"admin") != 0)
+		REDIRECT("/ui?error");
+
+	if (! login_success("admin",apikey,NULL))
+		REDIRECT("/ui?error");
+
+/////////////////////////////////////////////////
+
+	OK();
+
+done:
+	END();
+}
+
+int
+ui_owner (struct http_request *req)
+{
+	const char *id 		= NULL;
+	const char *apikey	= NULL;
+
+	req->status = 403;
+
+	http_populate_post(req);
+
+	// TODO: check captcha 
+
+	if (
+		(! http_argument_get_string(req,"id",&id))
+			||
+		(! http_argument_get_string(req,"apikey",&apikey))
+	)
+	{
+		REDIRECT("/ui?error");
+	}
+
+/////////////////////////////////////////////////
+
+	if (! looks_like_a_valid_owner(id))
+		REDIRECT("/ui?error");
+
+	if (! login_success(id,apikey,NULL))
+		REDIRECT("/ui?error");
+
+/////////////////////////////////////////////////
+
+	OK();
+
+done:
+	END();
+}
+
+int
+ui_entity (struct http_request *req)
+{
+	const char *id 		= NULL;
+	const char *apikey	= NULL;
+
+	req->status = 403;
+
+	http_populate_post(req);
+
+	// TODO: check captcha 
+
+	if (
+		(! http_argument_get_string(req,"id",&id))
+			||
+		(! http_argument_get_string(req,"apikey",&apikey))
+	)
+	{
+		REDIRECT("/ui?error");
+	}
+
+/////////////////////////////////////////////////
+
+	if (! looks_like_a_valid_entity(id))
+		REDIRECT("/ui?error");
+
+	bool is_autonomous = false;
+
+	if (! login_success(id,apikey, &is_autonomous))
+		REDIRECT("/ui?error");
+
+	if (! is_autonomous)
+		REDIRECT("/ui?error");
+
+/////////////////////////////////////////////////
+
+	OK();
+
+done:
+	END();
+}
