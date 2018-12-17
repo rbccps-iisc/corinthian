@@ -1,4 +1,5 @@
-#!/usr/bin/env python
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
 
 import copy
 import json
@@ -17,55 +18,34 @@ import requests
 import urllib3
 import subprocess
 from requests.adapters import HTTPAdapter
-import multiprocessing as mp 
+import multiprocessing as mp
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 logger = logging.getLogger(__name__)
 
-base_url = "https://localhost"
+base_url = 'https://localhost'
 
-s = requests.Session();
+s = requests.Session()
 s.mount('https://localhost/', HTTPAdapter(pool_connections=10))
 
 output = mp.Queue()
 
-#Connection pool for amqp connections
-pool={}
+colour = {}
 
-colour ={}
-
-colour['HEADER'] 		= '\033[95m'
-colour['BLUE'] 			= '\033[94m'
-colour['GREEN'] 		= '\033[92m'
-colour['WARNING'] 		= '\033[93m'
-colour['FAIL'] 			= '\033[91m'
-colour['ENDC'] 			= '\033[0m'
-colour['BOLD'] 			= '\033[1m'
-colour['UNDERLINE'] 		= '\033[4m'
-colour[''] 			= ''
-
-def get_channel(token):
-
-    global pool
-
-    username=token.split(":")[0]
-    apikey=token.split(":")[1]
-
-    if ((pool.get(username, "not found") == "not found") or (not pool.get(username).is_open)):
-
-	credentials = pika.PlainCredentials(username, apikey)
-	parameters = pika.ConnectionParameters(host='localhost',port=5671, credentials=credentials, ssl=True)
-	connection = pika.BlockingConnection(parameters)
-	channel = connection.channel()
-
-        pool[username] = channel
-
-    return pool.get(username)
+colour['HEADER'] = '\033[95m'
+colour['BLUE'] = '\033[94m'
+colour['GREEN'] = '\033[92m'
+colour['WARNING'] = '\033[93m'
+colour['FAIL'] = '\033[91m'
+colour['ENDC'] = '\033[0m'
+colour['BOLD'] = '\033[1m'
+colour['UNDERLINE'] = '\033[4m'
+colour[''] = ''
 
 
 def gen_admin():
-    
+
     admin_id = gen_rand(8)
     apikey = gen_rand(32)
     salt = gen_rand(32)
@@ -74,2358 +54,4097 @@ def gen_admin():
 
     hash_string = hashlib.sha256(string.encode()).hexdigest()
 
-    cmd = "docker exec postgres psql -U postgres -c \"insert into users values('"+admin_id+"','"+hash_string+"',NULL,'"+salt+"','f','t') ON CONFLICT DO NOTHING\""
+    cmd = \
+        'docker exec postgres psql -U postgres -c "insert into users values(\'' \
+        + admin_id + "','" + hash_string + "',NULL,'" + salt \
+        + '\',\'f\',\'t\') ON CONFLICT DO NOTHING"'
 
     try:
-	p = subprocess.check_output(cmd, shell=True)
-    except Exception as e:
-	print("Could not create admin user")
-	sys.exit(1)
+        p = subprocess.check_output(cmd, shell=True)
+    except Exception, e:
+        print 'Could not create admin user'
+        sys.exit(1)
 
-    return admin_id, apikey
+    return (admin_id, apikey)
 
-    
-def log(message, clr, modifier=""):
 
-	if clr:
-		logger.info(colour[clr]+colour[modifier]+message+colour['ENDC'])
-	else:
-		logger.info(message)
+def log(message, clr, modifier=''):
+
+    if clr:
+        logger.info(colour[clr] + colour[modifier] + message
+                    + colour['ENDC'])
+    else:
+        logger.info(message)
+
 
 def check(response, code):
-	
-	assert_exit(response.status_code == code, "Message = "+response.text+" Status code ="+str(response.status_code))
+
+    assert_exit(response.status_code == code, 'Message = '
+                + response.text + ' Status code ='
+                + str(response.status_code))
+
 
 def assert_exit(condition, error_message):
-    
+
     try:
-	assert condition
-    
+        assert condition
     except AssertionError:
-	print(error_message)
-	raise
 
-def gen_rand(size, prefix=""):
+        print error_message
+        raise
 
-	rand_str = prefix + ''.join(random.choice(string.ascii_lowercase) for _ in range(size))
-	return rand_str
 
-def get_entity(device_keys, app_keys, entity_type=""):
+def gen_rand(size, prefix=''):
 
-    if entity_type == "dev":
-	    name = random.choice(device_keys.keys())
-	    key = str(device_keys[name])
-    elif entity_type == "app":
-	    name = random.choice(app_keys.keys())
-	    key = str(app_keys[name])
-	    
-    return name, key
+    rand_str = prefix + ''.join(random.choice(string.ascii_lowercase)
+                                for _ in range(size))
+    return rand_str
+
+
+def get_entity(device_keys, app_keys, entity_type=''):
+
+    if entity_type == 'dev':
+        name = random.choice(device_keys.keys())
+        key = str(device_keys[name])
+    elif entity_type == 'app':
+        name = random.choice(app_keys.keys())
+        key = str(app_keys[name])
+
+    return (name, key)
+
 
 def register_owner(apikey, owner):
-	
-	url = base_url + "/register-owner"
-	headers = {"id": "admin", "apikey": apikey, "owner": owner}
-	r = s.post(url=url, headers=headers, verify=False)
-	return r
+
+    url = base_url + '/register-owner'
+    headers = {'id': 'admin', 'apikey': apikey, 'owner': owner}
+    r = s.post(url=url, headers=headers, verify=False)
+    return r
+
 
 def register(ID, apikey, entity_id):
-	
-	url = base_url + "/owner/register-entity"
-	headers = {"id": ID, "apikey": apikey, "entity": entity_id, "is-autonomous": "true"}
-	r = s.post(url=url, headers=headers, data="{\"test\":\"schema\"}", verify=False)
-	return r
+
+    url = base_url + '/owner/register-entity'
+    headers = {
+        'id': ID,
+        'apikey': apikey,
+        'entity': entity_id,
+        'is-autonomous': 'true',
+        }
+    r = s.post(url=url, headers=headers, data='{"test":"schema"}',
+               verify=False)
+    return r
+
 
 def deregister(ID, apikey, entity_id):
 
-	url = base_url + "/owner/deregister-entity"
-	headers = {"id": ID, "apikey": apikey, "entity": entity_id}
-	r = s.post(url=url, headers=headers, verify=False)
-	return r
+    url = base_url + '/owner/deregister-entity'
+    headers = {'id': ID, 'apikey': apikey, 'entity': entity_id}
+    r = s.post(url=url, headers=headers, verify=False)
+    return r
 
-def block_unblock(ID, apikey, entity_id, req_type):
-	
-	url = base_url 
-	
-	if req_type == "block":
-		url = url + "/owner/block"
-	elif req_type == "unblock":
-		url = url + "/owner/unblock"
 
-	headers = {"id": ID, "apikey": apikey, "entity": entity_id}
-	r = s.post(url=url, headers=headers, verify=False)
-	return r
+def block_unblock(
+    ID,
+    apikey,
+    entity_id,
+    req_type,
+    ):
 
-def permissions(ID, apikey, entity_id=""):
+    url = base_url
 
-	url = base_url + "/entity/permissions"
+    if req_type == 'block':
+        url = url + '/owner/block'
+    elif req_type == 'unblock':
+        url = url + '/owner/unblock'
 
-	headers = {}
+    headers = {'id': ID, 'apikey': apikey, 'entity': entity_id}
+    r = s.post(url=url, headers=headers, verify=False)
+    return r
 
-	if entity_id:
-		headers['entity'] = entity_id
 
-	headers ['id'] 		= ID
-	headers	['apikey'] 	= apikey
+def permissions(ID, apikey, entity_id=''):
 
-	r = s.get(url=url, headers=headers, verify=False)
-	return r
+    url = base_url + '/entity/permissions'
 
-def publish(ID, apikey, to, topic, message_type, data):
+    headers = {}
 
-	url = base_url + "/entity/publish"
-	headers = {"id": ID, "apikey": apikey, "to": to, "subject": topic, "message-type": message_type, "content-type": "text/plain"}
-	r = s.post(url=url,headers=headers,data=data,verify=False)
-	return r
+    if entity_id:
+        headers['entity'] = entity_id
 
-def follow(ID, apikey, to_id, permission, from_id="", topic ="", validity = "", message_type=""):
+    headers['id'] = ID
+    headers['apikey'] = apikey
 
-	url = base_url + "/entity/follow"
-	headers = {}
+    r = s.get(url=url, headers=headers, verify=False)
+    return r
 
-	if from_id:
-		headers['from'] = from_id
 
-	headers['id'] = ID
-	headers['apikey'] = apikey
-	headers['to'] = to_id
+def publish(
+    ID,
+    apikey,
+    to,
+    topic,
+    message_type,
+    data,
+    ):
 
-	if topic:
-	    headers['topic'] = topic
-	else:
-	    headers['topic'] = "test"
+    url = base_url + '/entity/publish'
+    headers = {
+        'id': ID,
+        'apikey': apikey,
+        'to': to,
+        'subject': topic,
+        'message-type': message_type,
+        'content-type': 'text/plain',
+        }
+    r = s.post(url=url, headers=headers, data=data, verify=False)
+    return r
 
-	if validity:
-	    headers['validity'] = validity
-	else:
-	    headers['validity'] = "24"
 
-	if message_type:
-	    headers['message-type'] = message_type
+def follow(
+    ID,
+    apikey,
+    to_id,
+    permission,
+    from_id='',
+    topic='',
+    validity='',
+    message_type='',
+    ):
 
-	headers['permission'] = permission
-	
-	r = s.post(url=url,headers=headers,verify=False)
-	return r
+    url = base_url + '/entity/follow'
+    headers = {}
+
+    if from_id:
+        headers['from'] = from_id
+
+    headers['id'] = ID
+    headers['apikey'] = apikey
+    headers['to'] = to_id
+
+    if topic:
+        headers['topic'] = topic
+    else:
+        headers['topic'] = 'test'
+
+    if validity:
+        headers['validity'] = validity
+    else:
+        headers['validity'] = '24'
+
+    if message_type:
+        headers['message-type'] = message_type
+
+    headers['permission'] = permission
+
+    r = s.post(url=url, headers=headers, verify=False)
+    return r
+
 
 def reject_follow(ID, apikey, follow_id):
-	
-	url =base_url + "/owner/reject-follow"
-	headers = {"id": ID, "apikey": apikey, "follow-id": follow_id}
-	r = s.post(url=url, headers=headers, verify=False)
-	return r
-	
 
-def unfollow(ID, apikey, to, topic, permission, message_type, from_id=""):
+    url = base_url + '/owner/reject-follow'
+    headers = {'id': ID, 'apikey': apikey, 'follow-id': follow_id}
+    r = s.post(url=url, headers=headers, verify=False)
+    return r
 
-	url = base_url + "/entity/unfollow"
-	headers = {}
 
-	if from_id:
-		headers['from'] = from_id
+def unfollow(
+    ID,
+    apikey,
+    to,
+    topic,
+    permission,
+    message_type,
+    from_id='',
+    ):
 
-	headers['id'] = ID
-	headers['apikey'] = apikey
-	headers['to'] = to
-	headers['topic'] = "test"
-	headers['permission'] = permission
-	headers['message-type'] = message_type 
-	
-	r = s.post(url=url,headers=headers,verify=False)
-	return r
+    url = base_url + '/entity/unfollow'
+    headers = {}
+
+    if from_id:
+        headers['from'] = from_id
+
+    headers['id'] = ID
+    headers['apikey'] = apikey
+    headers['to'] = to
+    headers['topic'] = 'test'
+    headers['permission'] = permission
+    headers['message-type'] = message_type
+
+    r = s.post(url=url, headers=headers, verify=False)
+    return r
+
 
 def share(ID, apikey, follow_id):
 
-	url =base_url + "/owner/share"
-	headers = {"id": ID, "apikey": apikey, "follow-id": follow_id}
-	r = s.post(url=url, headers=headers, verify=False)
-	return r
+    url = base_url + '/owner/share'
+    headers = {'id': ID, 'apikey': apikey, 'follow-id': follow_id}
+    r = s.post(url=url, headers=headers, verify=False)
+    return r
 
-def bind_unbind(ID, apikey, to, topic, req_type, message_type, from_id="", is_priority="false"):
 
-	url = base_url
-	headers = {}
+def bind_unbind(
+    ID,
+    apikey,
+    to,
+    topic,
+    req_type,
+    message_type,
+    from_id='',
+    is_priority='false',
+    ):
 
-	if req_type == "bind":
-		url = url + "/entity/bind"
-	elif req_type == "unbind":
-		url = url + "/entity/unbind"
+    url = base_url
+    headers = {}
 
-	if from_id:
-		headers['from'] = from_id
+    if req_type == 'bind':
+        url = url + '/entity/bind'
+    elif req_type == 'unbind':
+        url = url + '/entity/unbind'
 
-	headers['message-type'] = message_type
+    if from_id:
+        headers['from'] = from_id
 
-	headers['id'] = ID
-	headers['apikey'] = apikey
-	headers['to'] = to
-	headers['topic'] = topic
-	headers['is-priority'] = is_priority 
+    headers['message-type'] = message_type
 
-	r = s.post(url=url, headers=headers, verify=False)
-	return r
+    headers['id'] = ID
+    headers['apikey'] = apikey
+    headers['to'] = to
+    headers['topic'] = topic
+    headers['is-priority'] = is_priority
 
-def subscribe(ID, apikey, message_type="", num_messages=""):
+    r = s.post(url=url, headers=headers, verify=False)
+    return r
 
-	url = base_url + "/entity/subscribe"
-	headers = {}
 
-	if message_type:
-		headers['message-type'] = message_type
+def subscribe(
+    ID,
+    apikey,
+    message_type='',
+    num_messages='',
+    ):
 
-	if num_messages:
-		headers['num-messages'] = num_messages
+    url = base_url + '/entity/subscribe'
+    headers = {}
 
-	headers['id'] = ID
-	headers['apikey'] = apikey
+    if message_type:
+        headers['message-type'] = message_type
 
-	r = s.get(url=url, headers=headers, verify=False)
-	return r
+    if num_messages:
+        headers['num-messages'] = num_messages
+
+    headers['id'] = ID
+    headers['apikey'] = apikey
+
+    r = s.get(url=url, headers=headers, verify=False)
+    return r
+
 
 def follow_requests(ID, apikey, request_type):
 
-	url = base_url
+    url = base_url
 
-	if request_type == "requests":
-		url = url + "/owner/follow-requests"
-	elif request_type == "status":
-		url = url + "/owner/follow-status"
+    if request_type == 'requests':
+        url = url + '/owner/follow-requests'
+    elif request_type == 'status':
+        url = url + '/owner/follow-status'
 
-	headers = {"id": ID, "apikey": apikey}
+    headers = {'id': ID, 'apikey': apikey}
 
-	r = s.get(url=url, headers=headers, verify=False)
-	return r
-
-def dev_publish(device_keys, message_type="protected"):
-
-	for device, apikey in device_keys.items():
-		log("PUBLISHING MESSAGE FROM " + device,'')
-		pub_req = publish(device, apikey, device, "test", message_type, "test message from " + device)
-		check(pub_req, 202)
-
-def dev_publish_amqp(device_keys, message_type="protected"):
-    
-	for device, apikey in device_keys.items():
-		log("PUBLISHING MESSAGE FROM " + device,'')
-		amqp_publish(device, apikey, message_type, "test", "test message from " + device)
-
-def bind_unbind_dev(device_keys, app_keys, expected=0, as_admin="", req_type="",
-message_type="protected", is_priority="false", admin_id="", admin_key=""):
-
-	if as_admin == False:
-
-		approved = 0
-
-		for app, apikey in app_keys.items():
-			log("APP " + app + " CHECKING APPROVAL STATUS OF FOLLOW REQUESTS BEFORE BINDING",'')
-			follow_status = follow_requests(app, apikey, "status")
-			response = follow_status.json() 
-			check(follow_status, 200)
-
-			for entry in response:
-				if entry['status'] == "approved":
-					approved = approved + 1
-
-			assert_exit(approved == expected, "Approved = "+str(approved)+" Expected = "+str(expected))
-			log("APP " + app + " HAS RECEIVED " + str(approved) + " APPROVALS",'')
-			approved = 0
-
-		for app, apikey in app_keys.items():
-			for device in device_keys:
-				log("APP " + app + " (UN)BINDING FROM DEVICE " + device,'')
-				bind_req = bind_unbind(app, apikey, device, "test", req_type,
-				message_type, is_priority=is_priority)
-				check(bind_req, 200)
-
-	elif as_admin == True:
-
-		approved = 0
-
-		for app in app_keys:
-
-			log("APP " + app + " CHECKING APPROVAL STATUS OF FOLLOW REQUESTS BEFORE BINDING",'')
-			follow_status = follow_requests(admin_id, admin_key, "status")
-			response = follow_status.json()
-
-			check(follow_status, 200)
-
-			for entry in response:
-				if entry['status'] == "approved":
-					approved = approved + 1
-
-			assert_exit(approved == expected, "Approved = "+str(approved)+" Expected = "+str(expected))
-			log("APP ADMIN HAS RECEIVED " + str(approved) + " APPROVALS",'')
-			approved = 0
-
-		for app in app_keys:
-			for device in device_keys:
-				log("APP " + app + " BINDING TO DEVICE " + device,'')
-				bind_req = bind_unbind(admin_id, admin_key, device, "test", req_type,
-				message_type, from_id=app, is_priority=is_priority)
-				check(bind_req, 200)
+    r = s.get(url=url, headers=headers, verify=False)
+    return r
 
 
-def bind_unbind_without_follow(device_keys, app_keys, as_admin="", req_type="",
-message_type="protected", is_priority = "false", admin_id="", admin_key=""):
+def dev_publish(device_keys, message_type='protected'):
 
-	if as_admin == False:
-			for app, apikey in app_keys.items():
-					for device in device_keys:
-						log("APP " + app + " (UN)BINDING FROM DEVICE " + device,'')
-						bind_req = bind_unbind(app, apikey, device, "test",
-						req_type, message_type, is_priority = is_priority)
-						check(bind_req, 403)
-
-	elif as_admin == True:
-		for app in app_keys:
-			for device in device_keys:
-				log("APP " + app + " BINDING TO DEVICE " + device,'')
-				bind_req = bind_unbind(admin_id, admin_key, device, "test", req_type,
-				message_type, from_id=app, is_priority=is_priority)
-				check(bind_req, 403)
-
-def app_subscribe(devices, app_keys, expected, message_type=""):
-
-	count = math.ceil(devices / 10.0)
-
-	actual = 0
-
-	for app, apikey in app_keys.items():
-
-		log("APP " + app + " SUBSCRIBING TO ITS QUEUE",'')
-
-		for i in range(0, int(count)):
-			
-			if message_type:
-			    sub_req = subscribe(app, apikey, num_messages="10",
-			    message_type=message_type)
-			else:
-			    sub_req = subscribe(app, apikey, num_messages="10")
-
-			response = sub_req.json() 
-			actual = actual + len(response)
-			check(sub_req, 200)
-		
-		assert_exit(actual == expected, "Actual = "+str(actual)+" Expected = "+str(expected))
-		actual = 0
-		log("APP " + app + " has successfully received " + str(expected) + " messages",'')
-
-def app_subscribe_amqp(devices, app_keys, expected, message_type=""):
-
-    for app, apikey in app_keys.items():
-
-		log("APP " + app + " SUBSCRIBING TO ITS QUEUE",'')
-
-		if message_type:
-		    messages = amqp_subscribe(app, apikey, devices, message_type)
-		else:
-		    messages = amqp_subscribe(app, apikey, devices, message_type="")
-
-		assert_exit(len(messages) == expected, "Received = " + str(messages) + " Expected = " + str(expected))
+    for (device, apikey) in device_keys.items():
+        log('PUBLISHING MESSAGE FROM ' + device, '')
+        pub_req = publish(
+            device,
+            apikey,
+            device,
+            'test',
+            message_type,
+            'test message from ' + device,
+            )
+        check(pub_req, 202)
 
 
-def follow_dev(device_keys, app_keys, as_admin="", permission="", message_type="protected",
-admin_id="", admin_key=""):
+def dev_publish_amqp(device_keys, message_type='protected'):
 
-	if as_admin == True:
-		for app in app_keys:
-			for device in device_keys:
-				log("FOLLOW REQUEST FROM APP " + app + " TO DEVICE " + device,'')
-				r = follow(admin_id, admin_key, device, permission, from_id=app,
-				message_type=message_type)
-				check(r, 202)
+    for (device, apikey) in device_keys.items():
+        log('PUBLISHING MESSAGE FROM ' + device, '')
+        amqp_publish(device, apikey, message_type, 'test',
+                     'test message from ' + device)
 
-	elif as_admin == False:
-		for app, apikey in app_keys.items():
-			for device in device_keys:
-				log("FOLLOW REQUEST FROM APP " + app + " TO DEVICE " + device,'')
-				r = follow(app, apikey, device, permission,
-				message_type=message_type)
-				check(r, 202)
 
-def unfollow_dev(device_keys, app_keys, as_admin="", permission="", message_type = "protected",
-admin_id="", admin_key=""):
+def bind_unbind_dev(
+    device_keys,
+    app_keys,
+    expected=0,
+    as_admin='',
+    req_type='',
+    message_type='protected',
+    is_priority='false',
+    admin_id='',
+    admin_key='',
+    ):
 
-	if as_admin == True:
-		for app in app_keys:
-			for device in device_keys:
-				log("UNFOLLOW REQUEST FROM APP " + app + " TO DEVICE " + device,'')
-				r = unfollow(admin_id, admin_key, device, "test", permission,
-				message_type, from_id=app)
-				check(r, 200)
+    if as_admin == False:
 
-	elif as_admin == False:
-		for app, apikey in app_keys.items():
-			for device in device_keys:
-				log("UNFOLLOW REQUEST FROM APP " + app + " TO DEVICE " + device,'')
-				r = unfollow(app, apikey, device, "test", permission, message_type)
-				check(r, 200)
+        approved = 0
+
+        for (app, apikey) in app_keys.items():
+            log('APP ' + app
+                + ' CHECKING APPROVAL STATUS OF FOLLOW REQUESTS BEFORE BINDING'
+                , '')
+            follow_status = follow_requests(app, apikey, 'status')
+            response = follow_status.json()
+            check(follow_status, 200)
+
+            for entry in response:
+                if entry['status'] == 'approved':
+                    approved = approved + 1
+
+            assert_exit(approved == expected, 'Approved = '
+                        + str(approved) + ' Expected = '
+                        + str(expected))
+            log('APP ' + app + ' HAS RECEIVED ' + str(approved)
+                + ' APPROVALS', '')
+            approved = 0
+
+        for (app, apikey) in app_keys.items():
+            for device in device_keys:
+                log('APP ' + app + ' (UN)BINDING FROM DEVICE '
+                    + device, '')
+                bind_req = bind_unbind(
+                    app,
+                    apikey,
+                    device,
+                    'test',
+                    req_type,
+                    message_type,
+                    is_priority=is_priority,
+                    )
+                check(bind_req, 200)
+    elif as_admin == True:
+
+        approved = 0
+
+        for app in app_keys:
+
+            log('APP ' + app
+                + ' CHECKING APPROVAL STATUS OF FOLLOW REQUESTS BEFORE BINDING'
+                , '')
+            follow_status = follow_requests(admin_id, admin_key,
+                    'status')
+            response = follow_status.json()
+
+            check(follow_status, 200)
+
+            for entry in response:
+                if entry['status'] == 'approved':
+                    approved = approved + 1
+
+            assert_exit(approved == expected, 'Approved = '
+                        + str(approved) + ' Expected = '
+                        + str(expected))
+            log('APP ADMIN HAS RECEIVED ' + str(approved) + ' APPROVALS'
+                , '')
+            approved = 0
+
+        for app in app_keys:
+            for device in device_keys:
+                log('APP ' + app + ' BINDING TO DEVICE ' + device, '')
+                bind_req = bind_unbind(
+                    admin_id,
+                    admin_key,
+                    device,
+                    'test',
+                    req_type,
+                    message_type,
+                    from_id=app,
+                    is_priority=is_priority,
+                    )
+                check(bind_req, 200)
+
+
+def bind_unbind_without_follow(
+    device_keys,
+    app_keys,
+    as_admin='',
+    req_type='',
+    message_type='protected',
+    is_priority='false',
+    admin_id='',
+    admin_key='',
+    ):
+
+    if as_admin == False:
+        for (app, apikey) in app_keys.items():
+            for device in device_keys:
+                log('APP ' + app + ' (UN)BINDING FROM DEVICE '
+                    + device, '')
+                bind_req = bind_unbind(
+                    app,
+                    apikey,
+                    device,
+                    'test',
+                    req_type,
+                    message_type,
+                    is_priority=is_priority,
+                    )
+                check(bind_req, 403)
+    elif as_admin == True:
+
+        for app in app_keys:
+            for device in device_keys:
+                log('APP ' + app + ' BINDING TO DEVICE ' + device, '')
+                bind_req = bind_unbind(
+                    admin_id,
+                    admin_key,
+                    device,
+                    'test',
+                    req_type,
+                    message_type,
+                    from_id=app,
+                    is_priority=is_priority,
+                    )
+                check(bind_req, 403)
+
+
+def app_subscribe(
+    devices,
+    app_keys,
+    expected,
+    message_type='',
+    ):
+
+    count = math.ceil(devices / 10.0)
+
+    actual = 0
+
+    for (app, apikey) in app_keys.items():
+
+        log('APP ' + app + ' SUBSCRIBING TO ITS QUEUE', '')
+
+        for i in range(0, int(count)):
+
+            if message_type:
+                sub_req = subscribe(app, apikey, num_messages='10',
+                                    message_type=message_type)
+            else:
+                sub_req = subscribe(app, apikey, num_messages='10')
+
+            response = sub_req.json()
+            actual = actual + len(response)
+            check(sub_req, 200)
+
+        assert_exit(actual == expected, 'Actual = ' + str(actual)
+                    + ' Expected = ' + str(expected))
+        actual = 0
+        log('APP ' + app + ' has successfully received '
+            + str(expected) + ' messages', '')
+
+
+def app_subscribe_amqp(
+    devices,
+    app_keys,
+    expected,
+    message_type='',
+    ):
+
+    for (app, apikey) in app_keys.items():
+
+        log('APP ' + app + ' SUBSCRIBING TO ITS QUEUE', '')
+
+        if message_type:
+            messages = amqp_subscribe(app, apikey, devices,
+                    message_type)
+        else:
+            messages = amqp_subscribe(app, apikey, devices,
+                    message_type='')
+
+        assert_exit(len(messages) == expected, 'Received = '
+                    + str(messages) + ' Expected = ' + str(expected))
+
+        log('APP ' + app + ' has successfully received '
+            + str(expected) + ' messages', '')
+
+
+def follow_dev(
+    device_keys,
+    app_keys,
+    as_admin='',
+    permission='',
+    message_type='protected',
+    admin_id='',
+    admin_key='',
+    ):
+
+    if as_admin == True:
+        for app in app_keys:
+            for device in device_keys:
+                log('FOLLOW REQUEST FROM APP ' + app + ' TO DEVICE '
+                    + device, '')
+                r = follow(
+                    admin_id,
+                    admin_key,
+                    device,
+                    permission,
+                    from_id=app,
+                    message_type=message_type,
+                    )
+                check(r, 202)
+    elif as_admin == False:
+
+        for (app, apikey) in app_keys.items():
+            for device in device_keys:
+                log('FOLLOW REQUEST FROM APP ' + app + ' TO DEVICE '
+                    + device, '')
+                r = follow(app, apikey, device, permission,
+                           message_type=message_type)
+                check(r, 202)
+
+
+def unfollow_dev(
+    device_keys,
+    app_keys,
+    as_admin='',
+    permission='',
+    message_type='protected',
+    admin_id='',
+    admin_key='',
+    ):
+
+    if as_admin == True:
+        for app in app_keys:
+            for device in device_keys:
+                log('UNFOLLOW REQUEST FROM APP ' + app + ' TO DEVICE '
+                    + device, '')
+                r = unfollow(
+                    admin_id,
+                    admin_key,
+                    device,
+                    'test',
+                    permission,
+                    message_type,
+                    from_id=app,
+                    )
+                check(r, 200)
+    elif as_admin == False:
+
+        for (app, apikey) in app_keys.items():
+            for device in device_keys:
+                log('UNFOLLOW REQUEST FROM APP ' + app + ' TO DEVICE '
+                    + device, '')
+                r = unfollow(
+                    app,
+                    apikey,
+                    device,
+                    'test',
+                    permission,
+                    message_type,
+                    )
+                check(r, 200)
+
 
 def share_dev(expected, admin_id, admin_key):
 
-	r = follow_requests(admin_id, admin_key, "requests")
-	response = r.json() 
-	count = 0
+    r = follow_requests(admin_id, admin_key, 'requests')
+    response = r.json()
+    count = 0
 
-	check(r,200)
-	
-	for follow_req in response:
-		count = count + 1
-		log("SHARE FROM DEVICE " + str(follow_req['to']).split(".")[0] + " TO APP " + str(follow_req['from']),'')
-		share_req = share(admin_id, admin_key, str(follow_req['follow-id']))
-		check(share_req, 200)
+    check(r, 200)
 
-	assert_exit(count == expected, "Count= "+str(count)+" Expected = "+str(expected))
+    for follow_req in response:
+        count = count + 1
+        log('SHARE FROM DEVICE ' + str(follow_req['to']).split('.')[0]
+            + ' TO APP ' + str(follow_req['from']), '')
+        share_req = share(admin_id, admin_key,
+                          str(follow_req['follow-id']))
+        check(share_req, 200)
+
+    assert_exit(count == expected, 'Count= ' + str(count)
+                + ' Expected = ' + str(expected))
+
 
 def app_publish(device_keys, app_keys, expected_code):
 
-	for app, apikey in app_keys.items():
-		for device in device_keys:
-			log("APP "+ app +" PUBLISHING TO DEVICE "+ device +".command EXCHANGE",'')
-			publish_req = publish(app,apikey, device, "test", "command", "data")
+    for (app, apikey) in app_keys.items():
+        for device in device_keys:
+            log('APP ' + app + ' PUBLISHING TO DEVICE ' + device
+                + '.command EXCHANGE', '')
+            publish_req = publish(
+                app,
+                apikey,
+                device,
+                'test',
+                'command',
+                'data',
+                )
 
-			check(publish_req, expected_code)
+            check(publish_req, expected_code)
+
 
 def app_publish_amqp(device_keys, app_keys):
 
-	for app, apikey in app_keys.items():
-		for device in device_keys:
-			log("APP "+ app +" PUBLISHING TO DEVICE "+ device +".command EXCHANGE",'')
-			amqp_publish(app, apikey, "publish", device+".command.test", "data")
+    for (app, apikey) in app_keys.items():
+        for device in device_keys:
+            log('APP ' + app + ' PUBLISHING TO DEVICE ' + device
+                + '.command EXCHANGE', '')
+            amqp_publish(app, apikey, 'publish', device
+                         + '.command.test', 'data')
+
 
 def dev_subscribe_amqp(apps, device_keys, expected):
 
-	actual = 0
+    actual = 0
 
-	for device, apikey in device_keys.items():
+    for (device, apikey) in device_keys.items():
 
-	    log("DEVICE " + device + " SUBSCRIBING TO ITS COMMAND QUEUE",'')
+        log('DEVICE ' + device + ' SUBSCRIBING TO ITS COMMAND QUEUE', ''
+            )
 
-	    messages = amqp_subscribe(device, apikey, apps, message_type="command")
-	    assert_exit(len(messages) == expected, "Actual= "+str(actual)+" Expected = "+str(expected))
-	    log("DEVICE " + device + " HAS RECEIVED " + str(expected) + " COMMAND MESSAGES",'')
+        messages = amqp_subscribe(device, apikey, apps,
+                                  message_type='command')
+
+        assert_exit(len(messages) == expected, 'Actual= ' + str(actual)
+                    + ' Expected = ' + str(expected))
+        log('DEVICE ' + device + ' HAS RECEIVED ' + str(expected)
+            + ' COMMAND MESSAGES', '')
+
 
 def dev_subscribe(apps, device_keys, expected):
 
-	count = math.ceil(apps / 10.0)
+    count = math.ceil(apps / 10.0)
 
-	actual = 0
+    actual = 0
 
-	for device, apikey in device_keys.items():
+    for (device, apikey) in device_keys.items():
 
-		log("DEVICE " + device + " SUBSCRIBING TO ITS COMMAND QUEUE",'')
+        log('DEVICE ' + device + ' SUBSCRIBING TO ITS COMMAND QUEUE', ''
+            )
 
-		for i in range(0, int(count)):
-			sub_req = subscribe(device, apikey, message_type="command", num_messages="10")
-			response = sub_req.json() 
-			actual = actual + len(response)
-			check(sub_req, 200)
-		
-		assert_exit(actual == expected, "Actual= "+str(actual)+" Expected = "+str(expected))
-		actual = 0
-		log("DEVICE " + device + " HAS RECEIVED " + str(expected) + " COMMAND MESSAGES",'')
+        for i in range(0, int(count)):
+            sub_req = subscribe(device, apikey, message_type='command',
+                                num_messages='10')
+            response = sub_req.json()
+            actual = actual + len(response)
+            check(sub_req, 200)
 
-def amqp_publish(ID, apikey, message_type, routing_key, body):
+        assert_exit(actual == expected, 'Actual= ' + str(actual)
+                    + ' Expected = ' + str(expected))
+        actual = 0
+        log('DEVICE ' + device + ' HAS RECEIVED ' + str(expected)
+            + ' COMMAND MESSAGES', '')
+
+
+def amqp_publish(
+    ID,
+    apikey,
+    message_type,
+    routing_key,
+    body,
+    ):
 
     credentials = pika.PlainCredentials(ID, apikey)
-    parameters = pika.ConnectionParameters(host='localhost',port=5671, credentials=credentials, ssl=True)
+    parameters = pika.ConnectionParameters(host='localhost', port=5671,
+            credentials=credentials, ssl=True)
     connection = pika.BlockingConnection(parameters)
     channel = connection.channel()
-    
-    assert(channel.basic_publish(exchange=ID + "." + message_type, routing_key=routing_key, body=body,mandatory=True))
 
-def amqp_subscribe(ID, apikey, num_messages, message_type=""):
+    assert channel.basic_publish(exchange=ID + '.' + message_type,
+                                 routing_key=routing_key, body=body,
+                                 mandatory=True)
+
+
+def amqp_subscribe(
+    ID,
+    apikey,
+    num_messages,
+    message_type='',
+    ):
 
     credentials = pika.PlainCredentials(ID, apikey)
-    parameters = pika.ConnectionParameters(host='localhost',port=5671, credentials=credentials, ssl=True)
+    parameters = pika.ConnectionParameters(host='localhost', port=5671,
+            credentials=credentials, ssl=True)
     connection = pika.BlockingConnection(parameters)
     channel = connection.channel()
 
     if message_type:
-	message_type = "." + message_type
-    
+        message_type = '.' + message_type
+
     messages = []
+    i = 0
 
-    for i in range(num_messages):
+    while i < num_messages:
 
-	method_frame, header_frame, body = channel.basic_get(ID+message_type)
-  
-	if method_frame:
+        t = time.time()
+
+        (method_frame, header_frame, body) = channel.basic_get(ID
+                + message_type)
+
+        if method_frame:
             channel.basic_ack(method_frame.delivery_tag)
             messages.append(body)
-    
+            i = i + 1
+        else:
+            i = i - 1
+
     return messages
 
-def registrations(devices, apps, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key):
-	
-	device_keys = {}
-	app_keys = {}
-
-	# Device regsitration
-	log("---------------> REGISTERING DEVICES ",'HEADER')
-
-	for i in range(0, devices):
-		log("REGISTERING DEVICE " + str(i),'')
-		dev_name = "dev" + ''.join(
-		random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(8))
-		r = register(dev_admin_id, dev_admin_key, dev_name)
-		response = r.json()
-		log(json.dumps(response),'')
-		check(r, 201)
-
-		device_keys[response['id']] = response['apikey']
-
-	# App registration
-	log("---------------> REGISTERING APPS", 'HEADER')
-
-	for i in range(0, apps):
-		log("REGISTERING APP " + str(i),'')
-		app_name = "app" + ''.join(
-			random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(8))
-		r = register(app_admin_id, app_admin_key, app_name)
-		response = r.json()
-		log(json.dumps(response),'')
-		check(r, 201)
-
-		app_keys[response['id']] = response['apikey']
-
-	return device_keys, app_keys
-
-def deregistrations(device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key):
-
-	#Deregister all apps and devices
-	log("---------------> DEREGISTERING DEVICES AND APPS",'HEADER')
-
-	for device in device_keys:
-		log("DEREGISTERING DEVICE "+ device,'')
-		dereg = deregister(dev_admin_id, dev_admin_key,device)
-		check(dereg,200)
- 
-	for app in app_keys:
-		log("DEREGISTERING APP "+ app,'')
-		dereg = deregister(app_admin_id, app_admin_key, app)
-		check(dereg,200)
-
-def invalid_apikey(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key):
-
-	#=========================================Invalid API key===============================================
-	print("\n\n")
-	log("------------------------- INVALID APIKEY -------------------------\n\n", 'GREEN')
-
-	dummy_key = gen_rand(32) 
-	dummy_id  = gen_rand(8) 
-
-	#Owner registration ( should not go through with the right apikey anyway ) 
-	
-	#logger.info(colour.HEADER + "---------------> OWNER REGISTRATION USING INVALID APIKEY " + colour.ENDC)
-	#r = register_owner(dummy_key, "owner"+dummy_id)
-	#check(r,403)
-	#logger.info("Received 403: OK")
-
-	#Registration
-	log("---------------> REGISTRATION USING INVALID APIKEY", 'HEADER')
-	
-	r = register(dev_admin_id, dummy_key, "dev"+dummy_id)
-	check(r,403)
-	log("Received 403: OK",'')
-
-	#Publish
-	log("---------------> PUBLISH USING INVALID APIKEY", 'HEADER')
-	
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
-
-	r = publish(dev_name, dummy_key, dev_name, "test", "protected", "hello")
-	check(r,403)
-	log("Received 403: OK",'')
-
-	log("---------------> PUBLISH USING VALID APIKEY TO ESTABLISH CONNECTION", 'HEADER')
-	
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
-
-	r = publish(dev_name, str(device_keys[dev_name]), dev_name, "test", "protected", "hello")
-	check(r,202)
-	log("Received 202: OK",'')
-
-	log("---------------> PUBLISH USING INVALID APIKEY ONCE CONNECTION HAS BEEN ESTABLISHED", 'HEADER')
-	
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
-
-	r = publish(dev_name, dummy_key, dev_name, "test", "protected", "hello")
-	check(r,403)
-	log("Received 403: OK",'')
-
-	#Subscribe
-	log("---------------> SUBSCRIBE USING INVALID APIKEY", 'HEADER')
-
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
 
-	r = subscribe(dev_name, dummy_key)
-	check(r,403)
-	log("Received 403: OK",'')
+def registrations(
+    devices,
+    apps,
+    dev_admin_id,
+    dev_admin_key,
+    app_admin_id,
+    app_admin_key,
+    ):
 
-	#Follow
-	log("---------------> FOLLOW USING INVALID APIKEY", 'HEADER')
+    device_keys = {}
+    app_keys = {}
 
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
-	r = follow(app_name, dummy_key, random.choice(device_keys.keys()), "read")
-	check(r,403)
-	log("Received 403: OK",'')
-	
-	#Follow using invalid admin key
-	log("---------------> FOLLOW USING INVALID ADMIN APIKEY", 'HEADER')
+    # Device regsitration
 
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+    log('---------------> REGISTERING DEVICES ', 'HEADER')
 
-	r = follow(app_admin_id, dummy_key, random.choice(device_keys.keys()), "read")
-	check(r,403)
-	log("Received 403: OK",'')
+    for i in range(0, devices):
+        log('REGISTERING DEVICE ' + str(i), '')
+        dev_name = 'dev' + ''.join(random.choice(string.ascii_uppercase
+                                   + string.ascii_lowercase
+                                   + string.digits) for _ in range(8))
+        r = register(dev_admin_id, dev_admin_key, dev_name)
+        response = r.json()
+        log(json.dumps(response), '')
+        check(r, 201)
 
-	#Share
-	log("---------------> SHARE USING INVALID APIKEY", 'HEADER')
+        device_keys[response['id']] = response['apikey']
 
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    # App registration
 
-	r = share(dev_name, dummy_key, str(random.randint(0,5)))
-	check(r,403)
-	log("Received 403: OK",'')
-	
-	#Share using invalid admin key
-	log("---------------> SHARE USING INVALID ADMIN APIKEY", 'HEADER')
+    log('---------------> REGISTERING APPS', 'HEADER')
 
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    for i in range(0, apps):
+        log('REGISTERING APP ' + str(i), '')
+        app_name = 'app' + ''.join(random.choice(string.ascii_uppercase
+                                   + string.ascii_lowercase
+                                   + string.digits) for _ in range(8))
+        r = register(app_admin_id, app_admin_key, app_name)
+        response = r.json()
+        log(json.dumps(response), '')
+        check(r, 201)
 
-	r = share(dev_admin_id, dummy_key, str(random.randint(0,5)))
-	check(r,403)
-	log("Received 403: OK",'')
+        app_keys[response['id']] = response['apikey']
 
-	#Unfollow
-	log("---------------> UNFOLLOW USING INVALID APIKEY", 'HEADER')
-	
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+    return (device_keys, app_keys)
 
-	r = unfollow(app_name, dummy_key, str(random.choice(device_keys.keys())), "test", "read", "protected")
-	check(r,403)
-	log("Received 403: OK",'')
 
-	#Unfollow using invalid admin apikey
-	log("---------------> UNFOLLOW USING INVALID ADMIN APIKEY", 'HEADER')
-	
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+def deregistrations(
+    device_keys,
+    app_keys,
+    dev_admin_id,
+    dev_admin_key,
+    app_admin_id,
+    app_admin_key,
+    ):
 
-	r = unfollow(app_admin_id, dummy_key, str(random.choice(device_keys.keys())), "test", "read", "protected", from_id=app_name)
-	check(r,403)
-	log("Received 403: OK",'')
+    # Deregister all apps and devices
+
+    log('---------------> DEREGISTERING DEVICES AND APPS', 'HEADER')
+
+    for device in device_keys:
+        log('DEREGISTERING DEVICE ' + device, '')
+        dereg = deregister(dev_admin_id, dev_admin_key, device)
+        check(dereg, 200)
+
+    for app in app_keys:
+        log('DEREGISTERING APP ' + app, '')
+        dereg = deregister(app_admin_id, app_admin_key, app)
+        check(dereg, 200)
 
-	#Follow-requests
-	log("---------------> FOLLOW-REQUESTS USING INVALID APIKEY", 'HEADER')
 
-	r = follow_requests(dev_admin_id, dummy_key, "requests")
-	check(r,403)
-	log("Received 403: OK",'')
-	
-	#Follow-requests using invalid device apikey
-	log("---------------> FOLLOW-REQUESTS USING INVALID DEVICE APIKEY", 'HEADER')
+def invalid_apikey(
+    devices,
+    apps,
+    device_keys,
+    app_keys,
+    dev_admin_id,
+    dev_admin_key,
+    app_admin_id,
+    app_admin_key,
+    ):
 
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    # =========================================Invalid API key===============================================
 
-	r = follow_requests(dev_name, dummy_key, "requests")
-	check(r,403)
-	log("Received 403: OK",'')
+    print '''
 
-	#Follow-status
-	log("---------------> FOLLOW-STATUS USING INVALID APIKEY", 'HEADER')
-
-	r = follow_requests(dev_admin_id, dummy_key, "status")
-	check(r,403)
-	log("Received 403: OK",'')
-
-	#Follow-status using invalid device apikey
-	log("---------------> FOLLOW-STATUS USING INVALID DEVICE APIKEY", 'HEADER')
-
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
-
-	r = follow_requests(dev_name, dummy_key, "status")
-	check(r,403)
-	log("Received 403: OK",'')
+'''
+    log('''------------------------- INVALID APIKEY -------------------------
 
-	#Reject follow using invalid admin key
-	log("---------------> REJECT-FOLLOW USING INVALID ADMIN APIKEY", 'HEADER')
+''',
+        'GREEN')
 
-	r = reject_follow(dev_admin_id, dummy_key, str(random.randint(1,5)))
-	check(r,403)
-	log("Received 403: OK",'')
-		
-	#Reject follow using invalid device key
-	log("---------------> REJECT-FOLLOW USING INVALID DEVICE APIKEY", 'HEADER')
-
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    dummy_key = gen_rand(32)
+    dummy_id = gen_rand(8)
 
-	r = reject_follow(dev_name, dummy_key, str(random.randint(1,5)))
-	check(r,403)
-	log("Received 403: OK",'')
+    # Owner registration ( should not go through with the right apikey anyway )
 
-	#Bind using invalid device apikey
-	log("---------------> BIND USING INVALID DEVICE APIKEY", 'HEADER')
-
-	
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
-
-	r = bind_unbind(app_name, dummy_key, dev_name, "test", "bind", "protected")
-	check(r,403)
-	log("Received 403: OK",'')
-	
-	#Bind using invalid admin apikey
-	log("---------------> BIND USING INVALID ADMIN APIKEY", 'HEADER')
-
-	
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
-
-	r = bind_unbind(app_admin_id, dummy_key, dev_name, "test", "bind", "protected", from_id = app_name)
-	check(r,403)
-	log("Received 403: OK",'')
-
-	#Unbind using invalid device apikey
-	log("---------------> UNBIND USING INVALID DEVICE APIKEY", 'HEADER')
-
-	
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
-
-	r = bind_unbind(app_name, dummy_key, dev_name, "test", "unbind", "protected")
-	check(r,403)
-	log("Received 403: OK",'')
-	
-	#Bind using invalid admin apikey
-	log("---------------> UNBIND USING INVALID ADMIN APIKEY", 'HEADER')
-
-	
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
-
-	r = bind_unbind(app_admin_id, dummy_key, dev_name, "test", "unbind", "protected", from_id = app_name)
-	check(r,403)
-	log("Received 403: OK",'')
-
-	#Block using invalid admin apikey	
-	log("---------------> BLOCK USING INVALID ADMIN APIKEY", 'HEADER')
-
-	r = block_unblock(dev_admin_id, dummy_key, str(random.choice(app_keys.keys())), "block")
-	check(r,403)
-	log("Received 403: OK",'')
+    # logger.info(colour.HEADER + "---------------> OWNER REGISTRATION USING INVALID APIKEY " + colour.ENDC)
+    # r = register_owner(dummy_key, "owner"+dummy_id)
+    # check(r,403)
+    # logger.info("Received 403: OK")
 
-	#Unblock using invalid admin apikey	
-	log("---------------> UNBLOCK USING INVALID ADMIN APIKEY", 'HEADER')
-
-	r = block_unblock(dev_admin_id, dummy_key, str(random.choice(app_keys.keys())), "unblock")
-	check(r,403)
-	log("Received 403: OK",'')
-
-	#Permissions using invalid admin apikey
-	log("---------------> PERMISSIONS USING INVALID ADMIN APIKEY", 'HEADER')
-	
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
-
-	r = permissions(dev_admin_id, dummy_key, entity_id = dev_name)
-	check(r,403)
-	log("Received 403: OK",'')
-	
-	#Permissions using invalid device apikey
-	log("---------------> PERMISSIONS USING INVALID DEVICE APIKEY", 'HEADER')
-	
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    # Registration
 
-	r = permissions(dev_name, dummy_key)
-	check(r,403)
-	log("Received 403: OK",'')
+    log('---------------> REGISTRATION USING INVALID APIKEY', 'HEADER')
 
-	#Deregister using invalid apikey
-	
-	log("---------------> DEREGISTRATION USING INVALID ADMIN APIKEY", 'HEADER')
+    r = register(dev_admin_id, dummy_key, 'dev' + dummy_id)
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    # Publish
 
-	r = deregister(dev_admin_id, dummy_key, dev_name)
-	check(r,403)
-	log("Received 403: OK",'')
-
-def invalid_id(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key):
+    log('---------------> PUBLISH USING INVALID APIKEY', 'HEADER')
 
-	#=========================================Invalid ID===============================================
-	
-	dummy_key = gen_rand(32) 
-	dummy_id  = gen_rand(8, prefix="admin/") 
-	dummy_admin_id = gen_rand(8) 
-
-	print("\n\n")
-	log("------------------------- INVALID ID -------------------------\n\n", 'GREEN')
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
 
-	#Owner registration ( should not go through with the right apikey anyway ) 
-	
-	#logger.info(colour.HEADER + "---------------> OWNER REGISTRATION USING INVALID APIKEY " + colour.ENDC)
-	#r = register_owner(dummy_key, "owner"+dummy_id)
-	#check(r,403)
-	#logger.info("Received 403: OK")
+    r = publish(
+        dev_name,
+        dummy_key,
+        dev_name,
+        'test',
+        'protected',
+        'hello',
+        )
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	#Registration
-	log("---------------> REGISTRATION USING INVALID ID", 'HEADER')
-	
-	r = register(dummy_id, dev_admin_key, "dev"+dummy_id)
-	check(r,403)
-	log("Received 403: OK",'')
-
-	#Publish
-	log("---------------> PUBLISH USING INVALID ID", 'HEADER')
-	
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    log('---------------> PUBLISH USING VALID APIKEY TO ESTABLISH CONNECTION'
+        , 'HEADER')
 
-	r = publish(dummy_id, str(device_keys[dev_name]), dummy_id, "test", "protected", "hello")
-	check(r,403)
-	log("Received 403: OK",'')
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
 
-	log("---------------> PUBLISH USING VALID APIKEY AND ID TO ESTABLISH CONNECTION", 'HEADER')
-	
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    r = publish(
+        dev_name,
+        str(device_keys[dev_name]),
+        dev_name,
+        'test',
+        'protected',
+        'hello',
+        )
+    check(r, 202)
+    log('Received 202: OK', '')
 
-	r = publish(dev_name, str(device_keys[dev_name]), dev_name, "test", "protected", "hello")
-	check(r,202)
-	log("Received 202: OK",'')
+    log('---------------> PUBLISH USING INVALID APIKEY ONCE CONNECTION HAS BEEN ESTABLISHED'
+        , 'HEADER')
 
-	log("---------------> PUBLISH USING INVALID ID ONCE CONNECTION HAS BEEN ESTABLISHED", 'HEADER')
-	
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
 
-	r = publish(dummy_id, str(device_keys[dev_name]), dummy_id , "test", "protected", "hello")
-	check(r,403)
-	log("Received 403: OK",'')
+    r = publish(
+        dev_name,
+        dummy_key,
+        dev_name,
+        'test',
+        'protected',
+        'hello',
+        )
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	#Subscribe
-	log("---------------> SUBSCRIBE USING INVALID ID", 'HEADER')
+    # Subscribe
 
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    log('---------------> SUBSCRIBE USING INVALID APIKEY', 'HEADER')
 
-	r = subscribe(dummy_id, str(device_keys[dev_name]))
-	check(r,403)
-	log("Received 403: OK",'')
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
 
-	#Follow
-	log("---------------> FOLLOW USING INVALID ID", 'HEADER')
+    r = subscribe(dev_name, dummy_key)
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+    # Follow
 
-	r = follow(dummy_id, str(app_keys[app_name]), random.choice(device_keys.keys()), "read")
-	check(r,403)
-	log("Received 403: OK",'')
-	
-	#Follow using invalid admin id
-	log("---------------> FOLLOW USING INVALID ADMIN ID", 'HEADER')
+    log('---------------> FOLLOW USING INVALID APIKEY', 'HEADER')
 
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
+    r = follow(app_name, dummy_key, random.choice(device_keys.keys()),
+               'read')
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	r = follow(dummy_id, app_admin_key, random.choice(device_keys.keys()), "read")
-	check(r,403)
-	log("Received 403: OK",'')
+    # Follow using invalid admin key
 
-	#Share
-	log("---------------> SHARE USING INVALID ID", 'HEADER')
+    log('---------------> FOLLOW USING INVALID ADMIN APIKEY', 'HEADER')
 
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
 
-	r = share(dummy_id, str(device_keys[dev_name]), str(random.randint(0,5)))
-	check(r,403)
-	log("Received 403: OK",'')
-	
-	#Share using invalid admin id
-	log("---------------> SHARE USING INVALID ADMIN ID", 'HEADER')
+    r = follow(app_admin_id, dummy_key,
+               random.choice(device_keys.keys()), 'read')
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    # Share
 
-	r = share(dummy_id, dev_admin_key, str(random.randint(0,5)))
-	check(r,403)
-	log("Received 403: OK",'')
+    log('---------------> SHARE USING INVALID APIKEY', 'HEADER')
 
-	#Unfollow
-	log("---------------> UNFOLLOW USING INVALID ID", 'HEADER')
-	
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
-
-	r = unfollow(dummy_id, str(app_keys[app_name]), str(random.choice(device_keys.keys())), "test", "read", "protected")
-	check(r,403)
-	log("Received 403: OK",'')
-
-	#Unfollow using invalid admin id
-	log("---------------> UNFOLLOW USING INVALID ADMIN ID", 'HEADER')
-	
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
 
-	r = unfollow(dummy_id, app_admin_key, str(random.choice(device_keys.keys())), "test", "read", "protected", from_id=app_name)
-	check(r,403)
-	log("Received 403: OK",'')
+    r = share(dev_name, dummy_key, str(random.randint(0, 5)))
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	#Follow-requests
-	log("---------------> FOLLOW-REQUESTS USING INVALID ID", 'HEADER')
+    # Share using invalid admin key
 
-	r = follow_requests(dummy_id, dev_admin_key, "requests")
-	check(r,403)
-	log("Received 403: OK",'')
-	
-	#Follow-requests using invalid device id
-	log("---------------> FOLLOW-REQUESTS USING INVALID DEVICE ID", 'HEADER')
+    log('---------------> SHARE USING INVALID ADMIN APIKEY', 'HEADER')
 
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
 
-	r = follow_requests(dummy_id, str(device_keys[dev_name]), "requests")
-	check(r,403)
-	log("Received 403: OK",'')
-
-	#Follow-status
-	log("---------------> FOLLOW-STATUS USING INVALID ID", 'HEADER')
-
-	r = follow_requests(dummy_id, app_admin_key , "status")
-	check(r,403)
-	log("Received 403: OK",'')
-
-	#Follow-status using invalid device id
-	log("---------------> FOLLOW-STATUS USING INVALID DEVICE ID", 'HEADER')
-
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
-
-	r = follow_requests(dummy_id, str(device_keys[dev_name]), "status")
-	check(r,403)
-	log("Received 403: OK",'')
-
-	#Reject follow using invalid admin id
-	log("---------------> REJECT-FOLLOW USING INVALID ADMIN ID", 'HEADER')
-
-	r = reject_follow(dummy_id, dev_admin_key, str(random.randint(1,5)))
-	check(r,403)
-	log("Received 403: OK",'')
-		
-	#Reject follow using invalid device id
-	log("---------------> REJECT-FOLLOW USING INVALID DEVICE ID", 'HEADER')
+    r = share(dev_admin_id, dummy_key, str(random.randint(0, 5)))
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    # Unfollow
 
-	r = reject_follow(dummy_id, str(device_keys[dev_name]), str(random.randint(1,5)))
-	check(r,403)
-	log("Received 403: OK",'')
+    log('---------------> UNFOLLOW USING INVALID APIKEY', 'HEADER')
 
-	#Bind using invalid device id
-	log("---------------> BIND USING INVALID DEVICE ID", 'HEADER')
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
 
-	
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+    r = unfollow(
+        app_name,
+        dummy_key,
+        str(random.choice(device_keys.keys())),
+        'test',
+        'read',
+        'protected',
+        )
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	r = bind_unbind(dummy_id, str(app_keys[app_name]), dev_name, "test", "bind", "protected")
-	check(r,403)
-	log("Received 403: OK",'')
-	
-	#Bind using invalid admin id
-	log("---------------> BIND USING INVALID ADMIN ID", 'HEADER')
+    # Unfollow using invalid admin apikey
 
-	
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+    log('---------------> UNFOLLOW USING INVALID ADMIN APIKEY', 'HEADER'
+        )
 
-	r = bind_unbind(dummy_id, app_admin_key, dev_name, "test", "bind", "protected", from_id = app_name)
-	check(r,403)
-	log("Received 403: OK",'')
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
 
-	#Unbind using invalid device id
-	log("---------------> UNBIND USING INVALID DEVICE ID", 'HEADER')
+    r = unfollow(
+        app_admin_id,
+        dummy_key,
+        str(random.choice(device_keys.keys())),
+        'test',
+        'read',
+        'protected',
+        from_id=app_name,
+        )
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    # Follow-requests
 
-	r = bind_unbind(dummy_id, str(app_keys[app_name]), dev_name, "test", "unbind", "protected")
-	check(r,403)
-	log("Received 403: OK",'')
-	
-	#Bind using invalid admin idy
-	log("---------------> UNBIND USING INVALID ADMIN ID", 'HEADER')
+    log('---------------> FOLLOW-REQUESTS USING INVALID APIKEY',
+        'HEADER')
 
-	
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    r = follow_requests(dev_admin_id, dummy_key, 'requests')
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	r = bind_unbind(dummy_id, app_admin_key, dev_name, "test", "unbind", "protected", from_id = app_name)
-	check(r,403)
-	log("Received 403: OK",'')
+    # Follow-requests using invalid device apikey
 
-	#Block using invalid admin id	
-	log("---------------> BLOCK USING INVALID ADMIN ID", 'HEADER')
+    log('---------------> FOLLOW-REQUESTS USING INVALID DEVICE APIKEY',
+        'HEADER')
 
-	r = block_unblock(dummy_admin_id, dev_admin_key, str(random.choice(device_keys.keys())), "block")
-	check(r,403)
-	log("Received 403: OK",'')
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
 
-	#Unblock using invalid admin id	
-	log("---------------> UNBLOCK USING INVALID ADMIN ID", 'HEADER')
+    r = follow_requests(dev_name, dummy_key, 'requests')
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	r = block_unblock(dummy_admin_id, dev_admin_key, str(random.choice(device_keys.keys())), "unblock")
-	check(r,403)
-	log("Received 403: OK",'')
+    # Follow-status
 
-	#Permissions using invalid admin id
-	log("---------------> PERMISSIONS USING INVALID ADMIN ID", 'HEADER')
-	
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    log('---------------> FOLLOW-STATUS USING INVALID APIKEY', 'HEADER')
 
-	r = permissions(dummy_admin_id, dev_admin_key, entity_id = dev_name)
-	check(r,403)
-	log("Received 403: OK",'')
-	
-	#Permissions using invalid device id
-	log("---------------> PERMISSIONS USING INVALID DEVICE ID", 'HEADER')
-	
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    r = follow_requests(dev_admin_id, dummy_key, 'status')
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	r = permissions(dummy_id, str(device_keys[dev_name]))
-	check(r,403)
-	log("Received 403: OK",'')
+    # Follow-status using invalid device apikey
 
-	#Deregister using invalid id
-	
-	log("---------------> DEREGISTRATION USING INVALID ADMIN ID", 'HEADER')
+    log('---------------> FOLLOW-STATUS USING INVALID DEVICE APIKEY',
+        'HEADER')
 
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
 
-	r = deregister(dummy_id, dev_admin_key, dev_name)
-	check(r,403)
-	log("Received 403: OK",'')
+    r = follow_requests(dev_name, dummy_key, 'status')
+    check(r, 403)
+    log('Received 403: OK', '')
 
-def invalid_publish(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key):
+    # Reject follow using invalid admin key
 
-	print("\n\n")
-	log("------------------------- PUBLISH -------------------------\n\n", 'GREEN')
+    log('---------------> REJECT-FOLLOW USING INVALID ADMIN APIKEY',
+        'HEADER')
 
-	#Publish to non-existent exchange
-	log("---------------> PUBLISH TO NON-EXISTENT EXCHANGE", 'HEADER')
+    r = reject_follow(dev_admin_id, dummy_key, str(random.randint(1,
+                      5)))
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    # Reject follow using invalid device key
 
-	dummy_exchange = gen_rand(8, prefix = gen_rand(8)+"/") 
-	r = publish(dev_name, dev_key, dummy_exchange, "test", "command", "hello") 
-	check(r,202)
-	log("Received 202: OK",'')
+    log('---------------> REJECT-FOLLOW USING INVALID DEVICE APIKEY',
+        'HEADER')
 
-	#Publish without authroisation
-	log("---------------> PUBLISH WITHOUT AUTHORISATION", 'HEADER')
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
 
+    r = reject_follow(dev_name, dummy_key, str(random.randint(1, 5)))
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    # Bind using invalid device apikey
 
-	r = publish(app_name, str(app_keys[app_name]), dev_name, "test", "command", "hello") 
-	check(r,202)
-	log("Received 202: OK",'')
+    log('---------------> BIND USING INVALID DEVICE APIKEY', 'HEADER')
 
-	#Publish to amq.topic
-	log("---------------> PUBLISH TO amq.topic", 'HEADER')
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
 
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    r = bind_unbind(
+        app_name,
+        dummy_key,
+        dev_name,
+        'test',
+        'bind',
+        'protected',
+        )
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	r = publish(dev_name, str(device_keys[dev_name]), "amq.topic", "test", "command", "hello") 
-	check(r,400)
-	log("Received 400: OK",'')
+    # Bind using invalid admin apikey
 
-	#Publish to amq.direct
-	log("---------------> PUBLISH TO amq.direct", 'HEADER')
+    log('---------------> BIND USING INVALID ADMIN APIKEY', 'HEADER')
 
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
 
-	r = publish(dev_name, str(device_keys[dev_name]), "amq.direct", "test", "command", "hello") 
-	check(r,400)
-	log("Received 400: OK",'')
+    r = bind_unbind(
+        app_admin_id,
+        dummy_key,
+        dev_name,
+        'test',
+        'bind',
+        'protected',
+        from_id=app_name,
+        )
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	#Publish to amq.headers
-	log("---------------> PUBLISH TO amq.headers", 'HEADER')
-	
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    # Unbind using invalid device apikey
 
-	r = publish(dev_name, str(device_keys[dev_name]), "amq.headers", "test", "command", "hello") 
-	check(r,400)
-	log("Received 400: OK",'')
+    log('---------------> UNBIND USING INVALID DEVICE APIKEY', 'HEADER')
 
-	#Publish to amq.fanout
-	log("---------------> PUBLISH TO amq.fanout", 'HEADER')
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
 
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    r = bind_unbind(
+        app_name,
+        dummy_key,
+        dev_name,
+        'test',
+        'unbind',
+        'protected',
+        )
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	r = publish(dev_name, str(device_keys[dev_name]), "amq.fanout", "test", "command", "hello") 
-	check(r,400)
-	log("Received 400: OK",'')
+    # Bind using invalid admin apikey
 
-	#Publish with invalid message-type
-	log("---------------> PUBLISH WITH INVALID MESSAGE-TYPE", 'HEADER')
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    log('---------------> UNBIND USING INVALID ADMIN APIKEY', 'HEADER')
 
-	r = publish(dev_name, str(device_keys[dev_name]), dev_name, "test", gen_rand(8), "hello") 
-	check(r,400)
-	log("Received 400: OK",'')
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
 
-def invalid_subscribe(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key):
+    r = bind_unbind(
+        app_admin_id,
+        dummy_key,
+        dev_name,
+        'test',
+        'unbind',
+        'protected',
+        from_id=app_name,
+        )
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	print("\n\n")
-	log("------------------------- SUBSCRIBE -------------------------\n\n", 'GREEN')
+    # Block using invalid admin apikey....
 
-	#With invalid message type
+    log('---------------> BLOCK USING INVALID ADMIN APIKEY', 'HEADER')
 
-	log("---------------> SUBSCRIBE WITH INVALID MESSAGE-TYPE", 'HEADER') 
-	dummy_mt = gen_rand(8)
+    r = block_unblock(dev_admin_id, dummy_key,
+                      str(random.choice(app_keys.keys())), 'block')
+    check(r, 403)
+    log('Received 403: OK', '')
 
+    # Unblock using invalid admin apikey....
 
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+    log('---------------> UNBLOCK USING INVALID ADMIN APIKEY', 'HEADER')
 
-	r = subscribe(app_name, app_key, dummy_mt)
-	check(r,400)
-	log("Received 400: OK",'')
+    r = block_unblock(dev_admin_id, dummy_key,
+                      str(random.choice(app_keys.keys())), 'unblock')
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	#With invalid num messages 
+    # Permissions using invalid admin apikey
 
-	log("---------------> SUBSCRIBE WITH INVALID NUM MESSSAGES", 'HEADER') 
-	dummy_nm = gen_rand(8)
+    log('---------------> PERMISSIONS USING INVALID ADMIN APIKEY',
+        'HEADER')
 
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
 
-	r = subscribe(app_name, app_key, num_messages= dummy_nm)
-	check(r,400)
-	log("Received 400: OK ",'')
+    r = permissions(dev_admin_id, dummy_key, entity_id=dev_name)
+    check(r, 403)
+    log('Received 403: OK', '')
 
-def invalid_bind(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key):
+    # Permissions using invalid device apikey
 
-	print("\n\n")
-	log("------------------------- BIND -------------------------\n\n", 'GREEN')
+    log('---------------> PERMISSIONS USING INVALID DEVICE APIKEY',
+        'HEADER')
 
-	#Bind to unauthorised exchange
-	log("---------------> BIND TO UNAUTHORISED EXCHANGE", 'HEADER') 
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
 
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    r = permissions(dev_name, dummy_key)
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+    # Deregister using invalid apikey
 
-	r = bind_unbind(app_name, str(app_keys[app_name]), dev_name, "test", "bind", "protected")
-	check(r, 403)
-	log("Received 403: OK",'')
-		
-	#Bind to non-existent exchange
-	log("---------------> BIND TO NON-EXISTENT EXCHANGE", 'HEADER') 
+    log('---------------> DEREGISTRATION USING INVALID ADMIN APIKEY',
+        'HEADER')
 
-	dummy_exchange = gen_rand(8, prefix= gen_rand(8))
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
 
-	r = bind_unbind(app_name, str(app_keys[app_name]), dummy_exchange, "test", "bind", "protected")
-	check(r, 403)
-	log("Received 403: OK",'')
-	
-	#Bind using invalid message_type
-	log("---------------> BIND USING INVALID MESSAGE-TYPE", 'HEADER') 
+    r = deregister(dev_admin_id, dummy_key, dev_name)
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
 
-	r = follow(app_name, str(app_keys[app_name]), dev_name, "read")
-	follow_id = r.json()['follow-id-read']
-	check(r, 202)
-	
-	r = share(dev_name, str(device_keys[dev_name]), follow_id)
-	check(r, 200)
+def invalid_id(
+    devices,
+    apps,
+    device_keys,
+    app_keys,
+    dev_admin_id,
+    dev_admin_key,
+    app_admin_id,
+    app_admin_key,
+    ):
 
-	r = bind_unbind(app_name, str(app_keys[app_name]), dev_name, "test", "bind", gen_rand(8))
-	check(r, 400)
-	log("Received 400: OK",'')
+    # =========================================Invalid ID===============================================
 
-	r = unfollow(app_name, str(app_keys[app_name]), dev_name, "test", "read", "protected")
-	check(r, 200)
-	
-	cmd = """ docker exec postgres psql -U postgres -c "delete from follow" """
+    dummy_key = gen_rand(32)
+    dummy_id = gen_rand(8, prefix='admin/')
+    dummy_admin_id = gen_rand(8)
 
-	try:
-		p = subprocess.check_output(cmd, shell=True)
-	except Exception as e:
-		pass
+    print '''
 
-	#Bind with a different topic from what was requested in follow 
-	log("---------------> BIND USING UNAUTHORISED TOPIC", 'HEADER') 
+'''
+    log('''------------------------- INVALID ID -------------------------
 
+''',
+        'GREEN')
 
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    # Owner registration ( should not go through with the right apikey anyway )
 
-	r = follow(app_name, str(app_keys[app_name]), dev_name, "read")
-	follow_id = r.json()['follow-id-read']
-	check(r, 202)
-	
-	r = share(dev_name, str(device_keys[dev_name]), follow_id)
-	check(r, 200)
+    # logger.info(colour.HEADER + "---------------> OWNER REGISTRATION USING INVALID APIKEY " + colour.ENDC)
+    # r = register_owner(dummy_key, "owner"+dummy_id)
+    # check(r,403)
+    # logger.info("Received 403: OK")
 
-	dummy_topic = gen_rand(8)
-	r = bind_unbind(app_name, str(app_keys[app_name]), dev_name, dummy_topic, "bind", "protected")
-	check(r, 403)
-	log("Received 403: OK",'')
+    # Registration
 
-	r = unfollow(app_name, str(app_keys[app_name]), dev_name, "test", "read", "protected")
-	check(r, 200)
-	
-	cmd = """ docker exec postgres psql -U postgres -c "delete from follow" """
+    log('---------------> REGISTRATION USING INVALID ID', 'HEADER')
 
-	try:
-		p = subprocess.check_output(cmd, shell=True)
-	except Exception as e:
-		pass
+    r = register(dummy_id, dev_admin_key, 'dev' + dummy_id)
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	#Cross-owner binding 
-	log("---------------> CROSS OWNER BINDING", 'HEADER') 
-	
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    # Publish
 
-	r = follow(app_name, str(app_keys[app_name]), dev_name, "read")
-	follow_id = r.json()['follow-id-read']
-	check(r, 202)
-	
-	r = share(dev_name, str(device_keys[dev_name]), follow_id)
-	check(r, 200)
+    log('---------------> PUBLISH USING INVALID ID', 'HEADER')
 
-	r = bind_unbind(dev_admin_id, dev_admin_key, dev_name, "test", "bind", "protected", from_id =
-	app_name)
-	check(r, 403)
-	log("Received 403: OK",'')
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
 
-	r = unfollow(app_name, str(app_keys[app_name]), dev_name, "test", "read", "protected")
-	check(r, 200)
-	
-	cmd = """ docker exec postgres psql -U postgres -c "delete from follow" """
+    r = publish(
+        dummy_id,
+        str(device_keys[dev_name]),
+        dummy_id,
+        'test',
+        'protected',
+        'hello',
+        )
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	try:
-		p = subprocess.check_output(cmd, shell=True)
-	except Exception as e:
-		pass
+    log('---------------> PUBLISH USING VALID APIKEY AND ID TO ESTABLISH CONNECTION'
+        , 'HEADER')
 
-	#Cross-device binding 
-	log("---------------> CROSS DEVICE BINDING", 'HEADER') 
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
 
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    r = publish(
+        dev_name,
+        str(device_keys[dev_name]),
+        dev_name,
+        'test',
+        'protected',
+        'hello',
+        )
+    check(r, 202)
+    log('Received 202: OK', '')
 
-	r = follow(app_name, str(app_keys[app_name]), dev_name, "read")
-	follow_id = r.json()['follow-id-read']
-	check(r, 202)
-	
-	r = share(dev_name, str(device_keys[dev_name]), follow_id)
-	check(r, 200)
-	
+    log('---------------> PUBLISH USING INVALID ID ONCE CONNECTION HAS BEEN ESTABLISHED'
+        , 'HEADER')
 
-	dummy_dev, dummy_dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
 
-	r = bind_unbind(dummy_dev, dummy_dev_key, dev_name, "test", "bind", "protected", from_id =
-	app_name)
-	check(r, 403)
-	log("Received 403: OK",'')
+    r = publish(
+        dummy_id,
+        str(device_keys[dev_name]),
+        dummy_id,
+        'test',
+        'protected',
+        'hello',
+        )
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	r = unfollow(app_name, str(app_keys[app_name]), dev_name, "test", "read", "protected")
-	check(r, 200)
+    # Subscribe
 
-	cmd = """ docker exec postgres psql -U postgres -c "delete from follow" """
+    log('---------------> SUBSCRIBE USING INVALID ID', 'HEADER')
 
-	try:
-		p = subprocess.check_output(cmd, shell=True)
-	except Exception as e:
-		pass
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
 
-def invalid_unbind(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key):
+    r = subscribe(dummy_id, str(device_keys[dev_name]))
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	print("\n\n")
-	log("------------------------- UNBIND -------------------------\n\n", 'GREEN')
+    # Follow
 
-	#Unbind to unauthorised exchange
-	log("---------------> UNBIND FROM UNAUTHORISED EXCHANGE", 'HEADER') 
+    log('---------------> FOLLOW USING INVALID ID', 'HEADER')
 
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
 
-	r = bind_unbind(app_name, str(app_keys[app_name]), dev_name, "test", "unbind", "protected")
-	check(r, 403)
-	log("Received 403: OK",'')
-		
-	#Unbind to non-existent exchange
-	log("---------------> UNBIND FROM NON-EXISTENT EXCHANGE", 'HEADER') 
+    r = follow(dummy_id, str(app_keys[app_name]),
+               random.choice(device_keys.keys()), 'read')
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	dummy_exchange = gen_rand(8, prefix= gen_rand(8))
+    # Follow using invalid admin id
 
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+    log('---------------> FOLLOW USING INVALID ADMIN ID', 'HEADER')
 
-	r = bind_unbind(app_name, str(app_keys[app_name]), dummy_exchange, "test", "unbind", "protected")
-	check(r, 403)
-	log("Received 403: OK",'')
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
 
-	#Unbind using invalid message_type
-	log("---------------> UNBIND USING INVALID MESSAGE-TYPE", 'HEADER') 
+    r = follow(dummy_id, app_admin_key,
+               random.choice(device_keys.keys()), 'read')
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    # Share
 
-	r = follow(app_name, str(app_keys[app_name]), dev_name, "read")
-	follow_id = r.json()['follow-id-read']
-	check(r, 202)
-	
-	r = share(dev_name, dev_key, follow_id)
-	check(r, 200)
+    log('---------------> SHARE USING INVALID ID', 'HEADER')
 
-	r = bind_unbind(app_name, app_key, dev_name, "test", "bind", "protected")
-	check(r, 200)
-	log("Received 200: OK",'')
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
 
-	r = bind_unbind(app_name, app_key, dev_name, "test", "unbind", gen_rand(8))
-	check(r, 400)
-	log("Received 400: OK",'')
+    r = share(dummy_id, str(device_keys[dev_name]),
+              str(random.randint(0, 5)))
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	r = unfollow(app_name, str(app_keys[app_name]), dev_name, "test", "read", "protected")
-	check(r, 200)
-	
-	cmd = """ docker exec postgres psql -U postgres -c "delete from follow" """
+    # Share using invalid admin id
 
-	try:
-		p = subprocess.check_output(cmd, shell=True)
-	except Exception as e:
-		pass
+    log('---------------> SHARE USING INVALID ADMIN ID', 'HEADER')
 
-	#Unbind with a different topic from what was requested in follow 
-	log("---------------> UNBIND USING UNAUTHORISED TOPIC", 'HEADER') 
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
 
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    r = share(dummy_id, dev_admin_key, str(random.randint(0, 5)))
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	r = follow(app_name, str(app_keys[app_name]), dev_name, "read")
-	follow_id = r.json()['follow-id-read']
-	check(r, 202)
-	
-	r = share(dev_name, str(device_keys[dev_name]), follow_id)
-	check(r, 200)
+    # Unfollow
 
-	r = bind_unbind(app_name, str(app_keys[app_name]), dev_name, "test", "bind", "protected")
-	check(r, 200)
-	log("Received 200: OK",'')
+    log('---------------> UNFOLLOW USING INVALID ID', 'HEADER')
 
-	r = bind_unbind(app_name, str(app_keys[app_name]), dev_name, gen_rand(8), "unbind", "protected")
-	check(r, 403)
-	log("Received 403: OK",'')
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
 
-	r = unfollow(app_name, str(app_keys[app_name]), dev_name, "test", "read", "protected")
-	check(r, 200)
+    r = unfollow(
+        dummy_id,
+        str(app_keys[app_name]),
+        str(random.choice(device_keys.keys())),
+        'test',
+        'read',
+        'protected',
+        )
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	cmd = """ docker exec postgres psql -U postgres -c "delete from follow" """
+    # Unfollow using invalid admin id
 
-	try:
-		p = subprocess.check_output(cmd, shell=True)
-	except Exception as e:
-		pass
+    log('---------------> UNFOLLOW USING INVALID ADMIN ID', 'HEADER')
 
-	#Cross-owner Unbinding 
-	log("---------------> CROSS OWNER UNBINDING", 'HEADER') 
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
 
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    r = unfollow(
+        dummy_id,
+        app_admin_key,
+        str(random.choice(device_keys.keys())),
+        'test',
+        'read',
+        'protected',
+        from_id=app_name,
+        )
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	r = follow(app_name, str(app_keys[app_name]), dev_name, "read")
-	follow_id = r.json()['follow-id-read']
-	check(r, 202)
-	
-	r = share(dev_name, str(device_keys[dev_name]), follow_id)
-	check(r, 200)
+    # Follow-requests
 
-	r = bind_unbind(app_name, str(app_keys[app_name]), dev_name, "test", "bind", "protected")
-	check(r, 200)
-	log("Received 200: OK",'')
+    log('---------------> FOLLOW-REQUESTS USING INVALID ID', 'HEADER')
 
-	r = bind_unbind(dev_admin_id, dev_admin_key, dev_name, "test", "unbind", "protected", from_id =
-	app_name)
-	check(r, 403)
-	log("Received 403: OK",'')
+    r = follow_requests(dummy_id, dev_admin_key, 'requests')
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	r = unfollow(app_name, str(app_keys[app_name]), dev_name, "test", "read", "protected")
-	check(r, 200)
+    # Follow-requests using invalid device id
 
-	cmd = """ docker exec postgres psql -U postgres -c "delete from follow" """
+    log('---------------> FOLLOW-REQUESTS USING INVALID DEVICE ID',
+        'HEADER')
 
-	try:
-		p = subprocess.check_output(cmd, shell=True)
-	except Exception as e:
-		pass
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
 
-	#Cross-device unbinding 
-	log("---------------> CROSS DEVICE UNBINDING", 'HEADER') 
+    r = follow_requests(dummy_id, str(device_keys[dev_name]), 'requests'
+                        )
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    # Follow-status
 
-	r = follow(app_name, str(app_keys[app_name]), dev_name, "read")
-	follow_id = r.json()['follow-id-read']
-	check(r, 202)
-	
-	r = share(dev_name, str(device_keys[dev_name]), follow_id)
-	check(r, 200)
+    log('---------------> FOLLOW-STATUS USING INVALID ID', 'HEADER')
 
-	dummy_dev, dummy_dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    r = follow_requests(dummy_id, app_admin_key, 'status')
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	r = bind_unbind(app_name, str(app_keys[app_name]), dev_name, "test", "bind", "protected")
-	check(r, 200)
-	log("Received 200: OK",'')
+    # Follow-status using invalid device id
 
-	r = bind_unbind(dummy_dev, dummy_dev_key, dev_name, "test", "unbind", "protected", from_id =
-	app_name)
-	check(r, 403)
-	log("Received 403: OK",'')
+    log('---------------> FOLLOW-STATUS USING INVALID DEVICE ID',
+        'HEADER')
 
-	r = unfollow(app_name, str(app_keys[app_name]), dev_name, "test", "read", "protected")
-	check(r, 200)
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
 
-	cmd = """ docker exec postgres psql -U postgres -c "delete from follow" """
+    r = follow_requests(dummy_id, str(device_keys[dev_name]), 'status')
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	try:
-		p = subprocess.check_output(cmd, shell=True)
-	except Exception as e:
-		pass
+    # Reject follow using invalid admin id
 
-def invalid_share(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key):
+    log('---------------> REJECT-FOLLOW USING INVALID ADMIN ID',
+        'HEADER')
 
-	print("\n\n")
-	log("------------------------- SHARE -------------------------\n\n", 'GREEN')
+    r = reject_follow(dummy_id, dev_admin_key, str(random.randint(1,
+                      5)))
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	#Cross-device share / Share to self
-	log("---------------> SHARE TO SELF USING DEVICE APIKEY", 'HEADER') 
+    # Reject follow using invalid device id
 
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    log('---------------> REJECT-FOLLOW USING INVALID DEVICE ID',
+        'HEADER')
 
-	r = follow(app_name, app_key, dev_name, "read")
-	follow_id = r.json()['follow-id-read']
-	check(r, 202)
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
 
-	r = share(app_name, app_key, follow_id)
-	check(r, 400)
-	log("Received 400: OK",'')
+    r = reject_follow(dummy_id, str(device_keys[dev_name]),
+                      str(random.randint(1, 5)))
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	cmd = """ docker exec postgres psql -U postgres -c "delete from follow" """
+    # Bind using invalid device id
 
-	try:
-		p = subprocess.check_output(cmd, shell=True)
-	except Exception as e:
-		pass
+    log('---------------> BIND USING INVALID DEVICE ID', 'HEADER')
 
-	#Cross-owner share / Share to self using owner's key
-	log("---------------> SHARE TO SELF USING OWNER APIKEY", 'HEADER') 
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
 
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+    r = bind_unbind(
+        dummy_id,
+        str(app_keys[app_name]),
+        dev_name,
+        'test',
+        'bind',
+        'protected',
+        )
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    # Bind using invalid admin id
 
-	r = follow(app_name, app_key, dev_name, "read")
-	follow_id = r.json()['follow-id-read']
-	check(r, 202)
+    log('---------------> BIND USING INVALID ADMIN ID', 'HEADER')
 
-	r = share(app_admin_id, app_admin_key, follow_id)
-	check(r, 400)
-	log("Received 400: OK",'')
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
 
-	cmd = """ docker exec postgres psql -U postgres -c "delete from follow" """
+    r = bind_unbind(
+        dummy_id,
+        app_admin_key,
+        dev_name,
+        'test',
+        'bind',
+        'protected',
+        from_id=app_name,
+        )
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	try:
-		p = subprocess.check_output(cmd, shell=True)
-	except Exception as e:
-		pass
+    # Unbind using invalid device id
 
-	#Share on behalf of another device
-	log("---------------> SHARE BY ANOTHER DEVICE", 'HEADER') 
+    log('---------------> UNBIND USING INVALID DEVICE ID', 'HEADER')
 
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
 
-	r = follow(app_name, app_key, dev_name, "read")
-	follow_id = r.json()['follow-id-read']
-	check(r, 202)
+    r = bind_unbind(
+        dummy_id,
+        str(app_keys[app_name]),
+        dev_name,
+        'test',
+        'unbind',
+        'protected',
+        )
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	dev_copy = copy.deepcopy(device_keys)	
-	dev_copy.pop(dev_name, None)
+    # Bind using invalid admin idy
 
-	dummy_dev = random.choice(dev_copy.keys())
-	dummy_dev_key = str(dev_copy[dummy_dev])
+    log('---------------> UNBIND USING INVALID ADMIN ID', 'HEADER')
 
-	r = share(dummy_dev, dummy_dev_key, follow_id)
-	check(r, 400)
-	log("Received 400: OK",'')
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
 
-	cmd = """ docker exec postgres psql -U postgres -c "delete from follow" """
+    r = bind_unbind(
+        dummy_id,
+        app_admin_key,
+        dev_name,
+        'test',
+        'unbind',
+        'protected',
+        from_id=app_name,
+        )
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	try:
-		p = subprocess.check_output(cmd, shell=True)
-	except Exception as e:
-		pass
+    # Block using invalid admin id....
 
-	#Share using invalid follow-id
-	log("---------------> SHARE USING INVALID FOLLOW-ID", 'HEADER') 
+    log('---------------> BLOCK USING INVALID ADMIN ID', 'HEADER')
 
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    r = block_unblock(dummy_admin_id, dev_admin_key,
+                      str(random.choice(device_keys.keys())), 'block')
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	r = follow(app_name, app_key, dev_name, "read")
-	follow_id = r.json()['follow-id-read']
-	check(r, 202)
+    # Unblock using invalid admin id....
 
-	r = share(dev_name, dev_key, gen_rand(8))
-	check(r, 500)
-	log("Received 500: OK",'')
+    log('---------------> UNBLOCK USING INVALID ADMIN ID', 'HEADER')
 
-	cmd = """ docker exec postgres psql -U postgres -c "delete from follow" """
+    r = block_unblock(dummy_admin_id, dev_admin_key,
+                      str(random.choice(device_keys.keys())), 'unblock')
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	try:
-		p = subprocess.check_output(cmd, shell=True)
-	except Exception as e:
-		pass
+    # Permissions using invalid admin id
 
-def invalid_follow(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key):
+    log('---------------> PERMISSIONS USING INVALID ADMIN ID', 'HEADER')
 
-	print("\n\n")
-	log("------------------------- FOLLOW -------------------------\n\n", 'GREEN')
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
 
-	#Invalid from
-	log("---------------> FOLLOW USING INVALID FROM-ID", 'HEADER') 
+    r = permissions(dummy_admin_id, dev_admin_key, entity_id=dev_name)
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    # Permissions using invalid device id
 
-	r = follow(app_admin_id,app_admin_key, dev_name, "read", from_id = gen_rand(8, prefix = gen_rand(8)))
-	check(r,403)
-	log("Received 403: OK",'')
+    log('---------------> PERMISSIONS USING INVALID DEVICE ID', 'HEADER'
+        )
 
-	#Invalid to-id
-	log("---------------> FOLLOW USING INVALID TO-ID", 'HEADER') 
-	
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
 
-	r = follow(app_name, str(app_keys[app_name]), gen_rand(8, prefix = gen_rand(8)), "read")
-	check(r, 403)
-	log("Received 403: OK",'')
+    r = permissions(dummy_id, str(device_keys[dev_name]))
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	#Invalid validity period - large validity
-	log("---------------> FOLLOW USING INVALID VALIDITY PERIOD - LARGE VALIDITY", 'HEADER') 
-	
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    # Deregister using invalid id
 
-	validity = random.randint(1000000, 100000000)
-	r = follow(app_name, app_key, dev_name, "read", validity=str(validity))
-	check(r, 400)
-	log("Received 400: OK",'')
-	
-	#Invalid validity period - non numeric validity
-	log("---------------> FOLLOW USING INVALID VALIDITY PERIOD - NON NUMERIC VALIDITY", 'HEADER') 
-	
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    log('---------------> DEREGISTRATION USING INVALID ADMIN ID',
+        'HEADER')
 
-	validity = gen_rand(8) 
-	r = follow(app_name, app_key, dev_name, "read", validity=validity)
-	check(r, 400)
-	log("Received 400: OK",'')
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
 
-	cmd = """ docker exec postgres psql -U postgres -c "delete from follow" """
+    r = deregister(dummy_id, dev_admin_key, dev_name)
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	try:
-		p = subprocess.check_output(cmd, shell=True)
-	except Exception as e:
-		pass
-	
-	#Cross-owner follow
-	log("---------------> CROSS-OWNER FOLLOW", 'HEADER') 
 
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
-	
-	r = follow(dev_admin_id, dev_admin_key, dev_name, "read", from_id = app_name)
-	check(r, 403)
-	log("Received 403: OK",'')
+def invalid_publish(
+    devices,
+    apps,
+    device_keys,
+    app_keys,
+    dev_admin_id,
+    dev_admin_key,
+    app_admin_id,
+    app_admin_key,
+    ):
 
-	#Cross-device follow
-	log("---------------> CROSS-DEVICE FOLLOW", 'HEADER') 
+    print '''
 
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
-	
-	r = follow(dev_name, dev_key, dev_name, "read", from_id = app_name)
-	check(r, 202)
-	log("Received 202: OK",'')
+'''
+    log('''------------------------- PUBLISH -------------------------
 
-	cmd = """ docker exec postgres psql -U postgres -c "delete from follow" """
+''',
+        'GREEN')
 
-	try:
-		p = subprocess.check_output(cmd, shell=True)
-	except Exception as e:
-		pass
+    # Publish to non-existent exchange
 
-	#Invalid permission
-	log("---------------> FOLLOW USING INVALID PERMISSION", 'HEADER') 
+    log('---------------> PUBLISH TO NON-EXISTENT EXCHANGE', 'HEADER')
 
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
 
-	permission = gen_rand(8)
+    dummy_exchange = gen_rand(8, prefix=gen_rand(8) + '/')
+    r = publish(
+        dev_name,
+        dev_key,
+        dummy_exchange,
+        'test',
+        'command',
+        'hello',
+        )
+    check(r, 202)
+    log('Received 202: OK', '')
 
-	r = follow(app_name, app_key, dev_name, permission)
-	check(r, 400)
-	log("Received 400: OK",'')
+    # Publish without authroisation
 
-	#Invalid message-type 
-	log("---------------> FOLLOW USING INVALID MESSAGE-TYPE", 'HEADER') 
+    log('---------------> PUBLISH WITHOUT AUTHORISATION', 'HEADER')
 
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
 
-	r = follow(app_name, app_key, dev_name, "read", message_type=gen_rand(8))
-	check(r, 400)
-	log("Received 400: OK",'')
+    r = publish(
+        app_name,
+        str(app_keys[app_name]),
+        dev_name,
+        'test',
+        'command',
+        'hello',
+        )
+    check(r, 202)
+    log('Received 202: OK', '')
 
-def invalid_unfollow(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key):
+    # Publish to amq.topic
 
-	print("\n\n")
-	log("------------------------- UNFOLLOW -------------------------\n\n", 'GREEN')
+    log('---------------> PUBLISH TO amq.topic', 'HEADER')
 
-	#Invalid to-id
-	log("---------------> UNFOLLOW USING INVALID TO-ID", 'HEADER') 
-	
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
 
-	r = follow(app_name, app_key, dev_name, "read")
-	follow_id = r.json()['follow-id-read']
-	check(r, 202)
-	
-	r = share(dev_name, dev_key, follow_id)
-	check(r, 200)
+    r = publish(
+        dev_name,
+        str(device_keys[dev_name]),
+        'amq.topic',
+        'test',
+        'command',
+        'hello',
+        )
+    check(r, 400)
+    log('Received 400: OK', '')
 
-	r = bind_unbind(app_name, str(app_keys[app_name]), dev_name, "test", "bind", "protected")
-	check(r, 200)
-	log("Received 200: OK",'')
-	
-	r = unfollow(app_name, app_key, gen_rand(8, prefix = gen_rand(8)), "test",
-	"read", "protected")
-	check(r, 403)
-	log("Received 403: OK",'')
+    # Publish to amq.direct
 
-	r = unfollow(app_name, app_key, dev_name, "test", "read", "protected")
-	check(r, 200)
+    log('---------------> PUBLISH TO amq.direct', 'HEADER')
 
-	cmd = """ docker exec postgres psql -U postgres -c "delete from follow" """
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
 
-	try:
-		p = subprocess.check_output(cmd, shell=True)
-	except Exception as e:
-		pass
+    r = publish(
+        dev_name,
+        str(device_keys[dev_name]),
+        'amq.direct',
+        'test',
+        'command',
+        'hello',
+        )
+    check(r, 400)
+    log('Received 400: OK', '')
 
-	#Invalid permission
-	log("---------------> UNFOLLOW USING INVALID PERMISSION", 'HEADER') 
+    # Publish to amq.headers
 
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    log('---------------> PUBLISH TO amq.headers', 'HEADER')
 
-	r = follow(app_name, app_key, dev_name, "read")
-	follow_id = r.json()['follow-id-read']
-	check(r, 202)
-	
-	r = share(dev_name, dev_key, follow_id)
-	check(r, 200)
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
 
-	r = bind_unbind(app_name, str(app_keys[app_name]), dev_name, "test", "bind", "protected")
-	check(r, 200)
-	log("Received 403: OK",'')
-	permission = gen_rand(8)
+    r = publish(
+        dev_name,
+        str(device_keys[dev_name]),
+        'amq.headers',
+        'test',
+        'command',
+        'hello',
+        )
+    check(r, 400)
+    log('Received 400: OK', '')
 
-	r = unfollow(app_name, app_key, dev_name, "test", permission, "protected")
-	check(r, 400)
-	log("Received 400: OK",'')
+    # Publish to amq.fanout
 
-	r = unfollow(app_name, app_key, dev_name, "test", "read", "protected")
-	check(r, 200)
+    log('---------------> PUBLISH TO amq.fanout', 'HEADER')
 
-	cmd = """ docker exec postgres psql -U postgres -c "delete from follow" """
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
 
-	try:
-		p = subprocess.check_output(cmd, shell=True)
-	except Exception as e:
-		pass
+    r = publish(
+        dev_name,
+        str(device_keys[dev_name]),
+        'amq.fanout',
+        'test',
+        'command',
+        'hello',
+        )
+    check(r, 400)
+    log('Received 400: OK', '')
 
-	#Cross-owner follow
-	log("---------------> CROSS-OWNER UNFOLLOW", 'HEADER') 
+    # Publish with invalid message-type
 
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
-	
-	r = follow(app_name, app_key, dev_name, "read")
-	follow_id = r.json()['follow-id-read']
-	check(r, 202)
-	
-	r = share(dev_name, dev_key, follow_id)
-	check(r, 200)
+    log('---------------> PUBLISH WITH INVALID MESSAGE-TYPE', 'HEADER')
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
 
-	r = bind_unbind(app_name, str(app_keys[app_name]), dev_name, "test", "bind", "protected")
-	check(r, 200)
-	log("Received 200: OK",'')
+    r = publish(
+        dev_name,
+        str(device_keys[dev_name]),
+        dev_name,
+        'test',
+        gen_rand(8),
+        'hello',
+        )
+    check(r, 400)
+    log('Received 400: OK', '')
 
-	r = unfollow(dev_admin_id, dev_admin_key, dev_name, "test", "read", "protected", from_id = app_name)
-	check(r, 403)
-	log("Received 403: OK",'')
 
-	r = unfollow(app_name, app_key, dev_name, "test", "read", "protected")
-	check(r, 200)
+def invalid_subscribe(
+    devices,
+    apps,
+    device_keys,
+    app_keys,
+    dev_admin_id,
+    dev_admin_key,
+    app_admin_id,
+    app_admin_key,
+    ):
 
-	cmd = """ docker exec postgres psql -U postgres -c "delete from follow" """
+    print '''
 
-	try:
-		p = subprocess.check_output(cmd, shell=True)
-	except Exception as e:
-		pass
+'''
+    log('''------------------------- SUBSCRIBE -------------------------
 
-	#Cross-device follow
-	log("---------------> CROSS-DEVICE UNFOLLOW", 'HEADER') 
+''',
+        'GREEN')
 
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
-	
-	r = follow(app_name, app_key, dev_name, "read")
-	follow_id = r.json()['follow-id-read']
-	check(r, 202)
-	
-	r = share(dev_name, dev_key, follow_id)
-	check(r, 200)
+    # With invalid message type
 
-	r = bind_unbind(app_name, str(app_keys[app_name]), dev_name, "test", "bind", "protected")
-	check(r, 200)
-	log("Received 200: OK",'')
+    log('---------------> SUBSCRIBE WITH INVALID MESSAGE-TYPE', 'HEADER'
+        )
+    dummy_mt = gen_rand(8)
 
-	r = unfollow(dev_name, dev_key, dev_name, "test", "read", "protected", from_id = app_name)
-	check(r, 403)
-	log("Received 403: OK",'')
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
 
-	r = unfollow(app_name, app_key, dev_name, "test", "read", "protected")
-	check(r, 200)
+    r = subscribe(app_name, app_key, dummy_mt)
+    check(r, 400)
+    log('Received 400: OK', '')
 
-	cmd = """ docker exec postgres psql -U postgres -c "delete from follow" """
+    # With invalid num messages
 
-	try:
-		p = subprocess.check_output(cmd, shell=True)
-	except Exception as e:
-		pass
+    log('---------------> SUBSCRIBE WITH INVALID NUM MESSSAGES',
+        'HEADER')
+    dummy_nm = gen_rand(8)
 
-	#Invalid message-type 
-	log("---------------> UNFOLLOW USING INVALID MESSAGE-TYPE", 'HEADER') 
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
 
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    r = subscribe(app_name, app_key, num_messages=dummy_nm)
+    check(r, 400)
+    log('Received 400: OK ', '')
 
-	r = follow(app_name, app_key, dev_name, "read")
-	follow_id = r.json()['follow-id-read']
-	check(r, 202)
-	
-	r = share(dev_name, dev_key, follow_id)
-	check(r, 200)
 
-	r = bind_unbind(app_name, str(app_keys[app_name]), dev_name, "test", "bind", "protected")
-	check(r, 200)
-	log("Received 200: OK",'')
+def invalid_bind(
+    devices,
+    apps,
+    device_keys,
+    app_keys,
+    dev_admin_id,
+    dev_admin_key,
+    app_admin_id,
+    app_admin_key,
+    ):
 
-	r = unfollow(app_name, app_key, dev_name, "test","read", message_type=gen_rand(8))
-	check(r, 403)
-	log("Received 403: OK",'')
+    print '''
 
-	r = unfollow(app_name, app_key, dev_name, "test", "read", "protected")
-	check(r, 200)
+'''
+    log('''------------------------- BIND -------------------------
 
-	cmd = """ docker exec postgres psql -U postgres -c "delete from follow" """
+''',
+        'GREEN')
 
-	try:
-		p = subprocess.check_output(cmd, shell=True)
-	except Exception as e:
-		pass
+    # Bind to unauthorised exchange
 
-def invalid_deregistrations(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key):
+    log('---------------> BIND TO UNAUTHORISED EXCHANGE', 'HEADER')
 
-	print("\n\n")
-	log("------------------------- DEREGISTRATION -------------------------\n\n", 'GREEN')
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
 
-	#Cross-owner deregistrations
-	log("---------------> CROSS-OWNER DEREGISTRATIONS", 'HEADER') 
-	
-	app_name, app_key = get_entity(device_keys, app_keys, entity_type="app")
-	dev_name, dev_key = get_entity(device_keys, app_keys, entity_type="dev")
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
 
-	r = deregister(dev_admin_id, dev_admin_key, app_name)
-	check(r, 403)
-	log("Received 403: OK",'')
+    r = bind_unbind(
+        app_name,
+        str(app_keys[app_name]),
+        dev_name,
+        'test',
+        'bind',
+        'protected',
+        )
+    check(r, 403)
+    log('Received 403: OK', '')
 
-	r = deregister(app_admin_id, app_admin_key, dev_name)
-	check(r, 403)
-	log("Received 403: OK",'')
+    # Bind to non-existent exchange
+
+    log('---------------> BIND TO NON-EXISTENT EXCHANGE', 'HEADER')
+
+    dummy_exchange = gen_rand(8, prefix=gen_rand(8))
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
+
+    r = bind_unbind(
+        app_name,
+        str(app_keys[app_name]),
+        dummy_exchange,
+        'test',
+        'bind',
+        'protected',
+        )
+    check(r, 403)
+    log('Received 403: OK', '')
+
+    # Bind using invalid message_type
+
+    log('---------------> BIND USING INVALID MESSAGE-TYPE', 'HEADER')
+
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
+
+    r = follow(app_name, str(app_keys[app_name]), dev_name, 'read')
+    follow_id = r.json()['follow-id-read']
+    check(r, 202)
+
+    r = share(dev_name, str(device_keys[dev_name]), follow_id)
+    check(r, 200)
+
+    r = bind_unbind(
+        app_name,
+        str(app_keys[app_name]),
+        dev_name,
+        'test',
+        'bind',
+        gen_rand(8),
+        )
+    check(r, 400)
+    log('Received 400: OK', '')
+
+    r = unfollow(
+        app_name,
+        str(app_keys[app_name]),
+        dev_name,
+        'test',
+        'read',
+        'protected',
+        )
+    check(r, 200)
+
+    cmd = \
+        """ docker exec postgres psql -U postgres -c "delete from follow" """
+
+    try:
+        p = subprocess.check_output(cmd, shell=True)
+    except Exception, e:
+        pass
+
+    # Bind with a different topic from what was requested in follow
+
+    log('---------------> BIND USING UNAUTHORISED TOPIC', 'HEADER')
+
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
+
+    r = follow(app_name, str(app_keys[app_name]), dev_name, 'read')
+    follow_id = r.json()['follow-id-read']
+    check(r, 202)
+
+    r = share(dev_name, str(device_keys[dev_name]), follow_id)
+    check(r, 200)
+
+    dummy_topic = gen_rand(8)
+    r = bind_unbind(
+        app_name,
+        str(app_keys[app_name]),
+        dev_name,
+        dummy_topic,
+        'bind',
+        'protected',
+        )
+    check(r, 403)
+    log('Received 403: OK', '')
+
+    r = unfollow(
+        app_name,
+        str(app_keys[app_name]),
+        dev_name,
+        'test',
+        'read',
+        'protected',
+        )
+    check(r, 200)
+
+    cmd = \
+        """ docker exec postgres psql -U postgres -c "delete from follow" """
+
+    try:
+        p = subprocess.check_output(cmd, shell=True)
+    except Exception, e:
+        pass
+
+    # Cross-owner binding
+
+    log('---------------> CROSS OWNER BINDING', 'HEADER')
+
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
+
+    r = follow(app_name, str(app_keys[app_name]), dev_name, 'read')
+    follow_id = r.json()['follow-id-read']
+    check(r, 202)
+
+    r = share(dev_name, str(device_keys[dev_name]), follow_id)
+    check(r, 200)
+
+    r = bind_unbind(
+        dev_admin_id,
+        dev_admin_key,
+        dev_name,
+        'test',
+        'bind',
+        'protected',
+        from_id=app_name,
+        )
+    check(r, 403)
+    log('Received 403: OK', '')
+
+    r = unfollow(
+        app_name,
+        str(app_keys[app_name]),
+        dev_name,
+        'test',
+        'read',
+        'protected',
+        )
+    check(r, 200)
+
+    cmd = \
+        """ docker exec postgres psql -U postgres -c "delete from follow" """
+
+    try:
+        p = subprocess.check_output(cmd, shell=True)
+    except Exception, e:
+        pass
+
+    # Cross-device binding
+
+    log('---------------> CROSS DEVICE BINDING', 'HEADER')
+
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
+
+    r = follow(app_name, str(app_keys[app_name]), dev_name, 'read')
+    follow_id = r.json()['follow-id-read']
+    check(r, 202)
+
+    r = share(dev_name, str(device_keys[dev_name]), follow_id)
+    check(r, 200)
+
+    (dummy_dev, dummy_dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
+
+    r = bind_unbind(
+        dummy_dev,
+        dummy_dev_key,
+        dev_name,
+        'test',
+        'bind',
+        'protected',
+        from_id=app_name,
+        )
+    check(r, 403)
+    log('Received 403: OK', '')
+
+    r = unfollow(
+        app_name,
+        str(app_keys[app_name]),
+        dev_name,
+        'test',
+        'read',
+        'protected',
+        )
+    check(r, 200)
+
+    cmd = \
+        """ docker exec postgres psql -U postgres -c "delete from follow" """
+
+    try:
+        p = subprocess.check_output(cmd, shell=True)
+    except Exception, e:
+        pass
+
+
+def invalid_unbind(
+    devices,
+    apps,
+    device_keys,
+    app_keys,
+    dev_admin_id,
+    dev_admin_key,
+    app_admin_id,
+    app_admin_key,
+    ):
+
+    print '''
+
+'''
+    log('''------------------------- UNBIND -------------------------
+
+''',
+        'GREEN')
+
+    # Unbind to unauthorised exchange
+
+    log('---------------> UNBIND FROM UNAUTHORISED EXCHANGE', 'HEADER')
+
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
+
+    r = bind_unbind(
+        app_name,
+        str(app_keys[app_name]),
+        dev_name,
+        'test',
+        'unbind',
+        'protected',
+        )
+    check(r, 403)
+    log('Received 403: OK', '')
+
+    # Unbind to non-existent exchange
+
+    log('---------------> UNBIND FROM NON-EXISTENT EXCHANGE', 'HEADER')
+
+    dummy_exchange = gen_rand(8, prefix=gen_rand(8))
+
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
+
+    r = bind_unbind(
+        app_name,
+        str(app_keys[app_name]),
+        dummy_exchange,
+        'test',
+        'unbind',
+        'protected',
+        )
+    check(r, 403)
+    log('Received 403: OK', '')
+
+    # Unbind using invalid message_type
+
+    log('---------------> UNBIND USING INVALID MESSAGE-TYPE', 'HEADER')
+
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
+
+    r = follow(app_name, str(app_keys[app_name]), dev_name, 'read')
+    follow_id = r.json()['follow-id-read']
+    check(r, 202)
+
+    r = share(dev_name, dev_key, follow_id)
+    check(r, 200)
+
+    r = bind_unbind(
+        app_name,
+        app_key,
+        dev_name,
+        'test',
+        'bind',
+        'protected',
+        )
+    check(r, 200)
+    log('Received 200: OK', '')
+
+    r = bind_unbind(
+        app_name,
+        app_key,
+        dev_name,
+        'test',
+        'unbind',
+        gen_rand(8),
+        )
+    check(r, 400)
+    log('Received 400: OK', '')
+
+    r = unfollow(
+        app_name,
+        str(app_keys[app_name]),
+        dev_name,
+        'test',
+        'read',
+        'protected',
+        )
+    check(r, 200)
+
+    cmd = \
+        """ docker exec postgres psql -U postgres -c "delete from follow" """
+
+    try:
+        p = subprocess.check_output(cmd, shell=True)
+    except Exception, e:
+        pass
+
+    # Unbind with a different topic from what was requested in follow
+
+    log('---------------> UNBIND USING UNAUTHORISED TOPIC', 'HEADER')
+
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
+
+    r = follow(app_name, str(app_keys[app_name]), dev_name, 'read')
+    follow_id = r.json()['follow-id-read']
+    check(r, 202)
+
+    r = share(dev_name, str(device_keys[dev_name]), follow_id)
+    check(r, 200)
+
+    r = bind_unbind(
+        app_name,
+        str(app_keys[app_name]),
+        dev_name,
+        'test',
+        'bind',
+        'protected',
+        )
+    check(r, 200)
+    log('Received 200: OK', '')
+
+    r = bind_unbind(
+        app_name,
+        str(app_keys[app_name]),
+        dev_name,
+        gen_rand(8),
+        'unbind',
+        'protected',
+        )
+    check(r, 403)
+    log('Received 403: OK', '')
+
+    r = unfollow(
+        app_name,
+        str(app_keys[app_name]),
+        dev_name,
+        'test',
+        'read',
+        'protected',
+        )
+    check(r, 200)
+
+    cmd = \
+        """ docker exec postgres psql -U postgres -c "delete from follow" """
+
+    try:
+        p = subprocess.check_output(cmd, shell=True)
+    except Exception, e:
+        pass
+
+    # Cross-owner Unbinding
+
+    log('---------------> CROSS OWNER UNBINDING', 'HEADER')
+
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
+
+    r = follow(app_name, str(app_keys[app_name]), dev_name, 'read')
+    follow_id = r.json()['follow-id-read']
+    check(r, 202)
+
+    r = share(dev_name, str(device_keys[dev_name]), follow_id)
+    check(r, 200)
+
+    r = bind_unbind(
+        app_name,
+        str(app_keys[app_name]),
+        dev_name,
+        'test',
+        'bind',
+        'protected',
+        )
+    check(r, 200)
+    log('Received 200: OK', '')
+
+    r = bind_unbind(
+        dev_admin_id,
+        dev_admin_key,
+        dev_name,
+        'test',
+        'unbind',
+        'protected',
+        from_id=app_name,
+        )
+    check(r, 403)
+    log('Received 403: OK', '')
+
+    r = unfollow(
+        app_name,
+        str(app_keys[app_name]),
+        dev_name,
+        'test',
+        'read',
+        'protected',
+        )
+    check(r, 200)
+
+    cmd = \
+        """ docker exec postgres psql -U postgres -c "delete from follow" """
+
+    try:
+        p = subprocess.check_output(cmd, shell=True)
+    except Exception, e:
+        pass
+
+    # Cross-device unbinding
+
+    log('---------------> CROSS DEVICE UNBINDING', 'HEADER')
+
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
+
+    r = follow(app_name, str(app_keys[app_name]), dev_name, 'read')
+    follow_id = r.json()['follow-id-read']
+    check(r, 202)
+
+    r = share(dev_name, str(device_keys[dev_name]), follow_id)
+    check(r, 200)
+
+    (dummy_dev, dummy_dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
+
+    r = bind_unbind(
+        app_name,
+        str(app_keys[app_name]),
+        dev_name,
+        'test',
+        'bind',
+        'protected',
+        )
+    check(r, 200)
+    log('Received 200: OK', '')
+
+    r = bind_unbind(
+        dummy_dev,
+        dummy_dev_key,
+        dev_name,
+        'test',
+        'unbind',
+        'protected',
+        from_id=app_name,
+        )
+    check(r, 403)
+    log('Received 403: OK', '')
+
+    r = unfollow(
+        app_name,
+        str(app_keys[app_name]),
+        dev_name,
+        'test',
+        'read',
+        'protected',
+        )
+    check(r, 200)
+
+    cmd = \
+        """ docker exec postgres psql -U postgres -c "delete from follow" """
+
+    try:
+        p = subprocess.check_output(cmd, shell=True)
+    except Exception, e:
+        pass
+
+
+def invalid_share(
+    devices,
+    apps,
+    device_keys,
+    app_keys,
+    dev_admin_id,
+    dev_admin_key,
+    app_admin_id,
+    app_admin_key,
+    ):
+
+    print '''
+
+'''
+    log('''------------------------- SHARE -------------------------
+
+''',
+        'GREEN')
+
+    # Cross-device share / Share to self
+
+    log('---------------> SHARE TO SELF USING DEVICE APIKEY', 'HEADER')
+
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
+
+    r = follow(app_name, app_key, dev_name, 'read')
+    follow_id = r.json()['follow-id-read']
+    check(r, 202)
+
+    r = share(app_name, app_key, follow_id)
+    check(r, 400)
+    log('Received 400: OK', '')
+
+    cmd = \
+        """ docker exec postgres psql -U postgres -c "delete from follow" """
+
+    try:
+        p = subprocess.check_output(cmd, shell=True)
+    except Exception, e:
+        pass
+
+    # Cross-owner share / Share to self using owner's key
+
+    log('---------------> SHARE TO SELF USING OWNER APIKEY', 'HEADER')
+
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
+
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
+
+    r = follow(app_name, app_key, dev_name, 'read')
+    follow_id = r.json()['follow-id-read']
+    check(r, 202)
+
+    r = share(app_admin_id, app_admin_key, follow_id)
+    check(r, 400)
+    log('Received 400: OK', '')
+
+    cmd = \
+        """ docker exec postgres psql -U postgres -c "delete from follow" """
+
+    try:
+        p = subprocess.check_output(cmd, shell=True)
+    except Exception, e:
+        pass
+
+    # Share on behalf of another device
+
+    log('---------------> SHARE BY ANOTHER DEVICE', 'HEADER')
+
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
+
+    r = follow(app_name, app_key, dev_name, 'read')
+    follow_id = r.json()['follow-id-read']
+    check(r, 202)
+
+    dev_copy = copy.deepcopy(device_keys)
+    dev_copy.pop(dev_name, None)
+
+    dummy_dev = random.choice(dev_copy.keys())
+    dummy_dev_key = str(dev_copy[dummy_dev])
+
+    r = share(dummy_dev, dummy_dev_key, follow_id)
+    check(r, 400)
+    log('Received 400: OK', '')
+
+    cmd = \
+        """ docker exec postgres psql -U postgres -c "delete from follow" """
+
+    try:
+        p = subprocess.check_output(cmd, shell=True)
+    except Exception, e:
+        pass
+
+    # Share using invalid follow-id
+
+    log('---------------> SHARE USING INVALID FOLLOW-ID', 'HEADER')
+
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
+
+    r = follow(app_name, app_key, dev_name, 'read')
+    follow_id = r.json()['follow-id-read']
+    check(r, 202)
+
+    r = share(dev_name, dev_key, gen_rand(8))
+    check(r, 500)
+    log('Received 500: OK', '')
+
+    cmd = \
+        """ docker exec postgres psql -U postgres -c "delete from follow" """
+
+    try:
+        p = subprocess.check_output(cmd, shell=True)
+    except Exception, e:
+        pass
+
+
+def invalid_follow(
+    devices,
+    apps,
+    device_keys,
+    app_keys,
+    dev_admin_id,
+    dev_admin_key,
+    app_admin_id,
+    app_admin_key,
+    ):
+
+    print '''
+
+'''
+    log('''------------------------- FOLLOW -------------------------
+
+''',
+        'GREEN')
+
+    # Invalid from
+
+    log('---------------> FOLLOW USING INVALID FROM-ID', 'HEADER')
+
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
+
+    r = follow(app_admin_id, app_admin_key, dev_name, 'read',
+               from_id=gen_rand(8, prefix=gen_rand(8)))
+    check(r, 403)
+    log('Received 403: OK', '')
+
+    # Invalid to-id
+
+    log('---------------> FOLLOW USING INVALID TO-ID', 'HEADER')
+
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
+
+    r = follow(app_name, str(app_keys[app_name]), gen_rand(8,
+               prefix=gen_rand(8)), 'read')
+    check(r, 403)
+    log('Received 403: OK', '')
+
+    # Invalid validity period - large validity
+
+    log('---------------> FOLLOW USING INVALID VALIDITY PERIOD - LARGE VALIDITY'
+        , 'HEADER')
+
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
+
+    validity = random.randint(1000000, 100000000)
+    r = follow(app_name, app_key, dev_name, 'read',
+               validity=str(validity))
+    check(r, 400)
+    log('Received 400: OK', '')
+
+    # Invalid validity period - non numeric validity
+
+    log('---------------> FOLLOW USING INVALID VALIDITY PERIOD - NON NUMERIC VALIDITY'
+        , 'HEADER')
+
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
+
+    validity = gen_rand(8)
+    r = follow(app_name, app_key, dev_name, 'read', validity=validity)
+    check(r, 400)
+    log('Received 400: OK', '')
+
+    cmd = \
+        """ docker exec postgres psql -U postgres -c "delete from follow" """
+
+    try:
+        p = subprocess.check_output(cmd, shell=True)
+    except Exception, e:
+        pass
+
+    # Cross-owner follow
+
+    log('---------------> CROSS-OWNER FOLLOW', 'HEADER')
+
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
+
+    r = follow(dev_admin_id, dev_admin_key, dev_name, 'read',
+               from_id=app_name)
+    check(r, 403)
+    log('Received 403: OK', '')
+
+    # Cross-device follow
+
+    log('---------------> CROSS-DEVICE FOLLOW', 'HEADER')
+
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
+
+    r = follow(dev_name, dev_key, dev_name, 'read', from_id=app_name)
+    check(r, 202)
+    log('Received 202: OK', '')
+
+    cmd = \
+        """ docker exec postgres psql -U postgres -c "delete from follow" """
+
+    try:
+        p = subprocess.check_output(cmd, shell=True)
+    except Exception, e:
+        pass
+
+    # Invalid permission
+
+    log('---------------> FOLLOW USING INVALID PERMISSION', 'HEADER')
+
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
+
+    permission = gen_rand(8)
+
+    r = follow(app_name, app_key, dev_name, permission)
+    check(r, 400)
+    log('Received 400: OK', '')
+
+    # Invalid message-type
+
+    log('---------------> FOLLOW USING INVALID MESSAGE-TYPE', 'HEADER')
+
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
+
+    r = follow(app_name, app_key, dev_name, 'read',
+               message_type=gen_rand(8))
+    check(r, 400)
+    log('Received 400: OK', '')
+
+
+def invalid_unfollow(
+    devices,
+    apps,
+    device_keys,
+    app_keys,
+    dev_admin_id,
+    dev_admin_key,
+    app_admin_id,
+    app_admin_key,
+    ):
+
+    print '''
+
+'''
+    log('''------------------------- UNFOLLOW -------------------------
+
+''',
+        'GREEN')
+
+    # Invalid to-id
+
+    log('---------------> UNFOLLOW USING INVALID TO-ID', 'HEADER')
+
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
+
+    r = follow(app_name, app_key, dev_name, 'read')
+    follow_id = r.json()['follow-id-read']
+    check(r, 202)
+
+    r = share(dev_name, dev_key, follow_id)
+    check(r, 200)
+
+    r = bind_unbind(
+        app_name,
+        str(app_keys[app_name]),
+        dev_name,
+        'test',
+        'bind',
+        'protected',
+        )
+    check(r, 200)
+    log('Received 200: OK', '')
+
+    r = unfollow(
+        app_name,
+        app_key,
+        gen_rand(8, prefix=gen_rand(8)),
+        'test',
+        'read',
+        'protected',
+        )
+    check(r, 403)
+    log('Received 403: OK', '')
+
+    r = unfollow(
+        app_name,
+        app_key,
+        dev_name,
+        'test',
+        'read',
+        'protected',
+        )
+    check(r, 200)
+
+    cmd = \
+        """ docker exec postgres psql -U postgres -c "delete from follow" """
+
+    try:
+        p = subprocess.check_output(cmd, shell=True)
+    except Exception, e:
+        pass
+
+    # Invalid permission
+
+    log('---------------> UNFOLLOW USING INVALID PERMISSION', 'HEADER')
+
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
+
+    r = follow(app_name, app_key, dev_name, 'read')
+    follow_id = r.json()['follow-id-read']
+    check(r, 202)
+
+    r = share(dev_name, dev_key, follow_id)
+    check(r, 200)
+
+    r = bind_unbind(
+        app_name,
+        str(app_keys[app_name]),
+        dev_name,
+        'test',
+        'bind',
+        'protected',
+        )
+    check(r, 200)
+    log('Received 403: OK', '')
+    permission = gen_rand(8)
+
+    r = unfollow(
+        app_name,
+        app_key,
+        dev_name,
+        'test',
+        permission,
+        'protected',
+        )
+    check(r, 400)
+    log('Received 400: OK', '')
+
+    r = unfollow(
+        app_name,
+        app_key,
+        dev_name,
+        'test',
+        'read',
+        'protected',
+        )
+    check(r, 200)
+
+    cmd = \
+        """ docker exec postgres psql -U postgres -c "delete from follow" """
+
+    try:
+        p = subprocess.check_output(cmd, shell=True)
+    except Exception, e:
+        pass
+
+    # Cross-owner follow
+
+    log('---------------> CROSS-OWNER UNFOLLOW', 'HEADER')
+
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
+
+    r = follow(app_name, app_key, dev_name, 'read')
+    follow_id = r.json()['follow-id-read']
+    check(r, 202)
+
+    r = share(dev_name, dev_key, follow_id)
+    check(r, 200)
+
+    r = bind_unbind(
+        app_name,
+        str(app_keys[app_name]),
+        dev_name,
+        'test',
+        'bind',
+        'protected',
+        )
+    check(r, 200)
+    log('Received 200: OK', '')
+
+    r = unfollow(
+        dev_admin_id,
+        dev_admin_key,
+        dev_name,
+        'test',
+        'read',
+        'protected',
+        from_id=app_name,
+        )
+    check(r, 403)
+    log('Received 403: OK', '')
+
+    r = unfollow(
+        app_name,
+        app_key,
+        dev_name,
+        'test',
+        'read',
+        'protected',
+        )
+    check(r, 200)
+
+    cmd = \
+        """ docker exec postgres psql -U postgres -c "delete from follow" """
+
+    try:
+        p = subprocess.check_output(cmd, shell=True)
+    except Exception, e:
+        pass
+
+    # Cross-device follow
+
+    log('---------------> CROSS-DEVICE UNFOLLOW', 'HEADER')
+
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
+
+    r = follow(app_name, app_key, dev_name, 'read')
+    follow_id = r.json()['follow-id-read']
+    check(r, 202)
+
+    r = share(dev_name, dev_key, follow_id)
+    check(r, 200)
+
+    r = bind_unbind(
+        app_name,
+        str(app_keys[app_name]),
+        dev_name,
+        'test',
+        'bind',
+        'protected',
+        )
+    check(r, 200)
+    log('Received 200: OK', '')
+
+    r = unfollow(
+        dev_name,
+        dev_key,
+        dev_name,
+        'test',
+        'read',
+        'protected',
+        from_id=app_name,
+        )
+    check(r, 403)
+    log('Received 403: OK', '')
+
+    r = unfollow(
+        app_name,
+        app_key,
+        dev_name,
+        'test',
+        'read',
+        'protected',
+        )
+    check(r, 200)
+
+    cmd = \
+        """ docker exec postgres psql -U postgres -c "delete from follow" """
+
+    try:
+        p = subprocess.check_output(cmd, shell=True)
+    except Exception, e:
+        pass
+
+    # Invalid message-type
+
+    log('---------------> UNFOLLOW USING INVALID MESSAGE-TYPE', 'HEADER'
+        )
+
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
+
+    r = follow(app_name, app_key, dev_name, 'read')
+    follow_id = r.json()['follow-id-read']
+    check(r, 202)
+
+    r = share(dev_name, dev_key, follow_id)
+    check(r, 200)
+
+    r = bind_unbind(
+        app_name,
+        str(app_keys[app_name]),
+        dev_name,
+        'test',
+        'bind',
+        'protected',
+        )
+    check(r, 200)
+    log('Received 200: OK', '')
+
+    r = unfollow(
+        app_name,
+        app_key,
+        dev_name,
+        'test',
+        'read',
+        message_type=gen_rand(8),
+        )
+    check(r, 403)
+    log('Received 403: OK', '')
+
+    r = unfollow(
+        app_name,
+        app_key,
+        dev_name,
+        'test',
+        'read',
+        'protected',
+        )
+    check(r, 200)
+
+    cmd = \
+        """ docker exec postgres psql -U postgres -c "delete from follow" """
+
+    try:
+        p = subprocess.check_output(cmd, shell=True)
+    except Exception, e:
+        pass
+
+
+def invalid_deregistrations(
+    devices,
+    apps,
+    device_keys,
+    app_keys,
+    dev_admin_id,
+    dev_admin_key,
+    app_admin_id,
+    app_admin_key,
+    ):
+
+    print '''
+
+'''
+    log('''------------------------- DEREGISTRATION -------------------------
+
+''',
+        'GREEN')
+
+    # Cross-owner deregistrations
+
+    log('---------------> CROSS-OWNER DEREGISTRATIONS', 'HEADER')
+
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
+
+    r = deregister(dev_admin_id, dev_admin_key, app_name)
+    check(r, 403)
+    log('Received 403: OK', '')
+
+    r = deregister(app_admin_id, app_admin_key, dev_name)
+    check(r, 403)
+    log('Received 403: OK', '')
 
 
 def security_tests():
 
-	print("\n\n")
-	log("========================= SECURITY TESTS =========================\n\n", 'GREEN', modifier='BOLD')
-	
-	devices = random.randint(2,5)
-	apps 	= random.randint(2,5)
+    print '''
+
+'''
+    log('''========================= SECURITY TESTS =========================
+
+''',
+        'GREEN', modifier='BOLD')
+
+    devices = random.randint(2, 5)
+    apps = random.randint(2, 5)
+
+    (dev_admin_id, dev_admin_key) = gen_admin()
+    (app_admin_id, app_admin_key) = gen_admin()
+
+    reg_time = time.time()
+    (device_keys, app_keys) = registrations(
+        devices,
+        apps,
+        dev_admin_id,
+        dev_admin_key,
+        app_admin_id,
+        app_admin_key,
+        )
+    reg_time = time.time() - reg_time
+
+    # Trying to register an owner from outside the localhost
+
+    # logger.info(colour.HEADER + "---------------> OWNER REGISTRATION FROM OUTSIDE LOCALHOST " + colour.ENDC)
+
+    # r = register_owner(admin_key, "owner"+dummy_id)
+    # check(r,403)
+    # logger.info("Received 403: OK")
+
+    test_time = time.time()
+
+    # Invalid apikey tests
+
+    invalid_apikey(
+        devices,
+        apps,
+        device_keys,
+        app_keys,
+        dev_admin_id,
+        dev_admin_key,
+        app_admin_id,
+        app_admin_key,
+        )
+
+    # Invalid ID tests
+
+    invalid_id(
+        devices,
+        apps,
+        device_keys,
+        app_keys,
+        dev_admin_id,
+        dev_admin_key,
+        app_admin_id,
+        app_admin_key,
+        )
+
+    # Invalid publish
+
+    invalid_publish(
+        devices,
+        apps,
+        device_keys,
+        app_keys,
+        dev_admin_id,
+        dev_admin_key,
+        app_admin_id,
+        app_admin_key,
+        )
+
+    # Invalid subscribe
+
+    invalid_subscribe(
+        devices,
+        apps,
+        device_keys,
+        app_keys,
+        dev_admin_id,
+        dev_admin_key,
+        app_admin_id,
+        app_admin_key,
+        )
+
+    # Invalid bind
+
+    invalid_bind(
+        devices,
+        apps,
+        device_keys,
+        app_keys,
+        dev_admin_id,
+        dev_admin_key,
+        app_admin_id,
+        app_admin_key,
+        )
+
+    # Invalid unbind
+
+    invalid_unbind(
+        devices,
+        apps,
+        device_keys,
+        app_keys,
+        dev_admin_id,
+        dev_admin_key,
+        app_admin_id,
+        app_admin_key,
+        )
+
+    # Invalid follow
+
+    invalid_follow(
+        devices,
+        apps,
+        device_keys,
+        app_keys,
+        dev_admin_id,
+        dev_admin_key,
+        app_admin_id,
+        app_admin_key,
+        )
+
+    # Invalid unfollow
+
+    invalid_unfollow(
+        devices,
+        apps,
+        device_keys,
+        app_keys,
+        dev_admin_id,
+        dev_admin_key,
+        app_admin_id,
+        app_admin_key,
+        )
 
-	dev_admin_id, dev_admin_key = gen_admin()
-	app_admin_id, app_admin_key = gen_admin()
+    # Invalid deregistrations
 
-	reg_time = time.time()
-	device_keys, app_keys = registrations(devices, apps, dev_admin_id, dev_admin_key,
-	app_admin_id, app_admin_key)	
-	reg_time = time.time() - reg_time
+    invalid_deregistrations(
+        devices,
+        apps,
+        device_keys,
+        app_keys,
+        dev_admin_id,
+        dev_admin_key,
+        app_admin_id,
+        app_admin_key,
+        )
+
+    test_time = time.time() - test_time
+
+    dereg_time = time.time()
+    deregistrations(
+        device_keys,
+        app_keys,
+        dev_admin_id,
+        dev_admin_key,
+        app_admin_id,
+        app_admin_key,
+        )
+    dereg_time = time.time() - dereg_time
 
-	#Trying to register an owner from outside the localhost
-	
-	#logger.info(colour.HEADER + "---------------> OWNER REGISTRATION FROM OUTSIDE LOCALHOST " + colour.ENDC)
+    time_list = [reg_time, test_time, dereg_time]
 
-	#r = register_owner(admin_key, "owner"+dummy_id)
-	#check(r,403)
-	#logger.info("Received 403: OK")
+    output.put(time_list)
 
-	test_time = time.time()
+
+def follow_with_read(
+    devices,
+    apps,
+    device_keys,
+    app_keys,
+    dev_admin_id,
+    dev_admin_key,
+    app_admin_id,
+    app_admin_key,
+    ):
 
-	#Invalid apikey tests
-	invalid_apikey(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
+    print '''
 
-	#Invalid ID tests
-	invalid_id(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
+'''
+    log('''------------------------- SIMPLE READ FOLLOW-SHARE -------------------------
 
-	#Invalid publish
-	invalid_publish(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
+''',
+        'GREEN')
 
-	#Invalid subscribe
-	invalid_subscribe(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
+    # Follow requests from apps to devices using apps' respective apikeys
 
-	#Invalid bind
-	invalid_bind(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
+    log('---------------> FOLLOW REQUESTS WITH READ PERMISSION ',
+        'HEADER')
+    follow_dev(device_keys, app_keys, as_admin=False, permission='read')
 
-	#Invalid unbind
-	invalid_unbind(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
+    # Devices read all follow requests and share with apps
 
-	#Invalid follow
-	invalid_follow(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
+    log('---------------> DEVICES READ FOLLOW REQUESTS AND ISSUE SHARE TO APPS'
+        , 'HEADER')
 
-	#Invalid unfollow
-	invalid_unfollow(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
+    share_dev(apps * devices, dev_admin_id, dev_admin_key)
 
-	#Invalid deregistrations
-	invalid_deregistrations(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
+    # Apps bind to devices' queues
 
-	test_time = time.time() - test_time
+    log('---------------> APPS BIND TO DEVICES', 'HEADER')
+    bind_unbind_dev(device_keys, app_keys, expected=devices,
+                    as_admin=False, req_type='bind')
 
-	dereg_time = time.time()
-	deregistrations(device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id,
-	app_admin_key)
-	dereg_time = time.time() - dereg_time
+    # Devices publish data
 
-	time_list = [reg_time, test_time, dereg_time]
+    log('---------------> DEVICES PUBLISH DATA', 'HEADER')
+    dev_publish(device_keys)
 
-	output.put(time_list)
+    # Apps subscribe to messages
 
-def follow_with_read(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key):
+    log('---------------> APPS TRY TO READ PUBLISHED DATA', 'HEADER')
+    app_subscribe(devices, app_keys, devices)
 
-	print("\n\n")
-	log("------------------------- SIMPLE READ FOLLOW-SHARE -------------------------\n\n", 'GREEN')
-	
-	# Follow requests from apps to devices using apps' respective apikeys
-	log("---------------> FOLLOW REQUESTS WITH READ PERMISSION ", 'HEADER')
-	follow_dev(device_keys, app_keys, as_admin=False, permission="read")
+    # Apps unbind from devices
 
-	# Devices read all follow requests and share with apps
-	log("---------------> DEVICES READ FOLLOW REQUESTS AND ISSUE SHARE TO APPS", 'HEADER')
+    log('---------------> APPS UNBIND FROM DEVICES', 'HEADER')
+    bind_unbind_dev(device_keys, app_keys, expected=devices,
+                    as_admin=False, req_type='unbind')
 
-	share_dev((apps*devices), dev_admin_id, dev_admin_key)
+    # Devices again publish messages
 
-	# Apps bind to devices' queues
-	log("---------------> APPS BIND TO DEVICES", 'HEADER')
-	bind_unbind_dev(device_keys, app_keys, expected=devices, as_admin=False, req_type="bind")
+    log('---------------> DEVICES PUBLISH DATA', 'HEADER')
+    dev_publish(device_keys)
 
-	# Devices publish data
-	log("---------------> DEVICES PUBLISH DATA", 'HEADER')
-	dev_publish(device_keys)
+    # Apps try to subscribe
 
-	# Apps subscribe to messages
-	log("---------------> APPS TRY TO READ PUBLISHED DATA", 'HEADER')
-	app_subscribe(devices, app_keys, devices)
+    log('---------------> APPS TRY TO READ PUBLISHED DATA', 'HEADER')
+    app_subscribe(devices, app_keys, 0)
 
-	# Apps unbind from devices
-	log("---------------> APPS UNBIND FROM DEVICES", 'HEADER')
-	bind_unbind_dev(device_keys, app_keys, expected=devices, as_admin=False, req_type="unbind")
+    # Apps unfollow devices
 
-	# Devices again publish messages
-	log("---------------> DEVICES PUBLISH DATA", 'HEADER')
-	dev_publish(device_keys)
+    log('---------------> APPS WITH READ ACCESS UNFOLLOW DEVICES',
+        'HEADER')
+    unfollow_dev(device_keys, app_keys, as_admin=False,
+                 permission='read')
 
-	# Apps try to subscribe
-	log("---------------> APPS TRY TO READ PUBLISHED DATA", 'HEADER')
-	app_subscribe(devices, app_keys, 0)
 
-	# Apps unfollow devices
-	log("---------------> APPS WITH READ ACCESS UNFOLLOW DEVICES", 'HEADER')
-	unfollow_dev(device_keys, app_keys, as_admin=False, permission="read")
+def follow_as_admin(
+    devices,
+    apps,
+    device_keys,
+    app_keys,
+    dev_admin_id,
+    dev_admin_key,
+    app_admin_id,
+    app_admin_key,
+    ):
 
+    print '''
 
-def follow_as_admin(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key):
+'''
+    log('''------------------------- FOLLOW REQUESTS AS ADMIN -------------------------
 
-	print("\n\n")
-	log("------------------------- FOLLOW REQUESTS AS ADMIN -------------------------\n\n", 'GREEN')
+''',
+        'GREEN')
 
-	#Follow requests as admin	
-	log("---------------> FOLLOW REQUESTS WITH READ PERMISSION AS ADMIN", 'HEADER')
-	follow_dev(device_keys, app_keys, as_admin=True, permission="read", admin_id = app_admin_id, admin_key = app_admin_key)
+    # Follow requests as admin....
 
-	#Devices share with apps
-	log("---------------> DEVICES READ FOLLOW REQUESTS AND ISSUE SHARE TO APPS", 'HEADER')
+    log('---------------> FOLLOW REQUESTS WITH READ PERMISSION AS ADMIN'
+        , 'HEADER')
+    follow_dev(
+        device_keys,
+        app_keys,
+        as_admin=True,
+        permission='read',
+        admin_id=app_admin_id,
+        admin_key=app_admin_key,
+        )
 
-	share_dev((apps*devices), admin_id = dev_admin_id, admin_key = dev_admin_key)
+    # Devices share with apps
 
-	# Apps bind to devices' queues
-	log("---------------> APPS BIND TO DEVICES", 'HEADER')
-	bind_unbind_dev(device_keys, app_keys, expected=devices, as_admin=False, req_type="bind")
+    log('---------------> DEVICES READ FOLLOW REQUESTS AND ISSUE SHARE TO APPS'
+        , 'HEADER')
 
-	# Devices publish data
-	log("---------------> DEVICES PUBLISH DATA", 'HEADER')
-	dev_publish(device_keys)
+    share_dev(apps * devices, admin_id=dev_admin_id,
+              admin_key=dev_admin_key)
 
-	# Apps subscribe to messages
-	log("---------------> APPS TRY TO READ PUBLISHED DATA", 'HEADER')
-	app_subscribe(devices, app_keys, devices)
+    # Apps bind to devices' queues
 
-	# Apps unfollow all devices
-	log("---------------> APPS UNFOLLOW ALL DEVICES USING THEIR ADMIN APIKEYS", 'HEADER')
-	unfollow_dev(device_keys, app_keys, as_admin=True, permission="read", admin_id = app_admin_id, admin_key = app_admin_key)
+    log('---------------> APPS BIND TO DEVICES', 'HEADER')
+    bind_unbind_dev(device_keys, app_keys, expected=devices,
+                    as_admin=False, req_type='bind')
 
-	# Apps try to bind to unfollowed devices
-	log("---------------> APPS TRY TO BIND TO UNFOLLOWED DEVICES", 'HEADER')
-	bind_unbind_without_follow(device_keys, app_keys, as_admin=False, req_type="bind")
+    # Devices publish data
 
+    log('---------------> DEVICES PUBLISH DATA', 'HEADER')
+    dev_publish(device_keys)
 
-def follow_with_write(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key):
+    # Apps subscribe to messages
 
-	print("\n\n")
-	log("------------------------- FOLLOW REQUESTS WITH WRITE PERMISSION -------------------------\n\n", 'GREEN')
+    log('---------------> APPS TRY TO READ PUBLISHED DATA', 'HEADER')
+    app_subscribe(devices, app_keys, devices)
 
-	#Follow requests for write	
-	log("---------------> FOLLOW REQUESTS WITH WRITE PERMISSIONS", 'HEADER')
-	follow_dev(device_keys, app_keys, as_admin=False, permission="write")
+    # Apps unfollow all devices
 
-	#Devices share with apps with write access
-	log("---------------> DEVICES READ FOLLOW REQUESTS AND ISSUE SHARE TO APPS", 'HEADER')
-	share_dev((apps*devices), dev_admin_id, dev_admin_key)
+    log('---------------> APPS UNFOLLOW ALL DEVICES USING THEIR ADMIN APIKEYS'
+        , 'HEADER')
+    unfollow_dev(
+        device_keys,
+        app_keys,
+        as_admin=True,
+        permission='read',
+        admin_id=app_admin_id,
+        admin_key=app_admin_key,
+        )
 
-	#Apps publish to command queue of devices
-	log("---------------> APPS PUBLISH TO COMMAND EXCHANGE OF DEVICES", 'HEADER')
-	app_publish(device_keys, app_keys, 202)
+    # Apps try to bind to unfollowed devices
 
-	#Devices subscribe to their command queue
-	log("---------------> DEVICES SUBSCRIBE TO THEIR COMMAND QUEUES", 'HEADER')
-	dev_subscribe(apps, device_keys, apps)
+    log('---------------> APPS TRY TO BIND TO UNFOLLOWED DEVICES',
+        'HEADER')
+    bind_unbind_without_follow(device_keys, app_keys, as_admin=False,
+                               req_type='bind')
 
-	#Follow requests for write	
-	log("---------------> APPS WITH WRITE ACCESS UNFOLLOW DEVICES", 'HEADER')
-	unfollow_dev(device_keys, app_keys, as_admin=False, permission="write")
 
-	#Apps publish to command queue of devices
-	log("---------------> APPS TRY TO PUBLISH TO COMMAND EXCHANGE OF UNFOLLOWED DEVICES", 'HEADER')
-	app_publish(device_keys, app_keys, 202)
+def follow_with_write(
+    devices,
+    apps,
+    device_keys,
+    app_keys,
+    dev_admin_id,
+    dev_admin_key,
+    app_admin_id,
+    app_admin_key,
+    ):
 
-def follow_with_read_write(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key):
+    print '''
 
-	print("\n\n")
-	log("------------------------- FOLLOW REQUESTS WITH READ-WRITE PERMISSIONS -------------------------\n\n", 'GREEN')
+'''
+    log('''------------------------- FOLLOW REQUESTS WITH WRITE PERMISSION -------------------------
 
-	#Apps request follow with read-write permissions
-	log("---------------> APPS REQUEST FOLLOW WITH READ-WRITE PERMISSIONS", 'HEADER')
-	follow_dev(device_keys, app_keys, as_admin=False, permission="read-write")
+''',
+        'GREEN')
 
-	#Devices approve issue share to apps
-	log("---------------> DEVICES APPROVE READ-WRITE FOLLOW REQUESTS WITH SHARE", 'HEADER')
-	share_dev((devices*apps*2), dev_admin_id, dev_admin_key)
+    # Follow requests for write....
 
-	#Apps publish to command queue of devices
-	log("---------------> APPS PUBLISH TO COMMAND EXCHANGE OF DEVICES", 'HEADER')
-	app_publish(device_keys, app_keys, 202)
+    log('---------------> FOLLOW REQUESTS WITH WRITE PERMISSIONS',
+        'HEADER')
+    follow_dev(device_keys, app_keys, as_admin=False, permission='write'
+               )
 
-	#Devices subscribe to their command queue
-	log("---------------> DEVICES SUBSCRIBE TO THEIR COMMAND QUEUES", 'HEADER')
-	dev_subscribe(apps, device_keys, apps)
-	
-	# Apps bind to devices' queues
-	log("---------------> APPS BIND TO DEVICES", 'HEADER')
-	bind_unbind_dev(device_keys, app_keys, expected=(2*devices), as_admin=False, req_type="bind")
+    # Devices share with apps with write access
 
-	# Devices publish again
-	log("---------------> DEVICES PUBLISH DATA", 'HEADER')
-	dev_publish(device_keys)
+    log('---------------> DEVICES READ FOLLOW REQUESTS AND ISSUE SHARE TO APPS'
+        , 'HEADER')
+    share_dev(apps * devices, dev_admin_id, dev_admin_key)
 
-	# Apps subscribe to messages
-	log("---------------> APPS TRY TO READ PUBLISHED DATA", 'HEADER')
-	app_subscribe(devices, app_keys, devices)
+    # Apps publish to command queue of devices
 
-	#Apps relinquish write permission
-	log("---------------> APPS UNFOLLOW DEVICES FOR WRITE PERMISSION", 'HEADER')
-	unfollow_dev(device_keys, app_keys, as_admin=False, permission="write")
+    log('---------------> APPS PUBLISH TO COMMAND EXCHANGE OF DEVICES',
+        'HEADER')
+    app_publish(device_keys, app_keys, 202)
 
-	#Apps publish to command queue of devices
-	log("---------------> APPS TRY TO PUBLISH TO COMMAND EXCHANGE OF UNFOLLOWED DEVICES", 'HEADER')
-	app_publish(device_keys, app_keys, 202)
+    # Devices subscribe to their command queue
 
-	# Devices publish again
-	log("---------------> DEVICES PUBLISH DATA AFTER WRITE UNFOLLOW", 'HEADER')
-	dev_publish(device_keys)
+    log('---------------> DEVICES SUBSCRIBE TO THEIR COMMAND QUEUES',
+        'HEADER')
+    dev_subscribe(apps, device_keys, apps)
 
-	# Apps subscribe to messages
-	log("---------------> APPS TRY TO READ PUBLISHED DATA AFTER WRITE UNFOLLOW", 'HEADER')
-	app_subscribe(devices, app_keys, devices)
+    # Follow requests for write....
 
-	# Apps unfollow with read permissions
-	log("---------------> APPS UNFOLLOW DEVICES WITH READ PERMISSION", 'HEADER')
-	unfollow_dev(device_keys, app_keys, as_admin=True, permission="read", admin_id = app_admin_id, admin_key = app_admin_key)
+    log('---------------> APPS WITH WRITE ACCESS UNFOLLOW DEVICES',
+        'HEADER')
+    unfollow_dev(device_keys, app_keys, as_admin=False,
+                 permission='write')
 
-	# Apps try to bind to unfollowed devices
-	log("---------------> APPS TRY TO BIND TO UNFOLLOWED DEVICES", 'HEADER')
-	bind_unbind_without_follow(device_keys, app_keys, as_admin=False, req_type="bind")
+    # Apps publish to command queue of devices
 
-def bind_as_admin(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key):
+    log('---------------> APPS TRY TO PUBLISH TO COMMAND EXCHANGE OF UNFOLLOWED DEVICES'
+        , 'HEADER')
+    app_publish(device_keys, app_keys, 202)
 
-	print(device_keys, app_keys)
 
-	print("\n\n")
-	log("------------------------- BIND USING ADMIN APIKEY -------------------------\n\n", 'GREEN')
+def follow_with_read_write(
+    devices,
+    apps,
+    device_keys,
+    app_keys,
+    dev_admin_id,
+    dev_admin_key,
+    app_admin_id,
+    app_admin_key,
+    ):
 
-	#Apps obtain read-write follow
-	log("---------------> APPS FOLLOW WITH READ-WRITE PERMISSIONS", 'HEADER')
-	follow_dev(device_keys, app_keys, as_admin=False, permission="read-write")
+    print '''
 
-	#Devices approve issue share to apps
-	log("---------------> DEVICES APPROVE READ-WRITE FOLLOW REQUESTS WITH SHARE", 'HEADER')
-	share_dev((devices*apps*2), dev_admin_id, dev_admin_key)
+'''
+    log('''------------------------- FOLLOW REQUESTS WITH READ-WRITE PERMISSIONS -------------------------
 
-	# Apps bind to devices again but this time using admin apikey
-	log("---------------> APPS BIND TO DEVICES USING ADMIN APIKEY", 'HEADER')
+''',
+        'GREEN')
 
-	bind_unbind_dev(device_keys, app_keys, expected=(devices*apps*2), as_admin=True,
-	req_type="bind", admin_id = app_admin_id, admin_key = app_admin_key)
+    # Apps request follow with read-write permissions
 
-	# Devices publish again
-	log("---------------> DEVICES PUBLISH DATA", 'HEADER')
-	dev_publish(device_keys)
+    log('---------------> APPS REQUEST FOLLOW WITH READ-WRITE PERMISSIONS'
+        , 'HEADER')
+    follow_dev(device_keys, app_keys, as_admin=False,
+               permission='read-write')
 
-	# Apps subscribe to messages
-	log("---------------> APPS TRY TO READ PUBLISHED DATA", 'HEADER')
-	app_subscribe(devices, app_keys, devices)
+    # Devices approve issue share to apps
 
-	# Unbind from devices as admin
-	log("---------------> APPS UNBIND FROM DEVICES USING ADMIN APIKEY", 'HEADER')
+    log('---------------> DEVICES APPROVE READ-WRITE FOLLOW REQUESTS WITH SHARE'
+        , 'HEADER')
+    share_dev(devices * apps * 2, dev_admin_id, dev_admin_key)
 
-	bind_unbind_dev(device_keys, app_keys, expected=(devices*apps*2), as_admin=True,
-	req_type="unbind", admin_id = app_admin_id, admin_key = app_admin_key)
+    # Apps publish to command queue of devices
 
-	# Devices now publish data
-	log("---------------> DEVICES PUBLISH DATA", 'HEADER')
-	dev_publish(device_keys)
+    log('---------------> APPS PUBLISH TO COMMAND EXCHANGE OF DEVICES',
+        'HEADER')
+    app_publish(device_keys, app_keys, 202)
 
-	# Apps try to subscribe but get 0 messages
-	log("---------------> APPS TRY TO READ PUBLISHED DATA", 'HEADER')
-	app_subscribe(devices, app_keys, 0)
+    # Devices subscribe to their command queue
 
-	# Apps unfollow all devices
-	log("---------------> APPS UNFOLLOW ALL DEVICES USING THEIR RESPECTIVE APIKEYS", 'HEADER')
-	unfollow_dev(device_keys, app_keys, as_admin=False, permission="read-write")
+    log('---------------> DEVICES SUBSCRIBE TO THEIR COMMAND QUEUES',
+        'HEADER')
+    dev_subscribe(apps, device_keys, apps)
 
-	# Apps try to bind to unfollowed devices
-	log("---------------> APPS TRY TO BIND TO UNFOLLOWED DEVICES", 'HEADER')
-	bind_unbind_without_follow(device_keys, app_keys, as_admin=True, req_type="bind", admin_id= app_admin_id, admin_key = app_admin_key)
+    # Apps bind to devices' queues
 
-def diagnostic_tests(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key):
+    log('---------------> APPS BIND TO DEVICES', 'HEADER')
+    bind_unbind_dev(device_keys, app_keys, expected=2 * devices,
+                    as_admin=False, req_type='bind')
 
-	# ===============================Diagnostics channel ===============================
+    # Devices publish again
 
-	# Follow requests from apps to devices using apps' respective apikeys for diagnostics
-	# channel
+    log('---------------> DEVICES PUBLISH DATA', 'HEADER')
+    dev_publish(device_keys)
 
-	print("\n\n")
-	log("------------------------- DIAGNOSTICS CHANNEL TESTS -------------------------\n\n", 'GREEN')
+    # Apps subscribe to messages
 
-	log("---------------> FOLLOW REQUESTS WITH READ PERMISSION TO DIAGNOSTICS CHANNEL", 'HEADER')
-	follow_dev(device_keys, app_keys, as_admin=False, permission="read",
-	message_type="diagnostics")
+    log('---------------> APPS TRY TO READ PUBLISHED DATA', 'HEADER')
+    app_subscribe(devices, app_keys, devices)
 
-	# Devices read all follow requests and share with apps
-	log("---------------> DEVICES READ FOLLOW REQUESTS AND ISSUE SHARE TO APPS", 'HEADER')
+    # Apps relinquish write permission
 
-	share_dev((apps*devices), dev_admin_id, dev_admin_key)
+    log('---------------> APPS UNFOLLOW DEVICES FOR WRITE PERMISSION',
+        'HEADER')
+    unfollow_dev(device_keys, app_keys, as_admin=False,
+                 permission='write')
 
-	# Apps bind to devices' diagnostics exchanges
-	log("---------------> APPS BIND TO DEVICES' DIAGNOSTICS CHANNEL", 'HEADER')
-	bind_unbind_dev(device_keys, app_keys, expected=devices, as_admin=False, req_type="bind", message_type="diagnostics")
+    # Apps publish to command queue of devices
 
-	# Devices publish data to diagnostics exchanges
-	log("---------------> DEVICES PUBLISH DATA TO DIAGNOSTICS CHANNEL", 'HEADER')
-	dev_publish(device_keys, message_type="diagnostics")
+    log('---------------> APPS TRY TO PUBLISH TO COMMAND EXCHANGE OF UNFOLLOWED DEVICES'
+        , 'HEADER')
+    app_publish(device_keys, app_keys, 202)
 
-	# Apps subscribe to messages
-	log("---------------> APPS TRY TO READ PUBLISHED DATA", 'HEADER')
-	app_subscribe(devices, app_keys, devices)
+    # Devices publish again
 
-	# Apps unbind from devices diagnostics channel
-	log("---------------> APPS UNBIND FROM DEVICES' DIAGNOSTICS CHANNEL", 'HEADER')
-	bind_unbind_dev(device_keys, app_keys, expected=devices, as_admin=False, req_type="unbind", message_type="diagnostics")
+    log('---------------> DEVICES PUBLISH DATA AFTER WRITE UNFOLLOW',
+        'HEADER')
+    dev_publish(device_keys)
 
-	# Devices again publish messages to diagnostics channel
-	log("---------------> DEVICES PUBLISH DATA TO DIAGNOSTICS CHANNEL", 'HEADER')
-	dev_publish(device_keys, message_type="diagnostics")
+    # Apps subscribe to messages
 
-	# Apps try to subscribe
-	log("---------------> APPS TRY TO READ PUBLISHED DATA", 'HEADER')
-	app_subscribe(devices, app_keys, 0)
+    log('---------------> APPS TRY TO READ PUBLISHED DATA AFTER WRITE UNFOLLOW'
+        , 'HEADER')
+    app_subscribe(devices, app_keys, devices)
 
-	# Apps bind to devices using admin apikey
-	log("---------------> APPS BIND TO DEVICES USING ADMIN APIKEY", 'HEADER')
+    # Apps unfollow with read permissions
 
-	bind_unbind_dev(device_keys, app_keys, expected=devices*apps, as_admin=True, req_type="bind", message_type="diagnostics", admin_id = app_admin_id, admin_key = app_admin_key)
+    log('---------------> APPS UNFOLLOW DEVICES WITH READ PERMISSION',
+        'HEADER')
+    unfollow_dev(
+        device_keys,
+        app_keys,
+        as_admin=True,
+        permission='read',
+        admin_id=app_admin_id,
+        admin_key=app_admin_key,
+        )
 
-	# Devices publish again to diagnostics channel
-	log("---------------> DEVICES PUBLISH DATA TO DIAGNOSTICS CHANNEL", 'HEADER')
-	dev_publish(device_keys, message_type="diagnostics")
+    # Apps try to bind to unfollowed devices
 
-	# Apps subscribe to messages
-	log("---------------> APPS TRY TO READ PUBLISHED DATA", 'HEADER')
-	app_subscribe(devices, app_keys, devices)
+    log('---------------> APPS TRY TO BIND TO UNFOLLOWED DEVICES',
+        'HEADER')
+    bind_unbind_without_follow(device_keys, app_keys, as_admin=False,
+                               req_type='bind')
 
-	# Unbind from devices as admin
-	log("---------------> APPS UNBIND FROM DEVICES USING ADMIN APIKEY", 'HEADER')
 
-	bind_unbind_dev(device_keys, app_keys, expected=(devices*apps), as_admin=True, req_type="unbind", message_type="diagnostics", admin_id = app_admin_id, admin_key = app_admin_key)
+def bind_as_admin(
+    devices,
+    apps,
+    device_keys,
+    app_keys,
+    dev_admin_id,
+    dev_admin_key,
+    app_admin_id,
+    app_admin_key,
+    ):
 
-	# Devices now publish data to diagnostics channel
-	log("---------------> DEVICES PUBLISH DATA TO DIAGNOSTICS CHANNEL", 'HEADER')
-	dev_publish(device_keys, message_type="diagnostics")
+    print (device_keys, app_keys)
 
-	# Apps try to subscribe but get 0 messages
-	log("---------------> APPS TRY TO READ PUBLISHED DATA", 'HEADER')
-	app_subscribe(devices, app_keys, 0)
+    print '''
 
-	# Apps unfollow all devices
-	log("---------------> APPS UNFOLLOW ALL DEVICES USING THEIR RESPECTIVE APIKEYS", 'HEADER')
-	unfollow_dev(device_keys, app_keys, as_admin=False, permission="read", message_type="diagnostics")
+'''
+    log('''------------------------- BIND USING ADMIN APIKEY -------------------------
 
-	# Apps try to bind to unfollowed devices' diagnostics channel
-	log("---------------> APPS TRY TO BIND TO UNFOLLOWED DEVICES' DIAGNOSTICS CHANNEL", 'HEADER')
-	bind_unbind_without_follow(device_keys, app_keys, as_admin=False, req_type="bind", message_type="diagnostics")
+''',
+        'GREEN')
 
-def priority_tests(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key):
+    # Apps obtain read-write follow
 
-	# ===============================Priority queue ===============================
+    log('---------------> APPS FOLLOW WITH READ-WRITE PERMISSIONS',
+        'HEADER')
+    follow_dev(device_keys, app_keys, as_admin=False,
+               permission='read-write')
 
-	print("\n\n")
-	log("------------------------- PRIORITY QUEUE TESTS -------------------------\n\n", 'GREEN')
+    # Devices approve issue share to apps
 
-	# Follow requests from apps to devices using apps' respective apikeys
-	log("---------------> FOLLOW REQUESTS WITH READ PERMISSION", 'HEADER')
-	follow_dev(device_keys, app_keys, as_admin=False, permission="read",)
+    log('---------------> DEVICES APPROVE READ-WRITE FOLLOW REQUESTS WITH SHARE'
+        , 'HEADER')
+    share_dev(devices * apps * 2, dev_admin_id, dev_admin_key)
 
-	# Devices read all follow requests and share with apps
-	log("---------------> DEVICES READ FOLLOW REQUESTS AND ISSUE SHARE TO APPS", 'HEADER')
+    # Apps bind to devices again but this time using admin apikey
 
-	share_dev((apps*devices), dev_admin_id, dev_admin_key)
+    log('---------------> APPS BIND TO DEVICES USING ADMIN APIKEY',
+        'HEADER')
 
-	# Apps bind to devices' diagnostics exchanges
-	log("---------------> APPS BIND TO DEVICES PROTECTED CHANNEL", 'HEADER')
-	bind_unbind_dev(device_keys, app_keys, expected=devices, as_admin=False, req_type="bind",
-	is_priority = "true")
+    bind_unbind_dev(
+        device_keys,
+        app_keys,
+        expected=devices * apps * 2,
+        as_admin=True,
+        req_type='bind',
+        admin_id=app_admin_id,
+        admin_key=app_admin_key,
+        )
 
-	# Devices publish data to diagnostics exchanges
-	log("---------------> DEVICES PUBLISH DATA", 'HEADER')
-	dev_publish(device_keys)
+    # Devices publish again
 
-	# Apps subscribe to messages
-	log("---------------> APPS TRY TO READ PUBLISHED DATA", 'HEADER')
-	app_subscribe(devices, app_keys, devices, message_type = "priority")
+    log('---------------> DEVICES PUBLISH DATA', 'HEADER')
+    dev_publish(device_keys)
 
-	# Apps unbind from devices diagnostics channel
-	log("---------------> APPS UNBIND FROM DEVICES", 'HEADER')
-	bind_unbind_dev(device_keys, app_keys, expected=devices, as_admin=False, req_type="unbind",
-	is_priority = "true")
+    # Apps subscribe to messages
 
-	# Devices again publish messages to diagnostics channel
-	log("---------------> DEVICES PUBLISH DATA", 'HEADER')
-	dev_publish(device_keys)
+    log('---------------> APPS TRY TO READ PUBLISHED DATA', 'HEADER')
+    app_subscribe(devices, app_keys, devices)
 
-	# Apps try to subscribe
-	log("---------------> APPS TRY TO READ PUBLISHED DATA", 'HEADER')
-	app_subscribe(devices, app_keys, 0, message_type = "priority")
+    # Unbind from devices as admin
 
-	# Apps bind to devices using admin apikey
-	log("---------------> APPS BIND TO DEVICES USING ADMIN APIKEY", 'HEADER')
+    log('---------------> APPS UNBIND FROM DEVICES USING ADMIN APIKEY',
+        'HEADER')
 
-	bind_unbind_dev(device_keys, app_keys, expected=devices*apps, as_admin=True,
-	req_type="bind", is_priority = "true", admin_id = app_admin_id, admin_key = app_admin_key)
+    bind_unbind_dev(
+        device_keys,
+        app_keys,
+        expected=devices * apps * 2,
+        as_admin=True,
+        req_type='unbind',
+        admin_id=app_admin_id,
+        admin_key=app_admin_key,
+        )
 
-	# Devices publish again to diagnostics channel
-	log("---------------> DEVICES PUBLISH DATA", 'HEADER')
-	dev_publish(device_keys)
+    # Devices now publish data
 
-	# Apps subscribe to messages
-	log("---------------> APPS TRY TO READ PUBLISHED DATA", 'HEADER')
-	app_subscribe(devices, app_keys, devices, message_type = "priority")
+    log('---------------> DEVICES PUBLISH DATA', 'HEADER')
+    dev_publish(device_keys)
 
-	# Unbind from devices as admin
-	log("---------------> APPS UNBIND FROM DEVICES USING ADMIN APIKEY", 'HEADER')
+    # Apps try to subscribe but get 0 messages
 
-	bind_unbind_dev(device_keys, app_keys, expected=(devices*apps), as_admin=True,
-	req_type="unbind", is_priority = "true", admin_id = app_admin_id, admin_key = app_admin_key)
+    log('---------------> APPS TRY TO READ PUBLISHED DATA', 'HEADER')
+    app_subscribe(devices, app_keys, 0)
 
-	# Devices now publish data to diagnostics channel
-	log("---------------> DEVICES PUBLISH DATA", 'HEADER')
-	dev_publish(device_keys)
+    # Apps unfollow all devices
 
-	# Apps try to subscribe but get 0 messages
-	log("---------------> APPS TRY TO READ PUBLISHED DATA", 'HEADER')
-	app_subscribe(devices, app_keys, 0, message_type = "priority")
+    log('---------------> APPS UNFOLLOW ALL DEVICES USING THEIR RESPECTIVE APIKEYS'
+        , 'HEADER')
+    unfollow_dev(device_keys, app_keys, as_admin=False,
+                 permission='read-write')
 
-	# Apps unfollow all devices
-	log("---------------> APPS UNFOLLOW ALL DEVICES USING THEIR RESPECTIVE APIKEYS", 'HEADER')
-	unfollow_dev(device_keys, app_keys, as_admin=False, permission="read")
+    # Apps try to bind to unfollowed devices
 
-	# Apps try to bind to unfollowed devices' diagnostics channel
-	log("---------------> APPS TRY TO BIND TO UNFOLLOWED DEVICES' DIAGNOSTICS CHANNEL", 'HEADER')
-	bind_unbind_without_follow(device_keys, app_keys, as_admin=False, req_type="bind",
-	is_priority = "true")
+    log('---------------> APPS TRY TO BIND TO UNFOLLOWED DEVICES',
+        'HEADER')
+    bind_unbind_without_follow(
+        device_keys,
+        app_keys,
+        as_admin=True,
+        req_type='bind',
+        admin_id=app_admin_id,
+        admin_key=app_admin_key,
+        )
 
-def amqp_tests(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key):
 
-	# =============================== AMQP TESTS===============================
+def diagnostic_tests(
+    devices,
+    apps,
+    device_keys,
+    app_keys,
+    dev_admin_id,
+    dev_admin_key,
+    app_admin_id,
+    app_admin_key,
+    ):
 
-	print("\n\n")
-	log("------------------------- AMQP TESTS -------------------------\n\n", 'GREEN')
+    # ===============================Diagnostics channel ===============================
 
-	#Apps request follow with read-write permissions
-	log("---------------> APPS REQUEST FOLLOW WITH READ-WRITE PERMISSIONS", 'HEADER')
-	follow_dev(device_keys, app_keys, as_admin=False, permission="read-write")
+    # Follow requests from apps to devices using apps' respective apikeys for diagnostics
+    # channel
 
-	#Devices approve issue share to apps
-	log("---------------> DEVICES APPROVE READ-WRITE FOLLOW REQUESTS WITH SHARE", 'HEADER')
-	share_dev((devices*apps*2), dev_admin_id, dev_admin_key)
+    print '''
 
-	#Apps publish to command queue of devices
-	log("---------------> APPS PUBLISH TO COMMAND EXCHANGE OF DEVICES", 'HEADER')
-	app_publish_amqp(device_keys, app_keys)
+'''
+    log('''------------------------- DIAGNOSTICS CHANNEL TESTS -------------------------
 
-	#Devices subscribe to their command queue
-	log("---------------> DEVICES SUBSCRIBE TO THEIR COMMAND QUEUES", 'HEADER')
-	dev_subscribe_amqp(apps, device_keys, apps)
-	
-	# Apps bind to devices' queues
-	log("---------------> APPS BIND TO DEVICES", 'HEADER')
-	bind_unbind_dev(device_keys, app_keys, expected=(2*devices), as_admin=False, req_type="bind")
+''',
+        'GREEN')
 
-	# Devices publish again
-	log("---------------> DEVICES PUBLISH DATA", 'HEADER')
-	dev_publish_amqp(device_keys)
+    log('---------------> FOLLOW REQUESTS WITH READ PERMISSION TO DIAGNOSTICS CHANNEL'
+        , 'HEADER')
+    follow_dev(device_keys, app_keys, as_admin=False, permission='read'
+               , message_type='diagnostics')
 
-	# Apps subscribe to messages
-	log("---------------> APPS TRY TO READ PUBLISHED DATA", 'HEADER')
-	app_subscribe_amqp(devices, app_keys, devices)
+    # Devices read all follow requests and share with apps
 
-	#Apps relinquish write permission
-	log("---------------> APPS WITH WRITE ACCESS UNFOLLOW DEVICES", 'HEADER')
-	unfollow_dev(device_keys, app_keys, as_admin=False, permission="write")
+    log('---------------> DEVICES READ FOLLOW REQUESTS AND ISSUE SHARE TO APPS'
+        , 'HEADER')
 
-	#Apps publish to command queue of devices
-	log("---------------> APPS TRY TO PUBLISH TO COMMAND EXCHANGE OF UNFOLLOWED DEVICES", 'HEADER')
-	app_publish_amqp(device_keys, app_keys)
+    share_dev(apps * devices, dev_admin_id, dev_admin_key)
 
-	#Devices subscribe to their command queue after write unfollow by apps
-	log("---------------> DEVICES SUBSCRIBE TO THEIR COMMAND QUEUES AFTER WRITE UNFOLLOW BY APPS", 'HEADER')
-	dev_subscribe_amqp(apps, device_keys, 0)
+    # Apps bind to devices' diagnostics exchanges
 
-	# Devices publish again
-	log("---------------> DEVICES PUBLISH DATA AFTER WRITE UNFOLLOW", 'HEADER')
-	dev_publish_amqp(device_keys)
+    log("---------------> APPS BIND TO DEVICES' DIAGNOSTICS CHANNEL",
+        'HEADER')
+    bind_unbind_dev(
+        device_keys,
+        app_keys,
+        expected=devices,
+        as_admin=False,
+        req_type='bind',
+        message_type='diagnostics',
+        )
 
-	# Apps subscribe to messages
-	log("---------------> APPS TRY TO READ PUBLISHED DATA AFTER WRITE UNFOLLOW", 'HEADER')
-	app_subscribe_amqp(devices, app_keys, devices)
+    # Devices publish data to diagnostics exchanges
 
-	# Apps unfollow with read permissions
-	log("---------------> APPS UNFOLLOW DEVICES WITH READ ACCESS", 'HEADER')
-	unfollow_dev(device_keys, app_keys, as_admin=True, permission="read", admin_id = app_admin_id, admin_key = app_admin_key)
+    log('---------------> DEVICES PUBLISH DATA TO DIAGNOSTICS CHANNEL',
+        'HEADER')
+    dev_publish(device_keys, message_type='diagnostics')
 
-	# Apps try to bind to unfollowed devices
-	log("---------------> APPS TRY TO BIND TO UNFOLLOWED DEVICES", 'HEADER')
-	bind_unbind_without_follow(device_keys, app_keys, as_admin=False, req_type="bind")
+    # Apps subscribe to messages
 
+    log('---------------> APPS TRY TO READ PUBLISHED DATA', 'HEADER')
+    app_subscribe(devices, app_keys, devices)
+
+    # Apps unbind from devices diagnostics channel
+
+    log("---------------> APPS UNBIND FROM DEVICES' DIAGNOSTICS CHANNEL"
+        , 'HEADER')
+    bind_unbind_dev(
+        device_keys,
+        app_keys,
+        expected=devices,
+        as_admin=False,
+        req_type='unbind',
+        message_type='diagnostics',
+        )
+
+    # Devices again publish messages to diagnostics channel
+
+    log('---------------> DEVICES PUBLISH DATA TO DIAGNOSTICS CHANNEL',
+        'HEADER')
+    dev_publish(device_keys, message_type='diagnostics')
+
+    # Apps try to subscribe
+
+    log('---------------> APPS TRY TO READ PUBLISHED DATA', 'HEADER')
+    app_subscribe(devices, app_keys, 0)
+
+    # Apps bind to devices using admin apikey
+
+    log('---------------> APPS BIND TO DEVICES USING ADMIN APIKEY',
+        'HEADER')
+
+    bind_unbind_dev(
+        device_keys,
+        app_keys,
+        expected=devices * apps,
+        as_admin=True,
+        req_type='bind',
+        message_type='diagnostics',
+        admin_id=app_admin_id,
+        admin_key=app_admin_key,
+        )
+
+    # Devices publish again to diagnostics channel
+
+    log('---------------> DEVICES PUBLISH DATA TO DIAGNOSTICS CHANNEL',
+        'HEADER')
+    dev_publish(device_keys, message_type='diagnostics')
+
+    # Apps subscribe to messages
+
+    log('---------------> APPS TRY TO READ PUBLISHED DATA', 'HEADER')
+    app_subscribe(devices, app_keys, devices)
+
+    # Unbind from devices as admin
+
+    log('---------------> APPS UNBIND FROM DEVICES USING ADMIN APIKEY',
+        'HEADER')
+
+    bind_unbind_dev(
+        device_keys,
+        app_keys,
+        expected=devices * apps,
+        as_admin=True,
+        req_type='unbind',
+        message_type='diagnostics',
+        admin_id=app_admin_id,
+        admin_key=app_admin_key,
+        )
+
+    # Devices now publish data to diagnostics channel
+
+    log('---------------> DEVICES PUBLISH DATA TO DIAGNOSTICS CHANNEL',
+        'HEADER')
+    dev_publish(device_keys, message_type='diagnostics')
+
+    # Apps try to subscribe but get 0 messages
+
+    log('---------------> APPS TRY TO READ PUBLISHED DATA', 'HEADER')
+    app_subscribe(devices, app_keys, 0)
+
+    # Apps unfollow all devices
+
+    log('---------------> APPS UNFOLLOW ALL DEVICES USING THEIR RESPECTIVE APIKEYS'
+        , 'HEADER')
+    unfollow_dev(device_keys, app_keys, as_admin=False,
+                 permission='read', message_type='diagnostics')
+
+    # Apps try to bind to unfollowed devices' diagnostics channel
+
+    log("---------------> APPS TRY TO BIND TO UNFOLLOWED DEVICES' DIAGNOSTICS CHANNEL"
+        , 'HEADER')
+    bind_unbind_without_follow(device_keys, app_keys, as_admin=False,
+                               req_type='bind',
+                               message_type='diagnostics')
+
+
+def priority_tests(
+    devices,
+    apps,
+    device_keys,
+    app_keys,
+    dev_admin_id,
+    dev_admin_key,
+    app_admin_id,
+    app_admin_key,
+    ):
+
+    # ===============================Priority queue ===============================
+
+    print '''
+
+'''
+    log('''------------------------- PRIORITY QUEUE TESTS -------------------------
+
+''',
+        'GREEN')
+
+    # Follow requests from apps to devices using apps' respective apikeys
+
+    log('---------------> FOLLOW REQUESTS WITH READ PERMISSION',
+        'HEADER')
+    follow_dev(device_keys, app_keys, as_admin=False, permission='read')
+
+    # Devices read all follow requests and share with apps
+
+    log('---------------> DEVICES READ FOLLOW REQUESTS AND ISSUE SHARE TO APPS'
+        , 'HEADER')
+
+    share_dev(apps * devices, dev_admin_id, dev_admin_key)
+
+    # Apps bind to devices' diagnostics exchanges
+
+    log('---------------> APPS BIND TO DEVICES PROTECTED CHANNEL',
+        'HEADER')
+    bind_unbind_dev(
+        device_keys,
+        app_keys,
+        expected=devices,
+        as_admin=False,
+        req_type='bind',
+        is_priority='true',
+        )
+
+    # Devices publish data to diagnostics exchanges
+
+    log('---------------> DEVICES PUBLISH DATA', 'HEADER')
+    dev_publish(device_keys)
+
+    # Apps subscribe to messages
+
+    log('---------------> APPS TRY TO READ PUBLISHED DATA', 'HEADER')
+    app_subscribe(devices, app_keys, devices, message_type='priority')
+
+    # Apps unbind from devices diagnostics channel
+
+    log('---------------> APPS UNBIND FROM DEVICES', 'HEADER')
+    bind_unbind_dev(
+        device_keys,
+        app_keys,
+        expected=devices,
+        as_admin=False,
+        req_type='unbind',
+        is_priority='true',
+        )
+
+    # Devices again publish messages to diagnostics channel
+
+    log('---------------> DEVICES PUBLISH DATA', 'HEADER')
+    dev_publish(device_keys)
+
+    # Apps try to subscribe
+
+    log('---------------> APPS TRY TO READ PUBLISHED DATA', 'HEADER')
+    app_subscribe(devices, app_keys, 0, message_type='priority')
+
+    # Apps bind to devices using admin apikey
+
+    log('---------------> APPS BIND TO DEVICES USING ADMIN APIKEY',
+        'HEADER')
+
+    bind_unbind_dev(
+        device_keys,
+        app_keys,
+        expected=devices * apps,
+        as_admin=True,
+        req_type='bind',
+        is_priority='true',
+        admin_id=app_admin_id,
+        admin_key=app_admin_key,
+        )
+
+    # Devices publish again to diagnostics channel
+
+    log('---------------> DEVICES PUBLISH DATA', 'HEADER')
+    dev_publish(device_keys)
+
+    # Apps subscribe to messages
+
+    log('---------------> APPS TRY TO READ PUBLISHED DATA', 'HEADER')
+    app_subscribe(devices, app_keys, devices, message_type='priority')
+
+    # Unbind from devices as admin
+
+    log('---------------> APPS UNBIND FROM DEVICES USING ADMIN APIKEY',
+        'HEADER')
+
+    bind_unbind_dev(
+        device_keys,
+        app_keys,
+        expected=devices * apps,
+        as_admin=True,
+        req_type='unbind',
+        is_priority='true',
+        admin_id=app_admin_id,
+        admin_key=app_admin_key,
+        )
+
+    # Devices now publish data to diagnostics channel
+
+    log('---------------> DEVICES PUBLISH DATA', 'HEADER')
+    dev_publish(device_keys)
+
+    # Apps try to subscribe but get 0 messages
+
+    log('---------------> APPS TRY TO READ PUBLISHED DATA', 'HEADER')
+    app_subscribe(devices, app_keys, 0, message_type='priority')
+
+    # Apps unfollow all devices
+
+    log('---------------> APPS UNFOLLOW ALL DEVICES USING THEIR RESPECTIVE APIKEYS'
+        , 'HEADER')
+    unfollow_dev(device_keys, app_keys, as_admin=False,
+                 permission='read')
+
+    # Apps try to bind to unfollowed devices' diagnostics channel
+
+    log("---------------> APPS TRY TO BIND TO UNFOLLOWED DEVICES' DIAGNOSTICS CHANNEL"
+        , 'HEADER')
+    bind_unbind_without_follow(device_keys, app_keys, as_admin=False,
+                               req_type='bind', is_priority='true')
+
+
+def amqp_tests(
+    devices,
+    apps,
+    device_keys,
+    app_keys,
+    dev_admin_id,
+    dev_admin_key,
+    app_admin_id,
+    app_admin_key,
+    ):
+
+    # =============================== AMQP TESTS===============================
+
+    print '''
+
+'''
+    log('''------------------------- AMQP TESTS -------------------------
+
+''',
+        'GREEN')
+
+    # Apps request follow with read-write permissions
+
+    log('---------------> APPS REQUEST FOLLOW WITH READ-WRITE PERMISSIONS'
+        , 'HEADER')
+    follow_dev(device_keys, app_keys, as_admin=False,
+               permission='read-write')
+
+    # Devices approve issue share to apps
+
+    log('---------------> DEVICES APPROVE READ-WRITE FOLLOW REQUESTS WITH SHARE'
+        , 'HEADER')
+    share_dev(devices * apps * 2, dev_admin_id, dev_admin_key)
+
+    # Apps publish to command queue of devices
+
+    log('---------------> APPS PUBLISH TO COMMAND EXCHANGE OF DEVICES',
+        'HEADER')
+    app_publish_amqp(device_keys, app_keys)
+
+    # Devices subscribe to their command queue
+
+    log('---------------> DEVICES SUBSCRIBE TO THEIR COMMAND QUEUES',
+        'HEADER')
+    dev_subscribe_amqp(apps, device_keys, apps)
+
+    # Apps bind to devices' queues
+
+    log('---------------> APPS BIND TO DEVICES', 'HEADER')
+    bind_unbind_dev(device_keys, app_keys, expected=2 * devices,
+                    as_admin=False, req_type='bind')
+
+    # Devices now publish
+
+    log('---------------> DEVICES PUBLISH DATA', 'HEADER')
+    dev_publish_amqp(device_keys)
+
+    # Apps subscribe to messages
+
+    log('---------------> APPS TRY TO READ PUBLISHED DATA', 'HEADER')
+    app_subscribe_amqp(devices, app_keys, devices)
+
+
+    # Apps relinquish write permission
+
+    # log('---------------> APPS WITH WRITE ACCESS UNFOLLOW DEVICES',
+    #    'HEADER')
+    # unfollow_dev(device_keys, app_keys, as_admin=False,
+    #          permission='write')
+
+    # Apps publish to command queue of devices
+
+    # log('---------------> APPS TRY TO PUBLISH TO COMMAND EXCHANGE OF UNFOLLOWED DEVICES'
+    #    , 'HEADER')
+    # app_publish_amqp(device_keys, app_keys)
+
+    # Devices subscribe to their command queue after write unfollow by apps
+
+    # log('---------------> DEVICES SUBSCRIBE TO THEIR COMMAND QUEUES AFTER WRITE UNFOLLOW BY APPS'
+    #    , 'HEADER')
+    # dev_subscribe_amqp(apps, device_keys, 0)
+
+    # Devices publish again
+
+    # log('---------------> DEVICES PUBLISH DATA AFTER WRITE UNFOLLOW',
+    #    'HEADER')
+    # dev_publish_amqp(device_keys)
+
+    # Apps subscribe to messages
+
+    # log('---------------> APPS TRY TO READ PUBLISHED DATA AFTER WRITE UNFOLLOW'
+    #    , 'HEADER')
+    # app_subscribe_amqp(devices, app_keys, devices)
+
+    # Apps unfollow with read permissions
+
+    # log('---------------> APPS UNFOLLOW DEVICES WITH READ ACCESS',
+    #    'HEADER')
+    # unfollow_dev(
+    #    device_keys,
+    #    app_keys,
+    #    as_admin=True,
+    #    permission='read',
+    #    admin_id=app_admin_id,
+    #    admin_key=app_admin_key,
+    #    )
+
+    # Apps try to bind to unfollowed devices
+
+    # log('---------------> APPS TRY TO BIND TO UNFOLLOWED DEVICES',
+    #    'HEADER')
+    # bind_unbind_without_follow(device_keys, app_keys, as_admin=False,
+    #                           req_type='bind')
 
 def functional_tests(*args):
-	
-	if type(args[0]) is list:
-	    devices = args[0][0]
-	    apps    = args[0][1]
 
-	else:
-	    devices = args[0]
-	    apps    = args[1]
+    if type(args[0]) is list:
+        devices = args[0][0]
+        apps = args[0][1]
+    else:
 
-	dev_admin_id, dev_admin_key = gen_admin()
-	app_admin_id, app_admin_key = gen_admin()
+        devices = args[0]
+        apps = args[1]
 
-	print("\n\n")
-	log("========================= FUNCTIONAL TESTS =========================\n\n", 'GREEN', modifier='BOLD')
+    (dev_admin_id, dev_admin_key) = gen_admin()
+    (app_admin_id, app_admin_key) = gen_admin()
 
-	reg_time = time.time()
-	device_keys, app_keys = registrations(devices, apps, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
-	reg_time = time.time() - reg_time
+    print '''
 
-	test_time = time.time()
+'''
+    log('''========================= FUNCTIONAL TESTS =========================
 
-	#Read follow requests. Also tests bind using admin keys
-	follow_with_read(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
+''',
+        'GREEN', modifier='BOLD')
 
-	#Follow requests as admin
-	follow_as_admin(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
+    reg_time = time.time()
+    (device_keys, app_keys) = registrations(
+        devices,
+        apps,
+        dev_admin_id,
+        dev_admin_key,
+        app_admin_id,
+        app_admin_key,
+        )
+    reg_time = time.time() - reg_time
 
-	#Follow with write
-	follow_with_write(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
+    test_time = time.time()
 
-	#Follow requests with read-write permissions
-	follow_with_read_write(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
+    # Read follow requests. Also tests bind using admin keys
 
-	#Bind and unbind as admin
-	bind_as_admin(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
+    follow_with_read(
+        devices,
+        apps,
+        device_keys,
+        app_keys,
+        dev_admin_id,
+        dev_admin_key,
+        app_admin_id,
+        app_admin_key,
+        )
 
-	#Diagnostic channel tests
-	diagnostic_tests(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
+    # Follow requests as admin
 
-	#Priority queue tests
-	priority_tests(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
+    follow_as_admin(
+        devices,
+        apps,
+        device_keys,
+        app_keys,
+        dev_admin_id,
+        dev_admin_key,
+        app_admin_id,
+        app_admin_key,
+        )
 
-	#AMQP tests
-	#amqp_tests(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
+    # Follow with write
 
-	test_time = time.time() - test_time
+    follow_with_write(
+        devices,
+        apps,
+        device_keys,
+        app_keys,
+        dev_admin_id,
+        dev_admin_key,
+        app_admin_id,
+        app_admin_key,
+        )
 
-	dereg_time = time.time()
+    # Follow requests with read-write permissions
 
-	#Deregister all devices and apps
-	deregistrations(device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
+    follow_with_read_write(
+        devices,
+        apps,
+        device_keys,
+        app_keys,
+        dev_admin_id,
+        dev_admin_key,
+        app_admin_id,
+        app_admin_key,
+        )
 
-	dereg_time = time.time() - dereg_time
+    # Bind and unbind as admin
 
-	time_list = [reg_time, test_time, dereg_time]
+    bind_as_admin(
+        devices,
+        apps,
+        device_keys,
+        app_keys,
+        dev_admin_id,
+        dev_admin_key,
+        app_admin_id,
+        app_admin_key,
+        )
 
-	output.put(time_list)
+    # Diagnostic channel tests
+
+    diagnostic_tests(
+        devices,
+        apps,
+        device_keys,
+        app_keys,
+        dev_admin_id,
+        dev_admin_key,
+        app_admin_id,
+        app_admin_key,
+        )
+
+    # Priority queue tests
+
+    priority_tests(
+        devices,
+        apps,
+        device_keys,
+        app_keys,
+        dev_admin_id,
+        dev_admin_key,
+        app_admin_id,
+        app_admin_key,
+        )
+
+    # AMQP tests
+
+    amqp_tests(
+        devices,
+        apps,
+        device_keys,
+        app_keys,
+        dev_admin_id,
+        dev_admin_key,
+        app_admin_id,
+        app_admin_key,
+        )
+
+    test_time = time.time() - test_time
+
+    dereg_time = time.time()
+
+    # Deregister all devices and apps
+
+    deregistrations(
+        device_keys,
+        app_keys,
+        dev_admin_id,
+        dev_admin_key,
+        app_admin_id,
+        app_admin_key,
+        )
+
+    dereg_time = time.time() - dereg_time
+
+    time_list = [reg_time, test_time, dereg_time]
+
+    output.put(time_list)
+
 
 def concurrency_tests():
 
@@ -2435,103 +4154,176 @@ def concurrency_tests():
 
     for num in range(concurrent_processes):
 
-	devices = random.randint(2,7)
-	apps	= random.randint(2,7)
-	
-	num_list.append([devices,apps])
+        devices = random.randint(2, 7)
+        apps = random.randint(2, 7)
 
-    processes = [mp.Process(target=functional_tests, args=(num,)) for num in num_list]
-    
-    for p in processes:
-	p.start()
+        num_list.append([devices, apps])
+
+    processes = [mp.Process(target=functional_tests, args=(num, ))
+                 for num in num_list]
 
     for p in processes:
-	p.join()
+        p.start()
+
+    for p in processes:
+        p.join()
 
     i = 1
 
-    print("\n\n")
-    log("=========================All tests have passed=========================", 'GREEN', modifier='BOLD')
-    
+    print '''
+
+'''
+    log('=========================All tests have passed========================='
+        , 'GREEN', modifier='BOLD')
+
     for p in processes:
 
-	time_list = output.get()
+        time_list = output.get()
 
-	print("\n\n")
-	log("------------------------- Process "+ str(i) +" -------------------------\n\n", 'GREEN')
-	log("Time taken for registrations    :	    "+str(time_list[0])+"s",'GREEN')
-	log("Time taken for test cases       :	    "+str(time_list[1])+"s",'GREEN')
-	log("Time taken for deregistrations  :	    "+str(time_list[2])+"s",'GREEN')
+        print '''
 
-	i = i + 1
+'''
+        log('------------------------- Process ' + str(i)
+            + ''' -------------------------
+
+''', 'GREEN')
+        log("Time taken for registrations    :	    "
+            + str(time_list[0]) + 's', 'GREEN')
+        log("Time taken for test cases       :	    "
+            + str(time_list[1]) + 's', 'GREEN')
+        log("Time taken for deregistrations  :	    "
+            + str(time_list[2]) + 's', 'GREEN')
+
+        i = i + 1
 
     sys.exit(0)
 
+
 def start_tests(devices, apps, args):
-	
-	if args.choice == "fxnl":
-		
-		functional_tests(devices, apps)
-		time_list = output.get()
 
-	elif args.choice == "sec":
-		
-		security_tests()
-		time_list = output.get()
+    if args.choice == 'fxnl':
 
-	elif args.choice == "concr":
-		
-		concurrency_tests()
+        functional_tests(devices, apps)
+        time_list = output.get()
+    elif args.choice == 'sec':
 
-	print("\n\n")
-	log("=========================All tests have passed=========================", 'GREEN', modifier='BOLD')
-	log("Time taken for registrations    :	    "+str(time_list[0])+"s",'GREEN')
-	log("Time taken for test cases       :	    "+str(time_list[1])+"s",'GREEN')
-	log("Time taken for deregistrations  :	    "+str(time_list[2])+"s",'GREEN')
+        security_tests()
+        time_list = output.get()
+    elif args.choice == 'concr':
+
+        concurrency_tests()
+
+    print '''
+
+'''
+    log('=========================All tests have passed========================='
+        , 'GREEN', modifier='BOLD')
+    log("Time taken for registrations    :	    " + str(time_list[0])
+        + 's', 'GREEN')
+    log("Time taken for test cases       :	    " + str(time_list[1])
+        + 's', 'GREEN')
+    log("Time taken for deregistrations  :	    " + str(time_list[2])
+        + 's', 'GREEN')
+
 
 if __name__ == '__main__':
 
-	parser = argparse.ArgumentParser(description='Test cases for Corinthian')
-	subparser = parser.add_subparsers(dest="choice")
+    parser = \
+        argparse.ArgumentParser(description='Test cases for Corinthian')
+    subparser = parser.add_subparsers(dest='choice')
 
-	func_parser = subparser.add_parser("fxnl", help="Performs functional tests")
+    func_parser = subparser.add_parser('fxnl',
+            help='Performs functional tests')
 
-	func_parser.add_argument('-d', '--devices', action="store", dest="devices", type=int, help="No. of devices to run the tests")
-	func_parser.add_argument('-a', '--apps', action="store", dest="apps", type=int, help="No. of apps to run the tests")
-	func_parser.add_argument('--random', action="store_true", help="Run tests with random devices and apps")
+    func_parser.add_argument(
+        '-d',
+        '--devices',
+        action='store',
+        dest='devices',
+        type=int,
+        help='No. of devices to run the tests',
+        )
+    func_parser.add_argument(
+        '-a',
+        '--apps',
+        action='store',
+        dest='apps',
+        type=int,
+        help='No. of apps to run the tests',
+        )
+    func_parser.add_argument('--random', action='store_true',
+                             help='Run tests with random devices and apps'
+                             )
 
-	sec_parser = subparser.add_parser("sec", help="Performs security tests")
+    sec_parser = subparser.add_parser('sec',
+            help='Performs security tests')
 
-	conc_parser = subparser.add_parser("concr", help="Performs concurrency tests")
+    conc_parser = subparser.add_parser('concr',
+            help='Performs concurrency tests')
 
-	conc_parser.add_argument('-d', '--devices', action="store", dest="devices", type=int, help="No. of devices to run the tests")
-	conc_parser.add_argument('-a', '--apps', action="store", dest="apps", type=int, help="No. of apps to run the tests")
-	conc_parser.add_argument('--random', action="store_true", help="Run tests with random devices and apps")
-	
-	all_parser = subparser.add_parser("all", help="Performs all of the above tests")
+    conc_parser.add_argument(
+        '-d',
+        '--devices',
+        action='store',
+        dest='devices',
+        type=int,
+        help='No. of devices to run the tests',
+        )
+    conc_parser.add_argument(
+        '-a',
+        '--apps',
+        action='store',
+        dest='apps',
+        type=int,
+        help='No. of apps to run the tests',
+        )
+    conc_parser.add_argument('--random', action='store_true',
+                             help='Run tests with random devices and apps'
+                             )
 
-	all_parser.add_argument('-d', '--devices', action="store", dest="devices", type=int, help="No. of devices to run the tests")
-	all_parser.add_argument('-a', '--apps', action="store", dest="apps", type=int, help="No. of apps to run the tests")
-	all_parser.add_argument('--random', action="store_true", help="Run tests with random devices and apps")
-	
-	args = parser.parse_args()
+    all_parser = subparser.add_parser('all',
+            help='Performs all of the above tests')
 
-	devices = 0
-	apps 	= 0					
+    all_parser.add_argument(
+        '-d',
+        '--devices',
+        action='store',
+        dest='devices',
+        type=int,
+        help='No. of devices to run the tests',
+        )
+    all_parser.add_argument(
+        '-a',
+        '--apps',
+        action='store',
+        dest='apps',
+        type=int,
+        help='No. of apps to run the tests',
+        )
+    all_parser.add_argument('--random', action='store_true',
+                            help='Run tests with random devices and apps'
+                            )
 
-	if args.choice <> "sec":
+    args = parser.parse_args()
 
-		if args.random:
-			devices = random.randint(10,20)
-			apps 	= random.randint(10,20)
-		else:
-			devices = args.devices
-			apps = args.apps
-		
-	logging.basicConfig(format='%(asctime)s %(levelname)-6s %(message)s', level=logging.DEBUG,
-						datefmt='%Y-%m-%d %H:%M:%S')
-	logging.getLogger("requests").setLevel(logging.WARNING)
-	logging.getLogger("urllib3").setLevel(logging.WARNING)
-	logging.getLogger("pika").setLevel(logging.WARNING)
+    devices = 0
+    apps = 0
 
-	start_tests(devices, apps, args)
+    if args.choice != 'sec':
+
+        if args.random:
+            devices = random.randint(10, 20)
+            apps = random.randint(10, 20)
+        else:
+            devices = args.devices
+            apps = args.apps
+
+    logging.basicConfig(format='%(asctime)s %(levelname)-6s %(message)s'
+                        , level=logging.DEBUG,
+                        datefmt='%Y-%m-%d %H:%M:%S')
+    logging.getLogger('requests').setLevel(logging.WARNING)
+    logging.getLogger('urllib3').setLevel(logging.WARNING)
+    logging.getLogger('pika').setLevel(logging.WARNING)
+
+    start_tests(devices, apps, args)
+
