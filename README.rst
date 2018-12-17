@@ -39,21 +39,40 @@ Quickstart
 
     ./tests/test fxnl --random
 
-Use-case diagram
-================
+Use-case diagrams
+=================
 
-.. image:: https://raw.githubusercontent.com/rbccps-iisc/corinthian/master/DOCS/uc.svg?sanitize=true
+.. image:: https://raw.githubusercontent.com/rbccps-iisc/corinthian/master/DOCS/usecase-diagrams/uc.svg?sanitize=true
+
+Sequence diagrams
+=================
+
+- Registration 
+
+.. image:: https://raw.githubusercontent.com/rbccps-iisc/corinthian/master/DOCS/sequence-diagrams/register.svg?sanitize=true
+
+- Share/Follow 
+
+.. image:: https://raw.githubusercontent.com/rbccps-iisc/corinthian/master/DOCS/sequence-diagrams/follow-share-publish-subscribe.svg?sanitize=true
 
 API
 ===
 - /admin/register-owner
 
-.. image:: https://raw.githubusercontent.com/rbccps-iisc/corinthian/master/DOCS/register-owner.svg?sanitize=true
+.. image:: https://raw.githubusercontent.com/rbccps-iisc/corinthian/master/DOCS/api/register-owner.svg?sanitize=true
 
 - /owner/register-entity
 
-.. image:: https://raw.githubusercontent.com/rbccps-iisc/corinthian/master/DOCS/register-entity.svg?sanitize=true
+.. image:: https://raw.githubusercontent.com/rbccps-iisc/corinthian/master/DOCS/api/register-entity.svg?sanitize=true
 
 - /entity/publish 
 
-.. image:: https://raw.githubusercontent.com/rbccps-iisc/corinthian/master/DOCS/publish.svg?sanitize=true
+.. image:: https://raw.githubusercontent.com/rbccps-iisc/corinthian/master/DOCS/api/publish.svg?sanitize=true
+
+- /entity/follow
+
+.. image:: https://raw.githubusercontent.com/rbccps-iisc/corinthian/master/DOCS/api/follow.svg?sanitize=true
+
+- /entity/follow-status
+
+.. image:: https://raw.githubusercontent.com/rbccps-iisc/corinthian/master/DOCS/api/follow-status.svg?sanitize=true
