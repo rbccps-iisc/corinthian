@@ -4,15 +4,15 @@ hide footbox
 
 group HTTPS POST /owner/register-entity
 
-owner -> middleware: **id**: string\r**apikey**: string\r**entity**: string
+owner -> IUDX: **id**: string\r**apikey**: string\r**entity**: string
 
 end
 
 create entity
-middleware -> entity : new account
+IUDX -> entity : new account
 
 group 201 CREATED
-middleware -> owner: {"**id**": string, "**apikey**": string}
+IUDX -> owner: {"**id**": string, "**apikey**": string}
 end
 
 @enduml
