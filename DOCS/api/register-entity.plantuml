@@ -8,7 +8,7 @@ owner -> IUDX: **id**: string\r**apikey**: string\r**entity**: string
 
 end
 
-create entity
+create entity entity
 IUDX -> entity : new account
 
 group 201 CREATED
