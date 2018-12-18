@@ -393,24 +393,28 @@ def bind_unbind_dev(
 
         approved = 0
 
-        for (app, apikey) in app_keys.items():
-            log('APP ' + app
-                + ' CHECKING APPROVAL STATUS OF FOLLOW REQUESTS BEFORE BINDING'
-                , '')
-            follow_status = follow_requests(app, apikey, 'status')
-            response = follow_status.json()
-            check(follow_status, 200)
+        if message_type != 'public':
 
-            for entry in response:
-                if entry['status'] == 'approved':
-                    approved = approved + 1
+            for (app, apikey) in app_keys.items():
 
-            assert_exit(approved == expected, 'Approved = '
-                        + str(approved) + ' Expected = '
-                        + str(expected))
-            log('APP ' + app + ' HAS RECEIVED ' + str(approved)
-                + ' APPROVALS', '')
-            approved = 0
+                log('APP ' + app
+                    + ' CHECKING APPROVAL STATUS OF FOLLOW REQUESTS BEFORE BINDING'
+                    , '')
+                follow_status = follow_requests(app, apikey, 'status')
+                response = follow_status.json()
+                check(follow_status, 200)
+
+                for entry in response:
+                    if entry['status'] == 'approved':
+                        approved = approved + 1
+
+                assert_exit(approved == expected, 'Approved = '
+                            + str(approved) + ' Expected = '
+                            + str(expected))
+
+                log('APP ' + app + ' HAS RECEIVED ' + str(approved)
+                    + ' APPROVALS', '')
+                approved = 0
 
         for (app, apikey) in app_keys.items():
             for device in device_keys:
@@ -430,31 +434,37 @@ def bind_unbind_dev(
 
         approved = 0
 
+        if message_type != 'public':
+
+            for app in app_keys:
+
+                log('APP ' + app
+                    + ' CHECKING APPROVAL STATUS OF FOLLOW REQUESTS BEFORE BINDING'
+                    , '')
+                follow_status = follow_requests(admin_id, admin_key,
+                        'status')
+                response = follow_status.json()
+
+                check(follow_status, 200)
+
+                for entry in response:
+                    if entry['status'] == 'approved':
+                        approved = approved + 1
+
+                assert_exit(approved == expected, 'Approved = '
+                            + str(approved) + ' Expected = '
+                            + str(expected))
+                log('APP ADMIN HAS RECEIVED ' + str(approved)
+                    + ' APPROVALS', '')
+
+                approved = 0
+
         for app in app_keys:
 
-            log('APP ' + app
-                + ' CHECKING APPROVAL STATUS OF FOLLOW REQUESTS BEFORE BINDING'
-                , '')
-            follow_status = follow_requests(admin_id, admin_key,
-                    'status')
-            response = follow_status.json()
-
-            check(follow_status, 200)
-
-            for entry in response:
-                if entry['status'] == 'approved':
-                    approved = approved + 1
-
-            assert_exit(approved == expected, 'Approved = '
-                        + str(approved) + ' Expected = '
-                        + str(expected))
-            log('APP ADMIN HAS RECEIVED ' + str(approved) + ' APPROVALS'
-                , '')
-            approved = 0
-
-        for app in app_keys:
             for device in device_keys:
+
                 log('APP ' + app + ' BINDING TO DEVICE ' + device, '')
+
                 bind_req = bind_unbind(
                     admin_id,
                     admin_key,
@@ -465,6 +475,7 @@ def bind_unbind_dev(
                     from_id=app,
                     is_priority=is_priority,
                     )
+
                 check(bind_req, 200)
 
 
@@ -777,12 +788,15 @@ def amqp_subscribe(
     messages = []
     i = 0
     t = time.time()
+    tries = 0
 
     while i < num_messages:
 
-	if i< 0:
-	    break
-	
+        tries = tries + 1
+
+        if i < 0 and tries > 500:
+            break
+
         (method_frame, header_frame, body) = channel.basic_get(ID
                 + message_type)
 
@@ -3479,8 +3493,6 @@ def bind_as_admin(
     app_admin_key,
     ):
 
-    print (device_keys, app_keys)
-
     print '''
 
 '''
@@ -3765,6 +3777,7 @@ def priority_tests(
 
     log('---------------> APPS BIND TO DEVICES PROTECTED CHANNEL',
         'HEADER')
+
     bind_unbind_dev(
         device_keys,
         app_keys,
@@ -3867,7 +3880,7 @@ def priority_tests(
 
     # Apps try to bind to unfollowed devices' diagnostics channel
 
-    log("---------------> APPS TRY TO BIND TO UNFOLLOWED DEVICES' DIAGNOSTICS CHANNEL"
+    log("---------------> APPS TRY TO BIND TO UNFOLLOWED DEVICES' PRIORITY CHANNEL"
         , 'HEADER')
     bind_unbind_without_follow(device_keys, app_keys, as_admin=False,
                                req_type='bind', is_priority='true')
@@ -3935,13 +3948,12 @@ def amqp_tests(
     log('---------------> APPS TRY TO READ PUBLISHED DATA', 'HEADER')
     app_subscribe_amqp(devices, app_keys, devices)
 
-
     # Apps relinquish write permission
 
     log('---------------> APPS WITH WRITE ACCESS UNFOLLOW DEVICES',
         'HEADER')
     unfollow_dev(device_keys, app_keys, as_admin=False,
-              permission='write')
+                 permission='write')
 
     # Apps publish to command queue of devices
 
@@ -3964,7 +3976,7 @@ def amqp_tests(
     # Apps subscribe to messages
 
     log('---------------> APPS TRY TO READ PUBLISHED DATA AFTER WRITE UNFOLLOW'
-       , 'HEADER')
+        , 'HEADER')
     app_subscribe_amqp(devices, app_keys, devices)
 
     # Apps unfollow with read permissions
@@ -3983,9 +3995,125 @@ def amqp_tests(
     # Apps try to bind to unfollowed devices
 
     log('---------------> APPS TRY TO BIND TO UNFOLLOWED DEVICES',
-       'HEADER')
+        'HEADER')
     bind_unbind_without_follow(device_keys, app_keys, as_admin=False,
-                              req_type='bind')
+                               req_type='bind')
+
+
+def public_exchange_tests(
+    devices,
+    apps,
+    device_keys,
+    app_keys,
+    dev_admin_id,
+    dev_admin_key,
+    app_admin_id,
+    app_admin_key,
+    ):
+
+    print '''
+
+'''
+    log('''------------------------- PUBLIC EXCHANGE TESTS -------------------------
+
+''',
+        'GREEN')
+
+    # Apps bind to devices' queues
+
+    log('---------------> APPS BIND TO DEVICES', 'HEADER')
+    bind_unbind_dev(
+        device_keys,
+        app_keys,
+        expected=devices,
+        as_admin=False,
+        req_type='bind',
+        message_type='public',
+        )
+
+    # Devices publish data
+
+    log('---------------> DEVICES PUBLISH DATA', 'HEADER')
+    dev_publish(device_keys, message_type='public')
+
+    # Apps subscribe to messages
+
+    log('---------------> APPS TRY TO READ PUBLISHED DATA', 'HEADER')
+    app_subscribe(devices, app_keys, devices)
+
+    # Apps unbind from devices
+
+    log('---------------> APPS UNBIND FROM DEVICES', 'HEADER')
+    bind_unbind_dev(
+        device_keys,
+        app_keys,
+        expected=devices,
+        as_admin=False,
+        req_type='unbind',
+        message_type='public',
+        )
+
+    # Devices again publish messages
+
+    log('---------------> DEVICES PUBLISH DATA', 'HEADER')
+    dev_publish(device_keys, message_type='public')
+
+    # Apps try to subscribe
+
+    log('---------------> APPS TRY TO READ PUBLISHED DATA', 'HEADER')
+    app_subscribe(devices, app_keys, 0)
+
+    # -------------------------Using admin apikey----------------------
+
+    # Apps bind to devices using admin apikey
+
+    log('---------------> APPS BIND TO DEVICES USING ADMIN APIKEY',
+        'HEADER')
+    bind_unbind_dev(
+        device_keys,
+        app_keys,
+        expected=devices,
+        as_admin=True,
+        req_type='bind',
+        message_type='public',
+        admin_id=app_admin_id,
+        admin_key=app_admin_key,
+        )
+
+    # Devices publish data
+
+    log('---------------> DEVICES PUBLISH DATA', 'HEADER')
+    dev_publish(device_keys, message_type='public')
+
+    # Apps subscribe to messages
+
+    log('---------------> APPS TRY TO READ PUBLISHED DATA', 'HEADER')
+    app_subscribe(devices, app_keys, devices)
+
+    # Apps unbind from devices using admin apikey
+
+    log('---------------> APPS UNBIND FROM DEVICES', 'HEADER')
+    bind_unbind_dev(
+        device_keys,
+        app_keys,
+        expected=devices,
+        as_admin=True,
+        req_type='unbind',
+        message_type='public',
+        admin_id=app_admin_id,
+        admin_key=app_admin_key,
+        )
+
+    # Devices again publish messages
+
+    log('---------------> DEVICES PUBLISH DATA', 'HEADER')
+    dev_publish(device_keys, message_type='public')
+
+    # Apps try to subscribe
+
+    log('---------------> APPS TRY TO READ PUBLISHED DATA', 'HEADER')
+    app_subscribe(devices, app_keys, 0)
+
 
 def functional_tests(*args):
 
@@ -4102,6 +4230,19 @@ def functional_tests(*args):
     # Priority queue tests
 
     priority_tests(
+        devices,
+        apps,
+        device_keys,
+        app_keys,
+        dev_admin_id,
+        dev_admin_key,
+        app_admin_id,
+        app_admin_key,
+        )
+
+    # Public exchange tests
+
+    public_exchange_tests(
         devices,
         apps,
         device_keys,

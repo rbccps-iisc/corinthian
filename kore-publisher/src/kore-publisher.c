@@ -1137,14 +1137,13 @@ subscribe (struct http_request *req)
 	kore_buf_reset(response);
 	kore_buf_append(response,"[",1);
 
+	time_t t, time_spent;
+	t = time(NULL);
+
 	for (i = 0; i < int_num_messages; ++i)
 	{
 		amqp_rpc_reply_t res;
 		amqp_message_t 	 message;
-
-		time_t t;
-		t = time(NULL);
-		int time_spent = 0;
 
 		do
 		{
@@ -1247,7 +1246,6 @@ subscribe (struct http_request *req)
 		if (time_spent >= 1)
 			break;
 	}
-
 
 	// remove the last comma
 	if (i > 0)
@@ -2059,26 +2057,29 @@ queue_unbind (struct http_request *req)
 	debug_printf("queue = %s",queue);
 	debug_printf("exchange = %s", exchange);
 
-	// if he is not the owner, he needs an entry in acl
-	if(! is_owner(id,to))
+	if(strcmp(message_type,"public") != 0)
 	{
-		CREATE_STRING (
-			query,
-			"SELECT 1 FROM acl WHERE "
-			"from_id = '%s' "
-			"AND exchange = '%s' "
-			"AND permission = 'read' "
-			"AND valid_till > now() "
-			"AND topic = '%s'",
-			from,
-			exchange,
-			topic
-		);
+	    // if he is not the owner, he needs an entry in acl
+	    if(! is_owner(id,to))
+	    {
+		    CREATE_STRING (
+			    query,
+			    "SELECT 1 FROM acl WHERE "
+			    "from_id = '%s' "
+			    "AND exchange = '%s' "
+			    "AND permission = 'read' "
+			    "AND valid_till > now() "
+			    "AND topic = '%s'",
+			    from,
+			    exchange,
+			    topic
+		    );
 
-		RUN_QUERY(query,"failed to query for permission");
+		    RUN_QUERY(query,"failed to query for permission");
 
-		if (kore_pgsql_ntuples(&sql) != 1)
+		    if (kore_pgsql_ntuples(&sql) != 1)
 			FORBIDDEN("unauthorized");
+	    }
 	}
 
 	amqp_queue_unbind (
@@ -2759,6 +2760,19 @@ share (struct http_request *req)
 		snprintf(bind_exchange,	129,"%s.publish",	from_id);
 		snprintf(bind_queue,	129,"%s",		my_exchange);		// exchange in follow is "device.command"
 		snprintf(bind_topic,	129,"%s.%s",		my_exchange,topic); 	// binding routing is "dev.command.topic"
+
+		if (! amqp_queue_bind (
+			cached_admin_conn,
+			1,
+			amqp_cstring_bytes(bind_queue),
+			amqp_cstring_bytes(bind_exchange),
+			amqp_cstring_bytes(bind_topic),
+			amqp_empty_table
+		    )
+		)
+		{
+			ERROR("bind failed for app.publish with device.command");
+		}
 	}
 	else
 	{
@@ -2767,17 +2781,17 @@ share (struct http_request *req)
 
 	debug_printf("\n--->binding {%s} with {%s} {%s}\n",bind_queue,bind_exchange,bind_topic);
 
-	if (! amqp_queue_bind (
-		cached_admin_conn,
-		1,
-		amqp_cstring_bytes(bind_queue),
-		amqp_cstring_bytes(bind_exchange),
-		amqp_cstring_bytes(bind_topic),
-		amqp_empty_table
-	))
-	{
-		ERROR("bind failed for app.publish with device.command");
-	}
+//	if (! amqp_queue_bind (
+//		cached_admin_conn,
+//		1,
+//		amqp_cstring_bytes(bind_queue),
+//		amqp_cstring_bytes(bind_exchange),
+//		amqp_cstring_bytes(bind_topic),
+//		amqp_empty_table
+//	))
+//	{
+//		ERROR("bind failed for app.publish with device.command");
+//	}
 
 	if (is_from_autonomous)
 		snprintf (exchange, 129, "%s.notification",from_id);
