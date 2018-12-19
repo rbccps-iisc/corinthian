@@ -1605,7 +1605,7 @@ register_owner(struct http_request *req)
 	req->status = 403;
 
 	if (! is_request_from_localhost(req))
-		FORBIDDEN("this api can only be called from localhost");
+		FORBIDDEN("admin APIs can only be called from localhost");
 
 	BAD_REQUEST_if
 	(
@@ -1619,7 +1619,7 @@ register_owner(struct http_request *req)
 	);
 
 	if (strcmp(id,"admin") != 0)
-		FORBIDDEN("only admin can call this api");
+		FORBIDDEN("only admin can call this API");
 
 	string_to_lower(owner);
 
@@ -1708,7 +1708,7 @@ deregister_owner(struct http_request *req)
 	req->status = 403;
 
 	if (! is_request_from_localhost(req))
-		FORBIDDEN("this api can only be called from localhost");
+		FORBIDDEN("admin APIs can only be called from localhost");
 
 	BAD_REQUEST_if
 	(
@@ -1722,7 +1722,7 @@ deregister_owner(struct http_request *req)
 	);
 
 	if (strcmp(id,"admin") != 0)
-		FORBIDDEN("only admin can call this api");
+		FORBIDDEN("only admin can call this API");
 
 	// cannot delete an admin, validator or database
 	if (strcmp(owner,"admin") == 0 || strcmp(owner,"validator") == 0 || strcmp(owner,"database") == 0)

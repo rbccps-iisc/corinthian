@@ -1,3 +1,42 @@
+<h2>Welcome admin</h2>
 
+<div class="tab">
+  <button class="tablinks" onclick="openTab(event, 'Add an owner')" id=defaultTab><h4>Add an owner</h4></button>
+  <button class="tablinks" onclick="openTab(event, 'Manage owners')"><h4>Manage owners</h4></button>
+  <button class="tablinks" onclick="openTab(event, 'Manage entities')"><h4>Manage entities</h4></button>
+</div>
+
+<div id="Add an owner" class="tabcontent">
+	<center>
+	<table>
+		<tr><td>Owner name</td><td><input type=text id=register_owner__owner></td></tr>
+		<tr><td>Max entities</td><td><input type=text></td></tr>
+		<tr><td colspan=2><input type=button value=Submit onclick='register_owner();'></td></tr>
+	</table>
+	</center>
+</div>
+
+<div id="Manage owners" class="tabcontent">
+</div>
+
+<div id="Manage entities" class="tabcontent">
+</div>
+
+<script>
+function openTab(evt, tabName) {
+  var i, tabcontent, tablinks;
+  tabcontent = document.getElementsByClassName("tabcontent");
+  for (i = 0; i < tabcontent.length; i++) {
+    tabcontent[i].style.display = "none";
+  }
+  tablinks = document.getElementsByClassName("tablinks");
+  for (i = 0; i < tablinks.length; i++) {
+    tablinks[i].className = tablinks[i].className.replace(" active", "");
+  }
+  document.getElementById(tabName).style.display = "block";
+  evt.currentTarget.className += " active";
+}
+</script>
+   
 </body>
-</html>
+</html> 

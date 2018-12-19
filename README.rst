@@ -73,10 +73,10 @@ API
 
 .. image:: https://raw.githubusercontent.com/rbccps-iisc/corinthian/master/DOCS/api/subscribe.svg?sanitize=true
 
-- /entity/follow
+- /owner/follow
 
 .. image:: https://raw.githubusercontent.com/rbccps-iisc/corinthian/master/DOCS/api/follow.svg?sanitize=true
 
-- /entity/follow-status
+- /owner/follow-status
 
 .. image:: https://raw.githubusercontent.com/rbccps-iisc/corinthian/master/DOCS/api/follow-status.svg?sanitize=true

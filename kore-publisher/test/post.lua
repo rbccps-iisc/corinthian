@@ -1,6 +1,0 @@
-wrk.method = "GET"
-wrk.headers["id"] = "guest"
-wrk.headers["apikey"] = "guest"
-wrk.headers["to"] = "amq.topic"
-wrk.headers["topic"] = "data"
-wrk.headers["message"] = "hello"
