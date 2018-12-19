@@ -1905,9 +1905,10 @@ queue_bind (struct http_request *req)
 	debug_printf("queue = %s\n",queue);
 	debug_printf("exchange = %s\n", exchange);
 
+	// For all non public messages
+	// if he is not the owner, he needs an entry in acl
 	if(strcmp(message_type,"public") != 0)
 	{
-		// if he is not the owner, he needs an entry in acl
 		if (! is_owner(id,to))
 		{ 
 			CREATE_STRING (
@@ -3693,11 +3694,16 @@ ui_admin (struct http_request *req)
 		REDIRECT("/ui?error");
 
 /////////////////////////////////////////////////
-
+	
+	kore_buf_reset(response);
+	kore_buf_append(response,asset_ADMIN_ui_1_html,asset_len_ADMIN_ui_1_html);
+	kore_buf_appendf(response,"<script language=javascript>var apikey='%s';</script>",apikey);
+	kore_buf_append(response,asset_ADMIN_ui_2_html,asset_len_ADMIN_ui_2_html);
+	
 	OK();
 
 done:
-	END();
+	END_HTML();
 }
 
 int
@@ -3731,10 +3737,15 @@ ui_owner (struct http_request *req)
 
 /////////////////////////////////////////////////
 
+	kore_buf_reset(response);
+	kore_buf_append(response,asset_OWNER_ui_1_html,asset_len_OWNER_ui_1_html);
+	kore_buf_appendf(response,"<script language=javascript>var apikey='%s';</script>",apikey);
+	kore_buf_append(response,asset_OWNER_ui_2_html,asset_len_OWNER_ui_2_html);
+	
 	OK();
 
 done:
-	END();
+	END_HTML();
 }
 
 int
@@ -3773,8 +3784,13 @@ ui_entity (struct http_request *req)
 
 /////////////////////////////////////////////////
 
+	kore_buf_reset(response);
+	kore_buf_append(response,asset_ENTITY_ui_1_html,asset_len_ENTITY_ui_1_html);
+	kore_buf_appendf(response,"<script language=javascript>var apikey='%s';</script>",apikey);
+	kore_buf_append(response,asset_ENTITY_ui_2_html,asset_len_ENTITY_ui_2_html);
+	
 	OK();
 
 done:
-	END();
+	END_HTML();
 }
