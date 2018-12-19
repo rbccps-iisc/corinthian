@@ -4,7 +4,7 @@ hide footbox
 
 group HTTPS POST /owner/register-entity
 
-owner -> IUDX: **id**: string\r**apikey**: string\r**entity**: string
+owner -> IUDX: **id**: string\r**apikey**: string\r**entity**: string\r (optional) **is-autonomous**: string
 
 end
 

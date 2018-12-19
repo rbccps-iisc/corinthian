@@ -2,7 +2,7 @@
 actor "owner" as owner
 hide footbox
 
-group HTTPS GET /entity/follow-status
+group HTTPS GET /owner/follow-status
 owner -> IUDX: **id**: string\r**apikey**: string
 end
 

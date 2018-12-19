@@ -2,7 +2,7 @@ hide footbox
 actor "owner of subscriber" as sowner
 
 
-group HTTPS POST /entity/follow                                                  
+group HTTPS POST /owner/follow                                                  
     sowner -> IUDX: **id**: string\r**apikey**: string\r**to**: string\r**topic**: string\r**permission**: string\r**validity**: string
 end                                                                              
                                                                                  

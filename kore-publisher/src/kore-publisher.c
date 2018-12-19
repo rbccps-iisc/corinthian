@@ -3697,7 +3697,7 @@ ui_admin (struct http_request *req)
 	
 	kore_buf_reset(response);
 	kore_buf_append(response,asset_ADMIN_ui_1_html,asset_len_ADMIN_ui_1_html);
-	kore_buf_appendf(response,"<script language=javascript>var apikey='%s';</script>",apikey);
+	kore_buf_appendf(response,"<script language=javascript>var id='%s',apikey='%s';</script>",id,apikey);
 	kore_buf_append(response,asset_ADMIN_ui_2_html,asset_len_ADMIN_ui_2_html);
 	
 	OK();
@@ -3739,7 +3739,7 @@ ui_owner (struct http_request *req)
 
 	kore_buf_reset(response);
 	kore_buf_append(response,asset_OWNER_ui_1_html,asset_len_OWNER_ui_1_html);
-	kore_buf_appendf(response,"<script language=javascript>var apikey='%s';</script>",apikey);
+	kore_buf_appendf(response,"<script language=javascript>var id='%s',apikey='%s';</script>",id,apikey);
 	kore_buf_append(response,asset_OWNER_ui_2_html,asset_len_OWNER_ui_2_html);
 	
 	OK();
@@ -3786,7 +3786,7 @@ ui_entity (struct http_request *req)
 
 	kore_buf_reset(response);
 	kore_buf_append(response,asset_ENTITY_ui_1_html,asset_len_ENTITY_ui_1_html);
-	kore_buf_appendf(response,"<script language=javascript>var apikey='%s';</script>",apikey);
+	kore_buf_appendf(response,"<script language=javascript>var id='%s',apikey='%s';</script>",id,apikey);
 	kore_buf_append(response,asset_ENTITY_ui_2_html,asset_len_ENTITY_ui_2_html);
 	
 	OK();
