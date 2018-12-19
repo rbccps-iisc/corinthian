@@ -1604,8 +1604,8 @@ register_owner(struct http_request *req)
 
 	req->status = 403;
 
-	if (! is_request_from_localhost(req))
-		FORBIDDEN("admin APIs can only be called from localhost");
+	/* if (! is_request_from_localhost(req))
+		FORBIDDEN("admin APIs can only be called from localhost"); */
 
 	BAD_REQUEST_if
 	(
@@ -1707,8 +1707,8 @@ deregister_owner(struct http_request *req)
 
 	req->status = 403;
 
-	if (! is_request_from_localhost(req))
-		FORBIDDEN("admin APIs can only be called from localhost");
+	/* if (! is_request_from_localhost(req))
+		FORBIDDEN("admin APIs can only be called from localhost"); */
 
 	BAD_REQUEST_if
 	(
@@ -3130,8 +3130,8 @@ block (struct http_request *req)
 
 	if (strcmp(id,"admin") == 0)
 	{
-		if (! is_request_from_localhost(req))
-			FORBIDDEN("admin can only use from localhost");
+		/* if (! is_request_from_localhost(req))
+			FORBIDDEN("admin can only use from localhost"); */
 	}
 	else
 	{
@@ -3185,8 +3185,8 @@ unblock (struct http_request *req)
 
 	if (strcmp(id,"admin") == 0)
 	{
-		if (! is_request_from_localhost(req))
-			FORBIDDEN("admin can only use from localhost");
+		/* if (! is_request_from_localhost(req))
+			FORBIDDEN("admin can only use from localhost"); */
 	}
 	else
 	{
