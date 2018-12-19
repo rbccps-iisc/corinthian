@@ -4,9 +4,6 @@ autonumber "<b>[0]"
 
 actor admin
 
-hnote over admin : logged on IUDX 
-...
-
 admin -> IUDX : HTTPS POST /admin/register-owner
 
 

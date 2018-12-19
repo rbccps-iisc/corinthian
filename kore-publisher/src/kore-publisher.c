@@ -3332,7 +3332,7 @@ create_exchanges_and_queues (void *v)
 		debug_printf("[owner] done creating exchange {%s}\n",my_exchange);
 
 		// create notification queue
-		snprintf(queue,129,"%s.notification",id);
+		snprintf(my_queue,129,"%s.notification",id);
 		debug_printf("[owner] creating queue {%s}\n",my_queue);
 		if (! amqp_queue_declare (
 			cached_admin_conn,
@@ -3345,7 +3345,7 @@ create_exchanges_and_queues (void *v)
 			lazy_queue_table
 		))
 		{
-			fprintf(stderr,"amqp_queue_declare failed {%s}\n",my_queue);
+			fprintf(stderr,"[owner] amqp_queue_declare failed {%s}\n",my_queue);
 			goto done;
 		}
 
@@ -3437,7 +3437,7 @@ create_exchanges_and_queues (void *v)
 				lazy_queue_table
 			))
 			{
-				fprintf(stderr,"amqp_queue_declare failed {%s}\n",my_queue);
+				fprintf(stderr,"[entity] amqp_queue_declare failed {%s}\n",my_queue);
 				goto done;
 			}
 			debug_printf("[entity] DONE creating queue {%s}\n",my_queue);
@@ -3445,7 +3445,7 @@ create_exchanges_and_queues (void *v)
 			// bind .private and .notification 
 			if (strcmp(_q[i],".private") == 0 || strcmp(_q[i],".notification") == 0)
 			{
-				snprintf(exchange,129,"%s%s",id,_q[i]);
+				snprintf(my_exchange,129,"%s%s",id,_q[i]);
 				debug_printf("[entity] binding {%s} -> {%s}\n",my_queue,my_exchange);
 
 				if (! amqp_queue_bind (
