@@ -16,8 +16,8 @@ char *_e[] = {
 		".notification",
 		".publish",
 		".diagnostics",
-		".public.validated",
-		".protected.validated",
+		// ".public.validated",
+		// ".protected.validated",
 		NULL
 };
 
@@ -1629,7 +1629,7 @@ register_owner(struct http_request *req)
 
 	// it should look like an owner
 	if (! looks_like_a_valid_owner(owner))
-		BAD_REQUEST("entity should be a valid owner");
+		BAD_REQUEST("invalid owner");
 
 /////////////////////////////////////////////////
 
@@ -1730,7 +1730,7 @@ deregister_owner(struct http_request *req)
 
 	// it should look like an owner
 	if (! looks_like_a_valid_owner(owner))
-		BAD_REQUEST("not a valid owner");
+		BAD_REQUEST("invalid owner");
 
 /////////////////////////////////////////////////
 
