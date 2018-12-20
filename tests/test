@@ -42,6 +42,7 @@ colour['BOLD'] = '\033[1m'
 colour['UNDERLINE'] = '\033[4m'
 colour[''] = ''
 
+pool = {}
 
 def gen_admin():
 
@@ -111,6 +112,23 @@ def get_entity(device_keys, app_keys, entity_type=''):
 
     return (name, key)
 
+def get_channel(token):
+
+    username = token.split(":")[0]
+    apikey   = token.split(":")[1]
+
+    if token not in pool:
+
+	credentials = pika.PlainCredentials(username, apikey)
+	parameters  = pika.ConnectionParameters(host="localhost", port = 5671, credentials = credentials, ssl=True)
+	connection  = pika.BlockingConnection(parameters)
+	channel	    = connection.channel()
+
+	channel.confirm_delivery()
+
+	pool[token] = channel
+
+    return pool[token]
 
 def register_owner(apikey, owner):
 
@@ -761,16 +779,18 @@ def amqp_publish(
     body,
     ):
 
-    credentials = pika.PlainCredentials(ID, apikey)
-    parameters = pika.ConnectionParameters(host='localhost', port=5671,
-            credentials=credentials, ssl=True)
-    connection = pika.BlockingConnection(parameters)
-    channel = connection.channel()
-    channel.confirm_delivery()
+    #credentials = pika.PlainCredentials(ID, apikey)
+    #parameters = pika.ConnectionParameters(host='localhost', port=5671,
+    #        credentials=credentials, ssl=True)
+    #connection = pika.BlockingConnection(parameters)
+    #channel = connection.channel()
+
+    token = ID+":"+apikey
+
+    channel = get_channel(token)
 
     assert channel.basic_publish(exchange=ID + '.' + message_type,
                                  routing_key=routing_key, body=body)
-
 
 def amqp_subscribe(
     ID,
@@ -779,11 +799,15 @@ def amqp_subscribe(
     message_type='',
     ):
 
-    credentials = pika.PlainCredentials(ID, apikey)
-    parameters = pika.ConnectionParameters(host='localhost', port=5671,
-            credentials=credentials, ssl=True)
-    connection = pika.BlockingConnection(parameters)
-    channel = connection.channel()
+    #credentials = pika.PlainCredentials(ID, apikey)
+    #parameters = pika.ConnectionParameters(host='localhost', port=5671,
+    #        credentials=credentials, ssl=True)
+    #connection = pika.BlockingConnection(parameters)
+    #channel = connection.channel()
+
+    token = ID+":"+apikey
+
+    channel = get_channel(token)
 
     if message_type:
         message_type = '.' + message_type
@@ -801,9 +825,6 @@ def amqp_subscribe(
 	
 	if method_frame.delivery_tag == num_messages:
 	    break
-    
-    channel.close()
-    connection.close()
     
     return messages
 
@@ -827,7 +848,9 @@ def registrations(
         log('REGISTERING DEVICE ' + str(i), '')
         dev_name = 'dev' + ''.join(random.choice(string.ascii_uppercase
                                    + string.ascii_lowercase
-                                   + string.digits) for _ in range(8))
+                                   + string.digits) for _ in range(8)) \
+				   + str(i)
+
         r = register(dev_admin_id, dev_admin_key, dev_name)
         response = r.json()
         log(json.dumps(response), '')
@@ -843,7 +866,9 @@ def registrations(
         log('REGISTERING APP ' + str(i), '')
         app_name = 'app' + ''.join(random.choice(string.ascii_uppercase
                                    + string.ascii_lowercase
-                                   + string.digits) for _ in range(8))
+                                   + string.digits) for _ in range(8)) \
+				   + str(i)
+
         r = register(app_admin_id, app_admin_key, app_name)
         response = r.json()
         log(json.dumps(response), '')
@@ -4161,107 +4186,107 @@ def functional_tests(*args):
 
     # Read follow requests. Also tests bind using admin keys
 
-    follow_with_read(
-        devices,
-        apps,
-        device_keys,
-        app_keys,
-        dev_admin_id,
-        dev_admin_key,
-        app_admin_id,
-        app_admin_key,
-        )
+    #follow_with_read(
+    #    devices,
+    #    apps,
+    #    device_keys,
+    #    app_keys,
+    #    dev_admin_id,
+    #    dev_admin_key,
+    #    app_admin_id,
+    #    app_admin_key,
+    #    )
 
-    # Follow requests as admin
+    ## Follow requests as admin
 
-    follow_as_admin(
-        devices,
-        apps,
-        device_keys,
-        app_keys,
-        dev_admin_id,
-        dev_admin_key,
-        app_admin_id,
-        app_admin_key,
-        )
+    #follow_as_admin(
+    #    devices,
+    #    apps,
+    #    device_keys,
+    #    app_keys,
+    #    dev_admin_id,
+    #    dev_admin_key,
+    #    app_admin_id,
+    #    app_admin_key,
+    #    )
 
-    # Follow with write
+    ## Follow with write
 
-    follow_with_write(
-        devices,
-        apps,
-        device_keys,
-        app_keys,
-        dev_admin_id,
-        dev_admin_key,
-        app_admin_id,
-        app_admin_key,
-        )
+    #follow_with_write(
+    #    devices,
+    #    apps,
+    #    device_keys,
+    #    app_keys,
+    #    dev_admin_id,
+    #    dev_admin_key,
+    #    app_admin_id,
+    #    app_admin_key,
+    #    )
 
-    # Follow requests with read-write permissions
+    ## Follow requests with read-write permissions
 
-    follow_with_read_write(
-        devices,
-        apps,
-        device_keys,
-        app_keys,
-        dev_admin_id,
-        dev_admin_key,
-        app_admin_id,
-        app_admin_key,
-        )
+    #follow_with_read_write(
+    #    devices,
+    #    apps,
+    #    device_keys,
+    #    app_keys,
+    #    dev_admin_id,
+    #    dev_admin_key,
+    #    app_admin_id,
+    #    app_admin_key,
+    #    )
 
-    # Bind and unbind as admin
+    ## Bind and unbind as admin
 
-    bind_as_admin(
-        devices,
-        apps,
-        device_keys,
-        app_keys,
-        dev_admin_id,
-        dev_admin_key,
-        app_admin_id,
-        app_admin_key,
-        )
+    #bind_as_admin(
+    #    devices,
+    #    apps,
+    #    device_keys,
+    #    app_keys,
+    #    dev_admin_id,
+    #    dev_admin_key,
+    #    app_admin_id,
+    #    app_admin_key,
+    #    )
 
-    # Diagnostic channel tests
+    ## Diagnostic channel tests
 
-    diagnostic_tests(
-        devices,
-        apps,
-        device_keys,
-        app_keys,
-        dev_admin_id,
-        dev_admin_key,
-        app_admin_id,
-        app_admin_key,
-        )
+    #diagnostic_tests(
+    #    devices,
+    #    apps,
+    #    device_keys,
+    #    app_keys,
+    #    dev_admin_id,
+    #    dev_admin_key,
+    #    app_admin_id,
+    #    app_admin_key,
+    #    )
 
-    # Priority queue tests
+    ## Priority queue tests
 
-    priority_tests(
-        devices,
-        apps,
-        device_keys,
-        app_keys,
-        dev_admin_id,
-        dev_admin_key,
-        app_admin_id,
-        app_admin_key,
-        )
+    #priority_tests(
+    #    devices,
+    #    apps,
+    #    device_keys,
+    #    app_keys,
+    #    dev_admin_id,
+    #    dev_admin_key,
+    #    app_admin_id,
+    #    app_admin_key,
+    #    )
 
-    # Public exchange tests
+    ## Public exchange tests
 
-    public_exchange_tests(
-        devices,
-        apps,
-        device_keys,
-        app_keys,
-        dev_admin_id,
-        dev_admin_key,
-        app_admin_id,
-        app_admin_key,
-        )
+    #public_exchange_tests(
+    #    devices,
+    #    apps,
+    #    device_keys,
+    #    app_keys,
+    #    dev_admin_id,
+    #    dev_admin_key,
+    #    app_admin_id,
+    #    app_admin_key,
+    #    )
 
     # AMQP tests
 
