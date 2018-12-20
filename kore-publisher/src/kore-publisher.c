@@ -1144,8 +1144,6 @@ subscribe (struct http_request *req)
 		amqp_rpc_reply_t res;
 		amqp_message_t 	 message;
 
-//		do
-//		{
 			res = amqp_basic_get(
 					*cached_conn,
 					1,
@@ -1153,11 +1151,6 @@ subscribe (struct http_request *req)
 					/*no ack*/ 1
 			);
 
-//		} while (
-//			(res.reply_type == AMQP_RESPONSE_NORMAL) 	&&
-//           		(res.reply.id 	== AMQP_BASIC_GET_EMPTY_METHOD) &&
-//           		((time_spent = (time(NULL) - t)) < 1)
-//		);
 
 		if (AMQP_RESPONSE_NORMAL != res.reply_type)
 			break;
@@ -3681,16 +3674,16 @@ ui_admin (struct http_request *req)
 		(! http_argument_get_string(req,"apikey",&apikey))
 	)
 	{
-		REDIRECT("/ui?error");
+		REDIRECT("/ui?");
 	}
 
 /////////////////////////////////////////////////
 
 	if (strcmp(id,"admin") != 0)
-		REDIRECT("/ui?error");
+		REDIRECT("/ui?");
 
 	if (! login_success("admin",apikey,NULL))
-		REDIRECT("/ui?error");
+		REDIRECT("/ui?");
 
 /////////////////////////////////////////////////
 	
@@ -3723,16 +3716,16 @@ ui_owner (struct http_request *req)
 		(! http_argument_get_string(req,"apikey",&apikey))
 	)
 	{
-		REDIRECT("/ui?error");
+		REDIRECT("/ui?");
 	}
 
 /////////////////////////////////////////////////
 
 	if (! looks_like_a_valid_owner(id))
-		REDIRECT("/ui?error");
+		REDIRECT("/ui?");
 
 	if (! login_success(id,apikey,NULL))
-		REDIRECT("/ui?error");
+		REDIRECT("/ui?");
 
 /////////////////////////////////////////////////
 
@@ -3765,21 +3758,21 @@ ui_entity (struct http_request *req)
 		(! http_argument_get_string(req,"apikey",&apikey))
 	)
 	{
-		REDIRECT("/ui?error");
+		REDIRECT("/ui?");
 	}
 
 /////////////////////////////////////////////////
 
 	if (! looks_like_a_valid_entity(id))
-		REDIRECT("/ui?error");
+		REDIRECT("/ui?");
 
 	bool is_autonomous = false;
 
 	if (! login_success(id,apikey, &is_autonomous))
-		REDIRECT("/ui?error");
+		REDIRECT("/ui?");
 
 	if (! is_autonomous)
-		REDIRECT("/ui?error");
+		REDIRECT("/ui?");
 
 /////////////////////////////////////////////////
 
