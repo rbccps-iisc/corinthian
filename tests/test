@@ -700,11 +700,13 @@ def app_publish(device_keys, app_keys, expected_code):
 def app_publish_amqp(device_keys, app_keys):
 
     for (app, apikey) in app_keys.items():
+	count = 0
         for device in device_keys:
+	    count += 1
             log('APP ' + app + ' PUBLISHING TO DEVICE ' + device
                 + '.command EXCHANGE', '')
             amqp_publish(app, apikey, 'publish', device
-                         + '.command.test', 'data')
+                         + '.command.test', 'command message from '+ app)
 
 
 def dev_subscribe_amqp(apps, device_keys, expected):
@@ -716,14 +718,15 @@ def dev_subscribe_amqp(apps, device_keys, expected):
         log('DEVICE ' + device + ' SUBSCRIBING TO ITS COMMAND QUEUE', ''
             )
 
-        messages = amqp_subscribe(device, apikey, apps,
+        messages = amqp_subscribe(device, apikey, expected,
                                   message_type='command')
 
-        assert_exit(len(messages) == expected, 'Actual= ' + str(actual)
+	actual = len(messages)
+
+        assert_exit(actual == expected, 'Actual= ' + str(actual)
                     + ' Expected = ' + str(expected))
         log('DEVICE ' + device + ' HAS RECEIVED ' + str(expected)
             + ' COMMAND MESSAGES', '')
-
 
 def dev_subscribe(apps, device_keys, expected):
 
@@ -763,10 +766,10 @@ def amqp_publish(
             credentials=credentials, ssl=True)
     connection = pika.BlockingConnection(parameters)
     channel = connection.channel()
+    channel.confirm_delivery()
 
     assert channel.basic_publish(exchange=ID + '.' + message_type,
-                                 routing_key=routing_key, body=body,
-                                 mandatory=True)
+                                 routing_key=routing_key, body=body)
 
 
 def amqp_subscribe(
@@ -786,29 +789,23 @@ def amqp_subscribe(
         message_type = '.' + message_type
 
     messages = []
-    i = 0
-    t = time.time()
-    tries = 0
 
-    while i < num_messages:
+    for method_frame, properties, body in channel.consume(ID+message_type, inactivity_timeout=1):
 
-        tries = tries + 1
+	if not method_frame:
+	    break
+	
+	channel.basic_ack(method_frame.delivery_tag)
 
-        if i < 0 and tries > 500:
-            break
-
-        (method_frame, header_frame, body) = channel.basic_get(ID
-                + message_type)
-
-        if method_frame:
-            channel.basic_ack(method_frame.delivery_tag)
-            messages.append(body)
-            i = i + 1
-        else:
-            i = i - 1
-
+	messages.append(body)
+	
+	if method_frame.delivery_tag == num_messages:
+	    break
+    
+    channel.close()
+    connection.close()
+    
     return messages
-
 
 def registrations(
     devices,
@@ -826,7 +823,7 @@ def registrations(
 
     log('---------------> REGISTERING DEVICES ', 'HEADER')
 
-    for i in range(0, devices):
+    for i in range(devices):
         log('REGISTERING DEVICE ' + str(i), '')
         dev_name = 'dev' + ''.join(random.choice(string.ascii_uppercase
                                    + string.ascii_lowercase
@@ -842,7 +839,7 @@ def registrations(
 
     log('---------------> REGISTERING APPS', 'HEADER')
 
-    for i in range(0, apps):
+    for i in range(apps):
         log('REGISTERING APP ' + str(i), '')
         app_name = 'app' + ''.join(random.choice(string.ascii_uppercase
                                    + string.ascii_lowercase
@@ -1029,7 +1026,7 @@ def invalid_apikey(
     log('Received 403: OK', '')
 
     # Unfollow
-
+    # TODO Obtain permissions before unfollowing
     log('---------------> UNFOLLOW USING INVALID APIKEY', 'HEADER')
 
     (app_name, app_key) = get_entity(device_keys, app_keys,
@@ -1047,6 +1044,8 @@ def invalid_apikey(
     log('Received 403: OK', '')
 
     # Unfollow using invalid admin apikey
+
+    # TODO Obtain permissions before unfollowing
 
     log('---------------> UNFOLLOW USING INVALID ADMIN APIKEY', 'HEADER'
         )
@@ -1131,6 +1130,8 @@ def invalid_apikey(
 
     # Bind using invalid device apikey
 
+    # TODO Obtain permissions before binding 
+
     log('---------------> BIND USING INVALID DEVICE APIKEY', 'HEADER')
 
     (dev_name, dev_key) = get_entity(device_keys, app_keys,
@@ -1150,6 +1151,7 @@ def invalid_apikey(
     log('Received 403: OK', '')
 
     # Bind using invalid admin apikey
+    # TODO Obtain permissions before binding 
 
     log('---------------> BIND USING INVALID ADMIN APIKEY', 'HEADER')
 
@@ -1171,6 +1173,7 @@ def invalid_apikey(
     log('Received 403: OK', '')
 
     # Unbind using invalid device apikey
+    # TODO Obtain permissions 
 
     log('---------------> UNBIND USING INVALID DEVICE APIKEY', 'HEADER')
 
@@ -1191,6 +1194,7 @@ def invalid_apikey(
     log('Received 403: OK', '')
 
     # Bind using invalid admin apikey
+    # TODO Obtain permissions 
 
     log('---------------> UNBIND USING INVALID ADMIN APIKEY', 'HEADER')
 
@@ -1211,7 +1215,7 @@ def invalid_apikey(
     check(r, 403)
     log('Received 403: OK', '')
 
-    # Block using invalid admin apikey....
+    # Block using invalid admin apikey
 
     log('---------------> BLOCK USING INVALID ADMIN APIKEY', 'HEADER')
 
@@ -1220,7 +1224,7 @@ def invalid_apikey(
     check(r, 403)
     log('Received 403: OK', '')
 
-    # Unblock using invalid admin apikey....
+    # Unblock using invalid admin apikey
 
     log('---------------> UNBLOCK USING INVALID ADMIN APIKEY', 'HEADER')
 
@@ -1417,6 +1421,7 @@ def invalid_id(
     log('Received 403: OK', '')
 
     # Unfollow
+    # TODO Obtain permissions 
 
     log('---------------> UNFOLLOW USING INVALID ID', 'HEADER')
 
@@ -1435,6 +1440,7 @@ def invalid_id(
     log('Received 403: OK', '')
 
     # Unfollow using invalid admin id
+    # TODO Obtain permissions 
 
     log('---------------> UNFOLLOW USING INVALID ADMIN ID', 'HEADER')
 
@@ -1518,6 +1524,7 @@ def invalid_id(
     log('Received 403: OK', '')
 
     # Bind using invalid device id
+    # TODO Obtain permissions 
 
     log('---------------> BIND USING INVALID DEVICE ID', 'HEADER')
 
@@ -1538,6 +1545,7 @@ def invalid_id(
     log('Received 403: OK', '')
 
     # Bind using invalid admin id
+    # TODO Obtain permissions 
 
     log('---------------> BIND USING INVALID ADMIN ID', 'HEADER')
 
@@ -1559,6 +1567,7 @@ def invalid_id(
     log('Received 403: OK', '')
 
     # Unbind using invalid device id
+    # TODO Obtain permissions 
 
     log('---------------> UNBIND USING INVALID DEVICE ID', 'HEADER')
 
@@ -1578,7 +1587,8 @@ def invalid_id(
     check(r, 403)
     log('Received 403: OK', '')
 
-    # Bind using invalid admin idy
+    # Bind using invalid admin id
+    # TODO Obtain permissions 
 
     log('---------------> UNBIND USING INVALID ADMIN ID', 'HEADER')
 
@@ -1599,7 +1609,7 @@ def invalid_id(
     check(r, 403)
     log('Received 403: OK', '')
 
-    # Block using invalid admin id....
+    # Block using invalid admin id
 
     log('---------------> BLOCK USING INVALID ADMIN ID', 'HEADER')
 
@@ -1608,7 +1618,7 @@ def invalid_id(
     check(r, 403)
     log('Received 403: OK', '')
 
-    # Unblock using invalid admin id....
+    # Unblock using invalid admin id
 
     log('---------------> UNBLOCK USING INVALID ADMIN ID', 'HEADER')
 
