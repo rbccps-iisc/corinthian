@@ -1137,16 +1137,15 @@ subscribe (struct http_request *req)
 	kore_buf_reset(response);
 	kore_buf_append(response,"[",1);
 
-	time_t t, time_spent;
-	t = time(NULL);
+	time_t start_time = time(NULL);
 
 	for (i = 0; i < int_num_messages; ++i)
 	{
 		amqp_rpc_reply_t res;
 		amqp_message_t 	 message;
 
-		do
-		{
+//		do
+//		{
 			res = amqp_basic_get(
 					*cached_conn,
 					1,
@@ -1154,11 +1153,11 @@ subscribe (struct http_request *req)
 					/*no ack*/ 1
 			);
 
-		} while (
-			(res.reply_type == AMQP_RESPONSE_NORMAL) 	&&
-           		(res.reply.id 	== AMQP_BASIC_GET_EMPTY_METHOD) &&
-           		((time_spent = (time(NULL) - t)) < 1)
-		);
+//		} while (
+//			(res.reply_type == AMQP_RESPONSE_NORMAL) 	&&
+//           		(res.reply.id 	== AMQP_BASIC_GET_EMPTY_METHOD) &&
+//           		((time_spent = (time(NULL) - t)) < 1)
+//		);
 
 		if (AMQP_RESPONSE_NORMAL != res.reply_type)
 			break;
@@ -1243,7 +1242,7 @@ subscribe (struct http_request *req)
 		kore_buf_append(response,"},",2);
 
 		// we waited for messages for at least a second
-		if (time_spent >= 1)
+		if ((time(NULL) - start_time) > 1)
 			break;
 	}
 
