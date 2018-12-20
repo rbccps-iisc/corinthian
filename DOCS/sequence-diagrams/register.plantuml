@@ -6,8 +6,6 @@ actor admin
 
 admin -> IUDX : HTTPS POST /admin/register-owner
 
-
-
 IUDX -> IUDX : create new owner
 
 IUDX -> admin: 201 CREATED + <credentials in body>
