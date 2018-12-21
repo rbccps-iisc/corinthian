@@ -1293,6 +1293,11 @@ reset_apikey (struct http_request *req)
 		if (strcmp(id,"admin") != 0)
 			FORBIDDEN("unauthorized");
 	}
+
+	OK();
+
+done:
+	END();
 }
 
 int
@@ -1348,12 +1353,12 @@ set_autonomous(struct http_request *req)
 /////////////////////////////////////////////////
 
 	CREATE_STRING (query,
-		"UPDATE users SET is_autonomous = '%c' WHERE id = '%s'"
+		"UPDATE users SET is_autonomous = '%c' WHERE id = '%s'",
 			char_is_autonomous,
 			entity
 	);
 
-	RUN_QUERY("failed to set is-autonomous state");
+	RUN_QUERY(query,"failed to set is-autonomous state");
 
 	OK();
 
