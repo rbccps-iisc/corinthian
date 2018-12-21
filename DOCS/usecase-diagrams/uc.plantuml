@@ -1,10 +1,10 @@
 @startuml
-
-
 left to right direction
 
+entity owner as "owner\n(a legal entity)"
 
-rectangle "Manage owners" {
+
+rectangle "Manage xowners" {
 
 	(Register owner)
 	(Deregister owner)
@@ -87,7 +87,7 @@ entity entity
 (Get a list of\naccessible\ndata streams) <-- entity
 (Search catalog) <-- entity
 
-actor "autonomous entity" as a
+entity "autonomous entity" as a
 entity <|- a : is an
 
 (Send a follow\nrequest) <-- a
@@ -97,8 +97,4 @@ entity <|- a : is an
 (Unfollow) <-- a
 (Get list of\nfollow requests) <-- a
 
-
-
-
 @enduml
-
