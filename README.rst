@@ -2,8 +2,14 @@
 Corinthian
 ==========
 
-.. image:: https://travis-ci.org/rbccps-iisc/corinthian.svg?branch=master
+|travis| |codacy| |license|
+
+.. |travis| image:: https://travis-ci.org/rbccps-iisc/corinthian.svg?branch=master
     :target: https://travis-ci.org/rbccps-iisc/corinthian
+    
+.. |codacy| image:: https://api.codacy.com/project/badge/Grade/d69aaf669bb9416580118d55566dc648
+
+.. |license| image:: https://img.shields.io/badge/license-ISC-blue.svg
     
 An IUDX compliant IoT middleware for smart cities
 
