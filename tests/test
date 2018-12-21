@@ -28,6 +28,8 @@ base_url = 'https://localhost'
 s = requests.Session()
 s.mount('https://localhost/', HTTPAdapter(pool_connections=10))
 
+admin_apikey = open("vars/admin.passwd","r").read()[:-1]
+
 output = mp.Queue()
 
 colour = {}
@@ -44,28 +46,25 @@ colour[''] = ''
 
 pool = {}
 
-def gen_admin():
+def cleanup():
 
-    admin_id = gen_rand(8)
-    apikey = gen_rand(32)
-    salt = gen_rand(32)
-
-    string = apikey + salt + admin_id
-
-    hash_string = hashlib.sha256(string.encode()).hexdigest()
-
-    cmd = \
-        'docker exec postgres psql -U postgres -c "insert into users values(\'' \
-        + admin_id + "','" + hash_string + "',NULL,'" + salt \
-        + '\',\'f\',\'t\') ON CONFLICT DO NOTHING"'
+    cmd = """ docker exec postgres psql -U postgres -c "delete from follow where status = 'pending';" """
 
     try:
-        p = subprocess.check_output(cmd, shell=True)
-    except Exception, e:
-        print 'Could not create admin user'
-        sys.exit(1)
+	subprocess.check_output(cmd, shell=True)
+    except Exception as e:
+	print("failed to cleanup")
+	sys.exit(1)
 
-    return (admin_id, apikey)
+def gen_owner():
+
+    owner_id = gen_rand(8)
+    
+    r = register_owner(admin_apikey, owner_id)
+    
+    apikey = r.json()["apikey"]
+
+    return (owner_id, apikey)
 
 
 def log(message, clr, modifier=''):
@@ -117,6 +116,8 @@ def get_channel(token):
     username = token.split(":")[0]
     apikey   = token.split(":")[1]
 
+    global pool
+
     if token not in pool:
 
 	credentials = pika.PlainCredentials(username, apikey)
@@ -132,21 +133,22 @@ def get_channel(token):
 
 def register_owner(apikey, owner):
 
-    url = base_url + '/register-owner'
+    url = base_url + '/admin/register-owner'
     headers = {'id': 'admin', 'apikey': apikey, 'owner': owner}
     r = s.post(url=url, headers=headers, verify=False)
     return r
 
 
-def register(ID, apikey, entity_id):
+def register(ID, apikey, entity_id, is_autonomous="true"):
 
     url = base_url + '/owner/register-entity'
     headers = {
         'id': ID,
         'apikey': apikey,
         'entity': entity_id,
-        'is-autonomous': 'true',
+        'is-autonomous': is_autonomous,
         }
+
     r = s.post(url=url, headers=headers, data='{"test":"schema"}',
                verify=False)
     return r
@@ -395,6 +397,78 @@ def dev_publish_amqp(device_keys, message_type='protected'):
                      'test message from ' + device)
 
 
+def non_autonomous_permissions(device_keys, app_keys):
+
+    for device, apikey in device_keys.items():
+
+	r = permissions(device, apikey)
+	check(r, 403)
+
+    for app, apikey in app_keys.items():
+
+	r = permissions(app, apikey)
+	check(r, 403)
+
+
+def non_autonomous_reject_follow(device_keys, admin_id, admin_key):
+
+    r = follow_requests(admin_id, admin_key, 'requests')
+    response = r.json()
+
+    for follow_request in response:
+
+	device	    = str(follow_request['to']).split(".")[0]
+	apikey	    = str(device_keys[device])
+	follow_id   = str(follow_request['follow-id'])
+
+	log('NON AUTONOMOUS DEVICE ' + device + ' TRYING TO REJECT FOLLOW REQUESTS', '')
+
+	r   = reject_follow(device, apikey, follow_id)
+	check(r, 403)
+
+def non_autonomous_follow_status(device_keys, app_keys, req_type="status"):
+
+    if req_type == "requests":
+
+	for device, apikey in device_keys.items():
+
+	    log("DEVICE "+ device + " TRYING TO READ FOLLOW REQUESTS", "")
+
+	    r = follow_requests(device, apikey, "requests")
+
+	    check(r, 403)
+
+    if req_type == "status":
+
+	for app, apikey in app_keys.items():
+
+	    log("APP "+ app + " TRYING TO READ FOLLOW STATUS", "")
+
+	    r = follow_requests(app, apikey, "status")
+
+	    check(r, 403)
+
+def non_autonomous_bind_unbind(device_keys, app_keys, req_type, message_type="protected", is_priority="false"):
+
+    for app, apikey in app_keys.items():
+
+	for device in device_keys:
+
+            log('APP ' + app + ' (UN)BINDING FROM DEVICE '
+                    + device, '')
+
+            bind_req = bind_unbind(
+                    app,
+                    apikey,
+                    device,
+                    'test',
+                    req_type,
+                    message_type,
+                    is_priority=is_priority,
+                    )
+            
+	    check(bind_req, 403)
+
 def bind_unbind_dev(
     device_keys,
     app_keys,
@@ -448,6 +522,7 @@ def bind_unbind_dev(
                     is_priority=is_priority,
                     )
                 check(bind_req, 200)
+
     elif as_admin == True:
 
         approved = 0
@@ -608,6 +683,7 @@ def follow_dev(
     message_type='protected',
     admin_id='',
     admin_key='',
+    expected=202
     ):
 
     if as_admin == True:
@@ -623,7 +699,7 @@ def follow_dev(
                     from_id=app,
                     message_type=message_type,
                     )
-                check(r, 202)
+                check(r, expected)
     elif as_admin == False:
 
         for (app, apikey) in app_keys.items():
@@ -632,7 +708,7 @@ def follow_dev(
                     + device, '')
                 r = follow(app, apikey, device, permission,
                            message_type=message_type)
-                check(r, 202)
+                check(r, expected)
 
 
 def unfollow_dev(
@@ -643,6 +719,7 @@ def unfollow_dev(
     message_type='protected',
     admin_id='',
     admin_key='',
+    expected=200
     ):
 
     if as_admin == True:
@@ -659,7 +736,8 @@ def unfollow_dev(
                     message_type,
                     from_id=app,
                     )
-                check(r, 200)
+                check(r, expected)
+
     elif as_admin == False:
 
         for (app, apikey) in app_keys.items():
@@ -674,27 +752,69 @@ def unfollow_dev(
                     permission,
                     message_type,
                     )
-                check(r, 200)
+                check(r, expected)
 
-
-def share_dev(expected, admin_id, admin_key):
+def non_autonomous_share(device_keys, admin_id, admin_key):
 
     r = follow_requests(admin_id, admin_key, 'requests')
     response = r.json()
-    count = 0
 
-    check(r, 200)
+    for follow_request in response:
 
-    for follow_req in response:
-        count = count + 1
-        log('SHARE FROM DEVICE ' + str(follow_req['to']).split('.')[0]
-            + ' TO APP ' + str(follow_req['from']), '')
-        share_req = share(admin_id, admin_key,
-                          str(follow_req['follow-id']))
-        check(share_req, 200)
+	device	    = str(follow_request['to']).split(".")[0]
+	apikey	    = str(device_keys[device])
+	follow_id   = str(follow_request['follow-id'])
 
-    assert_exit(count == expected, 'Count= ' + str(count)
-                + ' Expected = ' + str(expected))
+	log('NON AUTONOMOUS DEVICE ' + device + ' TRYING TO INVOKE SHARE', '')
+
+	share_req = share(device, apikey, follow_id)
+	check(share_req, 403)
+	
+def share_dev(device_keys, expected_requests, as_admin=False, admin_id="", admin_key="", expected_code=200):
+
+    if as_admin == False:
+
+	for device, apikey in device_keys.items():
+	
+	    r = follow_requests(device, apikey, 'requests')
+	    response = r.json()
+	    count = 0
+
+	    check(r, 200)
+
+	    for follow_req in response:
+		
+		count = count + 1
+	    
+		log('SHARE FROM DEVICE ' + device + ' TO APP ' + str(follow_req['from']), '')
+	    
+		share_req = share(device, apikey, str(follow_req['follow-id']))
+	    
+		check(share_req, expected_code)
+
+	    assert_exit(count == expected_requests, 'Actual = ' + str(count)
+                + ' Expected = ' + str(expected_requests))
+    
+    elif as_admin == True:
+
+	    r = follow_requests(admin_id, admin_key, 'requests')
+	    response = r.json()
+	    count = 0
+
+	    check(r, 200)
+
+	    for follow_req in response:
+		
+		count = count + 1
+	    
+		log('SHARE FROM DEVICE ' +  str(follow_req['to']).split('.')[0] + ' TO APP ' + str(follow_req['from']), '')
+	    
+		share_req = share(admin_id, admin_key, str(follow_req['follow-id']))
+	    
+		check(share_req, expected_code)
+
+	    assert_exit(count == expected_requests, 'Actual = ' + str(count)
+                + ' Expected = ' + str(expected_requests))
 
 
 def app_publish(device_keys, app_keys, expected_code):
@@ -3031,6 +3151,238 @@ def invalid_deregistrations(
     check(r, 403)
     log('Received 403: OK', '')
 
+def is_autonomous(devices, apps):
+
+    print '''
+
+'''
+    log('''========================= IS-AUTONOMOUS TEST CASES =========================
+
+''',
+        'GREEN', modifier='BOLD')
+
+    device_keys = {}
+    app_keys	= {}
+
+    (dev_admin_id, dev_admin_key) = gen_owner()
+    (app_admin_id, app_admin_key) = gen_owner()
+
+    log('---------------> REGISTERING DEVICES ', 'HEADER')
+
+    for i in range(devices):
+        log('REGISTERING DEVICE ' + str(i), '')
+        dev_name = 'dev' + ''.join(random.choice(string.ascii_uppercase
+                                   + string.ascii_lowercase
+                                   + string.digits) for _ in range(8)) \
+				   + str(i)
+
+        r = register(dev_admin_id, dev_admin_key, dev_name, is_autonomous="false")
+        response = r.json()
+        log(json.dumps(response), '')
+        check(r, 201)
+
+        device_keys[response['id']] = response['apikey']
+
+    log('---------------> REGISTERING APPS', 'HEADER')
+
+    for i in range(devices):
+        log('REGISTERING APP ' + str(i), '')
+        dev_name = 'app' + ''.join(random.choice(string.ascii_uppercase
+                                   + string.ascii_lowercase
+                                   + string.digits) for _ in range(8)) \
+				   + str(i)
+
+        r = register(app_admin_id, app_admin_key, dev_name, is_autonomous="false")
+        response = r.json()
+        log(json.dumps(response), '')
+        check(r, 201)
+
+        app_keys[response['id']] = response['apikey']
+
+    print '''
+
+'''
+    log('''------------------------- FOLLOW API -------------------------
+
+''',
+        'GREEN')
+
+    log('---------------> DEVICES TRY TO FOLLOW WITH READ PERMISSION ',
+        'HEADER')
+
+    follow_dev(device_keys, app_keys, as_admin=False, permission="read", expected=403)
+
+    print '''
+
+'''
+    log('''------------------------- UNFOLLOW API -------------------------
+
+''',
+        'GREEN')
+
+    log('---------------> FOLLOW REQUESTS AS ADMIN ',
+        'HEADER')
+
+    follow_dev(device_keys, app_keys, as_admin=True, permission="read", admin_id = app_admin_id, admin_key = app_admin_key)
+
+    log('---------------> DEVICES READ FOLLOW REQUESTS AND ISSUE SHARE TO APPS'
+        , 'HEADER')
+
+    share_dev(device_keys, apps, as_admin=True, admin_id=dev_admin_id, admin_key=dev_admin_key)
+
+    log('---------------> APPS TRY TO UNFOLLOW DEVICES'
+        , 'HEADER')
+
+    unfollow_dev(device_keys, app_keys, as_admin=False, permission="read", expected=403)
+
+    log('---------------> APPS UNFOLLOW DEVICES USING ADMIN APIKEY'
+        , 'HEADER')
+
+    unfollow_dev(device_keys, app_keys, as_admin=True, permission="read", admin_id=app_admin_id, admin_key=app_admin_key)
+
+    print '''
+
+'''
+    log('''------------------------- SHARE API -------------------------
+
+''',
+        'GREEN')
+
+    log('---------------> FOLLOW REQUESTS AS ADMIN ',
+        'HEADER')
+
+    follow_dev(device_keys, app_keys, as_admin=True, permission="read", admin_id = app_admin_id, admin_key = app_admin_key)
+
+    log('---------------> DEVICES TRY TO INVOKE SHARE ',
+        'HEADER')
+
+    non_autonomous_share(device_keys, dev_admin_id, dev_admin_key) 
+
+    print '''
+
+'''
+    log('''------------------------- BIND API -------------------------
+
+''',
+        'GREEN')
+
+    cleanup()
+
+    log('---------------> FOLLOW REQUESTS AS ADMIN ',
+        'HEADER')
+
+    follow_dev(device_keys, app_keys, as_admin=True, permission="read", admin_id = app_admin_id, admin_key = app_admin_key)
+
+    log('---------------> DEVICES READ FOLLOW REQUESTS AND ISSUE SHARE TO APPS'
+        , 'HEADER')
+
+    share_dev(device_keys, apps, as_admin=True, admin_id=dev_admin_id, admin_key=dev_admin_key)
+
+    log('---------------> NON AUTONOMOUS APPS TRY TO BIND ',
+        'HEADER')
+
+    non_autonomous_bind_unbind(device_keys, app_keys, "bind")
+
+    log('---------------> APPS UNFOLLOW DEVICES USING ADMIN APIKEY'
+        , 'HEADER')
+
+    unfollow_dev(device_keys, app_keys, as_admin=True, permission="read", admin_id=app_admin_id, admin_key=app_admin_key)
+
+    print '''
+
+'''
+    log('''------------------------- UNBIND API -------------------------
+
+''',
+        'GREEN')
+
+    cleanup()
+
+    log('---------------> FOLLOW REQUESTS AS ADMIN ',
+        'HEADER')
+
+    follow_dev(device_keys, app_keys, as_admin=True, permission="read", admin_id = app_admin_id, admin_key = app_admin_key)
+
+    log('---------------> DEVICES READ FOLLOW REQUESTS AND ISSUE SHARE TO APPS'
+        , 'HEADER')
+
+    share_dev(device_keys, apps, as_admin=True, admin_id=dev_admin_id, admin_key=dev_admin_key)
+
+    log('---------------> APPS BIND TO DEVICES USING ADMIN APIKEY'
+        , 'HEADER')
+    
+    bind_unbind_dev(device_keys, app_keys, expected=(devices*apps), as_admin=True, req_type="bind", admin_id=app_admin_id, admin_key=app_admin_key) 
+
+    log('---------------> NON AUTONOMOUS APPS TRY TO UNBIND ',
+        'HEADER')
+
+    non_autonomous_bind_unbind(device_keys, app_keys, "unbind")
+
+    log('---------------> APPS UNFOLLOW DEVICES USING ADMIN APIKEY'
+        , 'HEADER')
+
+    unfollow_dev(device_keys, app_keys, as_admin=True, permission="read", admin_id=app_admin_id, admin_key=app_admin_key)
+
+    print '''
+
+'''
+    log('''------------------------- FOLLOW REQUESTS API -------------------------
+
+''',
+        'GREEN')
+
+    cleanup()
+
+    log('---------------> FOLLOW REQUESTS AS ADMIN ',
+        'HEADER')
+
+    follow_dev(device_keys, app_keys, as_admin=True, permission="read", admin_id = app_admin_id, admin_key = app_admin_key)
+
+    non_autonomous_follow_status(device_keys, app_keys, req_type="requests")
+
+    print '''
+
+'''
+    log('''------------------------- FOLLOW STATUS API -------------------------
+
+''',
+        'GREEN')
+
+    cleanup()
+
+    log('---------------> FOLLOW REQUESTS AS ADMIN ',
+        'HEADER')
+
+    follow_dev(device_keys, app_keys, as_admin=True, permission="read", admin_id = app_admin_id, admin_key = app_admin_key)
+
+    non_autonomous_follow_status(device_keys, app_keys, req_type="status")
+
+    print '''
+
+'''
+    log('''------------------------- REJECT FOLLOW API -------------------------
+
+''',
+        'GREEN')
+
+    cleanup()
+
+    log('---------------> FOLLOW REQUESTS AS ADMIN ',
+        'HEADER')
+
+    follow_dev(device_keys, app_keys, as_admin=True, permission="read", admin_id = app_admin_id, admin_key = app_admin_key)
+
+    non_autonomous_reject_follow(device_keys, dev_admin_id, dev_admin_key)
+
+#    print '''
+#
+#'''
+#    log('''------------------------- PERMISSIONS API -------------------------
+#
+#''',
+#        'GREEN')
+#
+#    non_autonomous_permissions(device_keys, app_keys)
 
 def security_tests():
 
@@ -3045,8 +3397,8 @@ def security_tests():
     devices = random.randint(2, 5)
     apps = random.randint(2, 5)
 
-    (dev_admin_id, dev_admin_key) = gen_admin()
-    (app_admin_id, app_admin_key) = gen_admin()
+    (dev_admin_id, dev_admin_key) = gen_owner()
+    (app_admin_id, app_admin_key) = gen_owner()
 
     reg_time = time.time()
     (device_keys, app_keys) = registrations(
@@ -3071,120 +3423,122 @@ def security_tests():
 
     # Invalid apikey tests
 
-    invalid_apikey(
-        devices,
-        apps,
-        device_keys,
-        app_keys,
-        dev_admin_id,
-        dev_admin_key,
-        app_admin_id,
-        app_admin_key,
-        )
+    #invalid_apikey(
+    #    devices,
+    #    apps,
+    #    device_keys,
+    #    app_keys,
+    #    dev_admin_id,
+    #    dev_admin_key,
+    #    app_admin_id,
+    #    app_admin_key,
+    #    )
 
-    # Invalid ID tests
+    ## Invalid ID tests
 
-    invalid_id(
-        devices,
-        apps,
-        device_keys,
-        app_keys,
-        dev_admin_id,
-        dev_admin_key,
-        app_admin_id,
-        app_admin_key,
-        )
+    #invalid_id(
+    #    devices,
+    #    apps,
+    #    device_keys,
+    #    app_keys,
+    #    dev_admin_id,
+    #    dev_admin_key,
+    #    app_admin_id,
+    #    app_admin_key,
+    #    )
 
-    # Invalid publish
+    ## Invalid publish
 
-    invalid_publish(
-        devices,
-        apps,
-        device_keys,
-        app_keys,
-        dev_admin_id,
-        dev_admin_key,
-        app_admin_id,
-        app_admin_key,
-        )
+    #invalid_publish(
+    #    devices,
+    #    apps,
+    #    device_keys,
+    #    app_keys,
+    #    dev_admin_id,
+    #    dev_admin_key,
+    #    app_admin_id,
+    #    app_admin_key,
+    #    )
 
-    # Invalid subscribe
+    ## Invalid subscribe
 
-    invalid_subscribe(
-        devices,
-        apps,
-        device_keys,
-        app_keys,
-        dev_admin_id,
-        dev_admin_key,
-        app_admin_id,
-        app_admin_key,
-        )
+    #invalid_subscribe(
+    #    devices,
+    #    apps,
+    #    device_keys,
+    #    app_keys,
+    #    dev_admin_id,
+    #    dev_admin_key,
+    #    app_admin_id,
+    #    app_admin_key,
+    #    )
 
-    # Invalid bind
+    ## Invalid bind
 
-    invalid_bind(
-        devices,
-        apps,
-        device_keys,
-        app_keys,
-        dev_admin_id,
-        dev_admin_key,
-        app_admin_id,
-        app_admin_key,
-        )
+    #invalid_bind(
+    #    devices,
+    #    apps,
+    #    device_keys,
+    #    app_keys,
+    #    dev_admin_id,
+    #    dev_admin_key,
+    #    app_admin_id,
+    #    app_admin_key,
+    #    )
 
-    # Invalid unbind
+    ## Invalid unbind
 
-    invalid_unbind(
-        devices,
-        apps,
-        device_keys,
-        app_keys,
-        dev_admin_id,
-        dev_admin_key,
-        app_admin_id,
-        app_admin_key,
-        )
+    #invalid_unbind(
+    #    devices,
+    #    apps,
+    #    device_keys,
+    #    app_keys,
+    #    dev_admin_id,
+    #    dev_admin_key,
+    #    app_admin_id,
+    #    app_admin_key,
+    #    )
 
-    # Invalid follow
+    ## Invalid follow
 
-    invalid_follow(
-        devices,
-        apps,
-        device_keys,
-        app_keys,
-        dev_admin_id,
-        dev_admin_key,
-        app_admin_id,
-        app_admin_key,
-        )
+    #invalid_follow(
+    #    devices,
+    #    apps,
+    #    device_keys,
+    #    app_keys,
+    #    dev_admin_id,
+    #    dev_admin_key,
+    #    app_admin_id,
+    #    app_admin_key,
+    #    )
 
-    # Invalid unfollow
+    ## Invalid unfollow
 
-    invalid_unfollow(
-        devices,
-        apps,
-        device_keys,
-        app_keys,
-        dev_admin_id,
-        dev_admin_key,
-        app_admin_id,
-        app_admin_key,
-        )
+    #invalid_unfollow(
+    #    devices,
+    #    apps,
+    #    device_keys,
+    #    app_keys,
+    #    dev_admin_id,
+    #    dev_admin_key,
+    #    app_admin_id,
+    #    app_admin_key,
+    #    )
 
-    # Invalid deregistrations
+    ## Invalid deregistrations
 
-    invalid_deregistrations(
-        devices,
-        apps,
-        device_keys,
-        app_keys,
-        dev_admin_id,
-        dev_admin_key,
-        app_admin_id,
-        app_admin_key,
-        )
+    #invalid_deregistrations(
+    #    devices,
+    #    apps,
+    #    device_keys,
+    #    app_keys,
+    #    dev_admin_id,
+    #    dev_admin_key,
+    #    app_admin_id,
+    #    app_admin_key,
+    #    )
+
+    is_autonomous(devices, apps)
 
     test_time = time.time() - test_time
 
@@ -3197,6 +3551,7 @@ def security_tests():
         app_admin_id,
         app_admin_key,
         )
+
     dereg_time = time.time() - dereg_time
 
     time_list = [reg_time, test_time, dereg_time]
@@ -3234,7 +3589,7 @@ def follow_with_read(
     log('---------------> DEVICES READ FOLLOW REQUESTS AND ISSUE SHARE TO APPS'
         , 'HEADER')
 
-    share_dev(apps * devices, dev_admin_id, dev_admin_key)
+    share_dev(device_keys, apps)
 
     # Apps bind to devices' queues
 
@@ -3299,6 +3654,7 @@ def follow_as_admin(
 
     log('---------------> FOLLOW REQUESTS WITH READ PERMISSION AS ADMIN'
         , 'HEADER')
+
     follow_dev(
         device_keys,
         app_keys,
@@ -3313,8 +3669,7 @@ def follow_as_admin(
     log('---------------> DEVICES READ FOLLOW REQUESTS AND ISSUE SHARE TO APPS'
         , 'HEADER')
 
-    share_dev(apps * devices, admin_id=dev_admin_id,
-              admin_key=dev_admin_key)
+    share_dev(device_keys, apps)
 
     # Apps bind to devices' queues
 
@@ -3383,7 +3738,7 @@ def follow_with_write(
 
     log('---------------> DEVICES READ FOLLOW REQUESTS AND ISSUE SHARE TO APPS'
         , 'HEADER')
-    share_dev(apps * devices, dev_admin_id, dev_admin_key)
+    share_dev(device_keys, apps)
 
     # Apps publish to command queue of devices
 
@@ -3441,7 +3796,7 @@ def follow_with_read_write(
 
     log('---------------> DEVICES APPROVE READ-WRITE FOLLOW REQUESTS WITH SHARE'
         , 'HEADER')
-    share_dev(devices * apps * 2, dev_admin_id, dev_admin_key)
+    share_dev(device_keys, (apps*2))
 
     # Apps publish to command queue of devices
 
@@ -3547,7 +3902,7 @@ def bind_as_admin(
 
     log('---------------> DEVICES APPROVE READ-WRITE FOLLOW REQUESTS WITH SHARE'
         , 'HEADER')
-    share_dev(devices * apps * 2, dev_admin_id, dev_admin_key)
+    share_dev(device_keys, (apps*2))
 
     # Apps bind to devices again but this time using admin apikey
 
@@ -3654,7 +4009,7 @@ def diagnostic_tests(
     log('---------------> DEVICES READ FOLLOW REQUESTS AND ISSUE SHARE TO APPS'
         , 'HEADER')
 
-    share_dev(apps * devices, dev_admin_id, dev_admin_key)
+    share_dev(device_keys, apps)
 
     # Apps bind to devices' diagnostics exchanges
 
@@ -3806,7 +4161,7 @@ def priority_tests(
     log('---------------> DEVICES READ FOLLOW REQUESTS AND ISSUE SHARE TO APPS'
         , 'HEADER')
 
-    share_dev(apps * devices, dev_admin_id, dev_admin_key)
+    share_dev(device_keys, apps)
 
     # Apps bind to devices' diagnostics exchanges
 
@@ -3953,7 +4308,7 @@ def amqp_tests(
 
     log('---------------> DEVICES APPROVE READ-WRITE FOLLOW REQUESTS WITH SHARE'
         , 'HEADER')
-    share_dev(devices * apps * 2, dev_admin_id, dev_admin_key)
+    share_dev(device_keys, (apps*2))
 
     # Apps publish to command queue of devices
 
@@ -4160,8 +4515,8 @@ def functional_tests(*args):
         devices = args[0]
         apps = args[1]
 
-    (dev_admin_id, dev_admin_key) = gen_admin()
-    (app_admin_id, app_admin_key) = gen_admin()
+    (dev_admin_id, dev_admin_key) = gen_owner()
+    (app_admin_id, app_admin_key) = gen_owner()
 
     print '''
 
@@ -4186,107 +4541,107 @@ def functional_tests(*args):
 
     # Read follow requests. Also tests bind using admin keys
 
-    #follow_with_read(
-    #    devices,
-    #    apps,
-    #    device_keys,
-    #    app_keys,
-    #    dev_admin_id,
-    #    dev_admin_key,
-    #    app_admin_id,
-    #    app_admin_key,
-    #    )
+    follow_with_read(
+        devices,
+        apps,
+        device_keys,
+        app_keys,
+        dev_admin_id,
+        dev_admin_key,
+        app_admin_id,
+        app_admin_key,
+        )
 
-    ## Follow requests as admin
+    # Follow requests as admin
 
-    #follow_as_admin(
-    #    devices,
-    #    apps,
-    #    device_keys,
-    #    app_keys,
-    #    dev_admin_id,
-    #    dev_admin_key,
-    #    app_admin_id,
-    #    app_admin_key,
-    #    )
+    follow_as_admin(
+        devices,
+        apps,
+        device_keys,
+        app_keys,
+        dev_admin_id,
+        dev_admin_key,
+        app_admin_id,
+        app_admin_key,
+        )
 
-    ## Follow with write
+    # Follow with write
 
-    #follow_with_write(
-    #    devices,
-    #    apps,
-    #    device_keys,
-    #    app_keys,
-    #    dev_admin_id,
-    #    dev_admin_key,
-    #    app_admin_id,
-    #    app_admin_key,
-    #    )
+    follow_with_write(
+        devices,
+        apps,
+        device_keys,
+        app_keys,
+        dev_admin_id,
+        dev_admin_key,
+        app_admin_id,
+        app_admin_key,
+        )
 
-    ## Follow requests with read-write permissions
+    # Follow requests with read-write permissions
 
-    #follow_with_read_write(
-    #    devices,
-    #    apps,
-    #    device_keys,
-    #    app_keys,
-    #    dev_admin_id,
-    #    dev_admin_key,
-    #    app_admin_id,
-    #    app_admin_key,
-    #    )
+    follow_with_read_write(
+        devices,
+        apps,
+        device_keys,
+        app_keys,
+        dev_admin_id,
+        dev_admin_key,
+        app_admin_id,
+        app_admin_key,
+        )
 
-    ## Bind and unbind as admin
+    # Bind and unbind as admin
 
-    #bind_as_admin(
-    #    devices,
-    #    apps,
-    #    device_keys,
-    #    app_keys,
-    #    dev_admin_id,
-    #    dev_admin_key,
-    #    app_admin_id,
-    #    app_admin_key,
-    #    )
+    bind_as_admin(
+        devices,
+        apps,
+        device_keys,
+        app_keys,
+        dev_admin_id,
+        dev_admin_key,
+        app_admin_id,
+        app_admin_key,
+        )
 
-    ## Diagnostic channel tests
+    # Diagnostic channel tests
 
-    #diagnostic_tests(
-    #    devices,
-    #    apps,
-    #    device_keys,
-    #    app_keys,
-    #    dev_admin_id,
-    #    dev_admin_key,
-    #    app_admin_id,
-    #    app_admin_key,
-    #    )
+    diagnostic_tests(
+        devices,
+        apps,
+        device_keys,
+        app_keys,
+        dev_admin_id,
+        dev_admin_key,
+        app_admin_id,
+        app_admin_key,
+        )
 
-    ## Priority queue tests
+    # Priority queue tests
 
-    #priority_tests(
-    #    devices,
-    #    apps,
-    #    device_keys,
-    #    app_keys,
-    #    dev_admin_id,
-    #    dev_admin_key,
-    #    app_admin_id,
-    #    app_admin_key,
-    #    )
+    priority_tests(
+        devices,
+        apps,
+        device_keys,
+        app_keys,
+        dev_admin_id,
+        dev_admin_key,
+        app_admin_id,
+        app_admin_key,
+        )
 
-    ## Public exchange tests
+    # Public exchange tests
 
-    #public_exchange_tests(
-    #    devices,
-    #    apps,
-    #    device_keys,
-    #    app_keys,
-    #    dev_admin_id,
-    #    dev_admin_key,
-    #    app_admin_id,
-    #    app_admin_key,
-    #    )
+    public_exchange_tests(
+        devices,
+        apps,
+        device_keys,
+        app_keys,
+        dev_admin_id,
+        dev_admin_key,
+        app_admin_id,
+        app_admin_key,
+        )
 
     # AMQP tests
 
@@ -4300,6 +4655,8 @@ def functional_tests(*args):
         app_admin_id,
         app_admin_key,
         )
+
+    is_autonomous(devices, apps)
 
     test_time = time.time() - test_time
 
