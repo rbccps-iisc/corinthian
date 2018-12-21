@@ -66,6 +66,7 @@ int publish		(struct http_request *);
 int publish_async	(struct http_request *);
 int subscribe		(struct http_request *);
 
+int myentities		(struct http_request *);
 int register_entity	(struct http_request *);
 int deregister_entity	(struct http_request *);
 

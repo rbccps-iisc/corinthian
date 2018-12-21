@@ -1240,7 +1240,7 @@ subscribe (struct http_request *req)
 	}
 
 	// remove the last comma
-	if (i > 0)
+	if (int_num_messages > 0)
 		--(response->offset);
 
 	kore_buf_append(response,"]",1);
@@ -1260,6 +1260,104 @@ done:
 		}
 	}
 
+	END();
+}
+
+int
+reset_apikey (struct http_request *req)
+{
+	const char *id;
+	const char *apikey;
+	const char *entity;
+
+	char salt		[33];
+	char entity_apikey	[33];
+	char password_hash	[65];
+
+	req->status = 403;
+
+	BAD_REQUEST_if
+	(
+		KORE_RESULT_OK != http_request_header(req, "id", &id)
+				||
+		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+				||
+		KORE_RESULT_OK != http_request_header(req, "entity", &entity)
+			,
+		"inputs missing in headers"
+	);
+
+	// only the owner or the admin can reset apikey
+	if (! looks_like_a_valid_owner(id))
+	{
+		if (strcmp(id,"admin") != 0)
+			FORBIDDEN("unauthorized");
+	}
+}
+
+int
+set_autonomous(struct http_request *req)
+{
+	const char *id;
+	const char *apikey;
+	const char *entity;
+	const char *str_is_autonomous;
+
+	BAD_REQUEST_if
+	(
+		KORE_RESULT_OK != http_request_header(req, "id", &id)
+				||
+		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+				||
+		KORE_RESULT_OK != http_request_header(req, "entity", &entity)
+				||
+		KORE_RESULT_OK != http_request_header(req, "is-autonomous", &str_is_autonomous)
+			,
+		"inputs missing in headers"
+	);
+
+	char char_is_autonomous = 'f';
+ 
+	if (strcmp(str_is_autonomous,"true") == 0)
+	{
+		char_is_autonomous = 't';
+	}
+	else if (strcmp(str_is_autonomous,"false") == 0)
+	{
+		char_is_autonomous = 'f';
+	}
+	else {
+		BAD_REQUEST("is-autonomous value is invalid");	
+	}
+
+/////////////////////////////////////////////////
+
+	if (! is_string_safe(entity))
+		FORBIDDEN("invalid entity");
+
+	// only the owner or the admin can set autonomous 
+	if (! is_owner(id,entity))
+	{
+		if (strcmp(id,"admin") != 0)
+			FORBIDDEN("unauthorized");
+	}
+
+	if (! login_success(id,apikey,NULL))
+		FORBIDDEN("invalid id or apikey");
+
+/////////////////////////////////////////////////
+
+	CREATE_STRING (query,
+		"UPDATE users SET is_autonomous = '%c' WHERE id = '%s'"
+			char_is_autonomous,
+			entity
+	);
+
+	RUN_QUERY("failed to set is-autonomous state");
+
+	OK();
+
+done:
 	END();
 }
 
@@ -1305,19 +1403,18 @@ register_entity (struct http_request *req)
 	bool is_autonomous = false;
 	if (http_request_header(req, "is-autonomous", &char_is_autonomous) == KORE_RESULT_OK)
 	{
-		if (strcmp(char_is_autonomous,"true") == 0)
-			is_autonomous = true;
+		is_autonomous = (0 == strcmp(char_is_autonomous,"true"));
 	}
 
 /////////////////////////////////////////////////
-
-	if (! login_success(id,apikey,NULL))
-		FORBIDDEN("invalid id or apikey");
 
 	string_to_lower(entity);
 
 	if (! is_string_safe(entity))
 		FORBIDDEN("invalid entity");
+
+	if (! login_success(id,apikey,NULL))
+		FORBIDDEN("invalid id or apikey");
 
 	if (body)
 		json_sanitize(body);
@@ -1414,6 +1511,73 @@ done:
 }
 
 int
+entities (struct http_request *req)
+{
+	int i;
+
+	const char *id;
+	const char *apikey;
+
+	req->status = 403;
+
+	BAD_REQUEST_if
+	(
+		KORE_RESULT_OK != http_request_header(req, "id", &id)
+				||
+		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+			,
+		"inputs missing in headers"
+	);
+
+/////////////////////////////////////////////////
+
+	// deny if the user is not a owner
+	if (! looks_like_a_valid_owner(id))
+		FORBIDDEN("id is not valid");
+
+	if (! login_success(id,apikey,NULL))
+		FORBIDDEN("invalid id or apikey");
+
+/////////////////////////////////////////////////
+
+	CREATE_STRING(query,
+		 	"SELECT id,is_autonomous FROM users WHERE id LIKE '%s/%%'",
+				id
+	);
+
+	RUN_QUERY (query,"could not get info about entity");
+
+	int num_rows = kore_pgsql_ntuples(&sql);
+
+	kore_buf_reset(response);
+	kore_buf_append(response,"[",1);
+
+	for (i = 0; i < num_rows; ++i)
+	{
+		char *entity 		= kore_pgsql_getvalue(&sql,i,0);
+		char *is_autonomous 	= kore_pgsql_getvalue(&sql,i,1);
+
+		kore_buf_appendf (
+				response,
+					"{\"%s\":%s},",
+						entity,
+						is_autonomous[0] == 't' ? "true" : "false"
+		);
+	}
+
+	// remove the last comma
+	if (num_rows > 0)
+		--(response->offset);
+
+	kore_buf_append(response,"]",1);
+
+	OK();
+
+done:
+	END();	
+}
+
+int
 deregister_entity (struct http_request *req)
 {
 	const char *id;
@@ -1436,25 +1600,25 @@ deregister_entity (struct http_request *req)
 		"inputs missing in headers"
 	);
 
+/////////////////////////////////////////////////
+
 	// deny if the id does not look like an owner
 	if (! looks_like_a_valid_owner(id))
 		FORBIDDEN("id is not an owner");
 
+	if (! is_string_safe(entity))
+		FORBIDDEN("invalid entity");
+
 	if (! looks_like_a_valid_entity(entity))
 		FORBIDDEN("entity is not valid");
 
-/////////////////////////////////////////////////
+	if (! is_owner(id,entity))
+		FORBIDDEN("you are not the owner of the entity");
 
 	if (! login_success(id,apikey,NULL))
 		FORBIDDEN("invalid id or apikey");
 
-	if (! is_string_safe(entity))
-		FORBIDDEN("invalid entity");
-
 /////////////////////////////////////////////////
-
-	if (! is_owner(id,entity))
-		FORBIDDEN("you are not the owner of the entity");
 
 	// check if the entity exists
 	CREATE_STRING (query,
@@ -1610,6 +1774,8 @@ register_owner(struct http_request *req)
 		"inputs missing in headers"
 	);
 
+/////////////////////////////////////////////////
+
 	if (strcmp(id,"admin") != 0)
 		FORBIDDEN("only admin can call this API");
 
@@ -1623,13 +1789,11 @@ register_owner(struct http_request *req)
 	if (! looks_like_a_valid_owner(owner))
 		BAD_REQUEST("invalid owner");
 
-/////////////////////////////////////////////////
+	if (! is_string_safe(owner))
+		FORBIDDEN("invalid owner");
 
 	if (! login_success("admin",apikey,NULL))
 		FORBIDDEN("invalid id or apikey");
-
-	if (! is_string_safe(owner))
-		FORBIDDEN("invalid owner");
 
 /////////////////////////////////////////////////
 
@@ -1726,11 +1890,11 @@ deregister_owner(struct http_request *req)
 
 /////////////////////////////////////////////////
 
-	if (! login_success("admin",apikey,NULL))
-		FORBIDDEN("invalid id or apikey");
-
 	if (! is_string_safe(owner))
 		FORBIDDEN("invalid owner");
+
+	if (! login_success("admin",apikey,NULL))
+		FORBIDDEN("invalid id or apikey");
 
 /////////////////////////////////////////////////
 
@@ -1866,14 +2030,6 @@ queue_bind (struct http_request *req)
 
 /////////////////////////////////////////////////
 
-	bool is_autonomous = false;
-
-	if (! login_success(id,apikey,&is_autonomous))
-		FORBIDDEN("invalid id or apikey");
-
-	if (! is_autonomous)
-		FORBIDDEN("unauthorized");
-
 	if (! is_string_safe(from))
 		FORBIDDEN("invalid from");
 
@@ -1882,6 +2038,14 @@ queue_bind (struct http_request *req)
 
 	if (! is_string_safe(topic))
 		FORBIDDEN("invalid topic");
+
+	bool is_autonomous = false;
+
+	if (! login_success(id,apikey,&is_autonomous))
+		FORBIDDEN("invalid id or apikey");
+
+	if (! is_autonomous)
+		FORBIDDEN("unauthorized");
 
 /////////////////////////////////////////////////
 
@@ -2014,18 +2178,7 @@ queue_unbind (struct http_request *req)
 		}
 	}
 
-	snprintf (exchange,128,"%s.%s", to,message_type); 
-
 /////////////////////////////////////////////////
-
-	bool is_autonomous = false;
-
-	if (! login_success(id,apikey, &is_autonomous))
-		FORBIDDEN("invalid id or apikey");
-
-	if (! is_autonomous)
-		FORBIDDEN("unauthorized");
-
 
 	if (! is_string_safe(from))
 		FORBIDDEN("invalid from");
@@ -2036,9 +2189,19 @@ queue_unbind (struct http_request *req)
 	if (! is_string_safe(topic))
 		FORBIDDEN("invalid topic");
 
+	bool is_autonomous = false;
+
+	if (! login_success(id,apikey, &is_autonomous))
+		FORBIDDEN("invalid id or apikey");
+
+	if (! is_autonomous)
+		FORBIDDEN("unauthorized");
+
 /////////////////////////////////////////////////
 
-	strlcpy(queue,from,128);
+	snprintf	(exchange,128,"%s.%s", to,message_type); 
+	strlcpy		(queue,from,128);
+
 	if (KORE_RESULT_OK == http_request_header(req, "is-priority", &is_priority))
 	{
 		if (strcmp(is_priority,"true") == 0)
@@ -2171,18 +2334,10 @@ follow (struct http_request *req)
 		from = id;
 	}
 
-	if (! looks_like_a_valid_entity(to))
-		FORBIDDEN("'to' is not a valid entity");
-
 /////////////////////////////////////////////////
 
-	bool is_autonomous = false;
-
-	if (! login_success(id,apikey,&is_autonomous))
-		FORBIDDEN("invalid id or apikey");
-
-	if (! is_autonomous)
-		FORBIDDEN("unauthorized");
+	if (! looks_like_a_valid_entity(to))
+		FORBIDDEN("'to' is not a valid entity");
 
 	if (! is_string_safe(from))
 		FORBIDDEN("invalid from");
@@ -2196,8 +2351,6 @@ follow (struct http_request *req)
 	if (! is_string_safe(topic))
 		FORBIDDEN("invalid topic");
 
-/////////////////////////////////////////////////
-
 	BAD_REQUEST_if (
 		(! strcmp(permission,"read") 		== 0) &&
 		(! strcmp(permission,"write") 		== 0) &&
@@ -2205,6 +2358,17 @@ follow (struct http_request *req)
 		,
 		"invalid permission"
 	);
+
+	bool is_autonomous = false;
+
+	if (! login_success(id,apikey,&is_autonomous))
+		FORBIDDEN("invalid id or apikey");
+
+	if (! is_autonomous)
+		FORBIDDEN("unauthorized");
+
+/////////////////////////////////////////////////
+
 
 	// if both from and to are owned by id
 	if (is_owner(id,to))
@@ -2465,14 +2629,6 @@ unfollow (struct http_request *req)
 
 /////////////////////////////////////////////////
 
-	bool is_autonomous = false;
-
-	if (! login_success(id,apikey,&is_autonomous))
-		FORBIDDEN("invalid id or apikey");
-
-	if (! is_autonomous)
-		FORBIDDEN("unauthorized");
-
 	if (! is_string_safe(from))
 		FORBIDDEN("invalid from");
 
@@ -2481,6 +2637,14 @@ unfollow (struct http_request *req)
 
 	if (! is_string_safe(topic))
 		FORBIDDEN("invalid topic");
+
+	bool is_autonomous = false;
+
+	if (! login_success(id,apikey,&is_autonomous))
+		FORBIDDEN("invalid id or apikey");
+
+	if (! is_autonomous)
+		FORBIDDEN("unauthorized");
 
 /////////////////////////////////////////////////
 
@@ -2658,6 +2822,9 @@ share (struct http_request *req)
 
 /////////////////////////////////////////////////
 
+	if (! is_string_safe(follow_id))
+		FORBIDDEN("invalid follow-id");
+
 	bool is_autonomous = false;
 
 	if (! login_success(id,apikey,&is_autonomous))
@@ -2665,9 +2832,6 @@ share (struct http_request *req)
 
 	if (! is_autonomous)
 		FORBIDDEN("unauthorized");
-
-	if (! is_string_safe(follow_id))
-		FORBIDDEN("invalid follow-id");
 
 /////////////////////////////////////////////////
 
@@ -2854,6 +3018,9 @@ reject_follow (struct http_request *req)
 
 /////////////////////////////////////////////////
 
+	if (! is_string_safe(follow_id))
+		FORBIDDEN("invalid follow-id");
+
 	bool is_autonomous = false;
 
 	if (! login_success(id,apikey,&is_autonomous))
@@ -2861,9 +3028,6 @@ reject_follow (struct http_request *req)
 
 	if (! is_autonomous)
 		FORBIDDEN("unauthorized");
-
-	if (! is_string_safe(follow_id))
-		FORBIDDEN("invalid follow-id");
 
 /////////////////////////////////////////////////
 
@@ -3133,11 +3297,11 @@ block (struct http_request *req)
 
 /////////////////////////////////////////////////
 
-	if (! login_success(id,apikey,NULL))
-		FORBIDDEN("invalid id or apikey");
-
 	if (! is_string_safe(entity))
 		FORBIDDEN("invalid entity");
+
+	if (! login_success(id,apikey,NULL))
+		FORBIDDEN("invalid id or apikey");
 
 /////////////////////////////////////////////////
 
@@ -3188,11 +3352,11 @@ unblock (struct http_request *req)
 
 /////////////////////////////////////////////////
 
-	if (! login_success(id,apikey,NULL))
-		FORBIDDEN("invalid id or apikey");
-
 	if (! is_string_safe(entity))
 		FORBIDDEN("invalid entity");
+
+	if (! login_success(id,apikey,NULL))
+		FORBIDDEN("invalid id or apikey");
 
 /////////////////////////////////////////////////
 
@@ -3242,11 +3406,11 @@ permissions (struct http_request *req)
 
 /////////////////////////////////////////////////
 
-	if (! login_success(id,apikey,NULL))
-		FORBIDDEN("invalid id or apikey");
-
 	if (! is_string_safe(entity))
 		FORBIDDEN("invalid entity");
+
+	if (! login_success(id,apikey,NULL))
+		FORBIDDEN("invalid id or apikey");
 
 /////////////////////////////////////////////////
 
@@ -3274,7 +3438,7 @@ permissions (struct http_request *req)
 	}
 
 	// remove the last comma
-	if (i > 0)
+	if (num_rows > 0)
 		--(response->offset);
 
 	kore_buf_append(response,"]",1);
@@ -3572,6 +3736,8 @@ done:
 bool
 is_string_safe (const char *string)
 {
+	size_t len = 0;
+
 	// string should not be NULL. let it crash if it is 
 	const char *p = (char *)string;
 
@@ -3579,8 +3745,6 @@ is_string_safe (const char *string)
 
 	while (*p)
 	{
-		/* wipe out anything that looks suspicious */
-	
 		if (! isalnum (*p))
 		{
 			switch (*p)
@@ -3599,6 +3763,11 @@ is_string_safe (const char *string)
 		}
 
 		++p;
+		++len;
+
+		// string is too long
+		if (len > 256)
+			return false;
 	}
 
 	return true;
