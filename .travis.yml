@@ -17,3 +17,6 @@ script:
   - ./tests/test fxnl --random
   - ./tests/test sec
   - ./tests/test concr
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
