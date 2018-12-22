@@ -20,6 +20,8 @@
 
 #define MAX_LEN_HASH_INPUT	(MAX_LEN_APIKEY + MAX_LEN_SALT + MAX_LEN_ENTITY_ID)
 
+#define MAX_LEN_FOLLOW_ID	(10)
+
 char password_chars[] = "abcdefghijklmnopqrstuvwxyz"
 			"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 			"0123456789"
@@ -2572,13 +2574,13 @@ follow (struct http_request *req)
 	kore_buf_reset(response);
 	kore_buf_append(response,"{",1);
 
-	if (strlen(read_follow_id) > 0)
+	if (read_follow_id[0])
 		kore_buf_appendf(response,"\"follow-id-read\":\"%s\"",read_follow_id);
 
-	if (strlen(write_follow_id) > 0)
+	if (write_follow_id[0])
 	{
-		// put a comma
-		if (strlen(read_follow_id) > 0)
+		// put a comma if follow-id-read was written in response
+		if (read_follow_id[0])
 			kore_buf_append(response,",",1);
 
 		kore_buf_appendf(response,"\"follow-id-write\":\"%s\"",write_follow_id);

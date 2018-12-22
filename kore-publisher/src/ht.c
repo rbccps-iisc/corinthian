@@ -6,11 +6,9 @@ unsigned int hash_function (const void *key)
 	size_t i;
 	unsigned int hash = 0;
 
-	size_t strlen_key = strlen(key);
+	size_t strlen_key = strnlen(key,16);
 
-	size_t len = strlen_key > 16 ? 16 : strlen_key; 
-
-	for (i = 0; i < len; ++i) {
+	for (i = 0; i < strlen_key; ++i) {
 		hash += *((const char *)key + i);
 	}
 
