@@ -1104,7 +1104,6 @@ subscribe (struct http_request *req)
 	amqp_connection_state_t	*cached_conn = NULL;
 
 	char key [MAX_LEN_HASH_KEY + 1];
-
 	snprintf (key, MAX_LEN_HASH_KEY, "%s%s", id, apikey);
 
 	if ((n = ht_search(&connection_ht,key)) != NULL)
@@ -1402,7 +1401,7 @@ register_entity (struct http_request *req)
 	const char *entity;
 	const char *char_is_autonomous;
 
-	char entity_name 	[MAX_LEN_ENTITY_ID];
+	char entity_name 	[MAX_LEN_ENTITY_ID + 1];
 
 	char salt		[MAX_LEN_APIKEY + 1];
 	char entity_apikey	[MAX_LEN_APIKEY + 1];
