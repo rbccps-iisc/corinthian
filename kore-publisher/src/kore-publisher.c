@@ -3,6 +3,23 @@
 
 #define UNPRIVILEGED_USER ("nobody")
 
+#define MAX_LEN_SALT		(32)
+#define MAX_LEN_APIKEY	 	(32)
+
+#define MIN_LEN_OWNER_ID	(3)
+#define MAX_LEN_OWNER_ID	(32)
+
+/* min = abc/efg */
+#define MIN_LEN_ENTITY_ID 	(7)
+#define MAX_LEN_ENTITY_ID 	(65)
+
+#define MIN_LEN_RESOURCE_ID	(MIN_LEN_ENTITY_ID)
+#define MAX_LEN_RESOURCE_ID	(128)
+
+#define MAX_LEN_HASH_KEY 	(MAX_LEN_ENTITY_ID + MAX_LEN_APIKEY)
+
+#define MAX_LEN_HASH_INPUT	(MAX_LEN_APIKEY + MAX_LEN_SALT + MAX_LEN_ENTITY_ID)
+
 char password_chars[] = "abcdefghijklmnopqrstuvwxyz"
 			"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 			"0123456789"
@@ -35,19 +52,20 @@ struct kore_pgsql sql;
 char queue	[129];
 char exchange	[129];
 
-struct kore_buf *query = NULL;
-struct kore_buf *response = NULL;
+struct kore_buf *query 		= NULL;
+struct kore_buf *response 	= NULL;
 
-char 	string_to_be_hashed 	[256];
+char 	string_to_be_hashed 	[MAX_LEN_APIKEY + MAX_LEN_SALT + MAX_LEN_ENTITY_ID + 1];
 uint8_t	binary_hash 		[SHA256_DIGEST_LENGTH];
-char 	hash_string		[SHA256_DIGEST_LENGTH*2 + 1];
+char 	hash_string		[2*SHA256_DIGEST_LENGTH + 1];
 
 ht connection_ht;
 ht async_connection_ht;
 
 bool is_success = false;
-char admin_apikey[33];
-char postgres_pwd[33];
+
+char admin_apikey [MAX_LEN_APIKEY + 1];
+char postgres_pwd [MAX_LEN_APIKEY + 1];
 
 char error_string [1025];
 
@@ -122,7 +140,7 @@ async_publish_function (void *v)
 	publish_async_data_t *data = NULL; 
 
 	node *n = NULL;
-	char key[65];
+	char key [MAX_LEN_HASH_KEY + 1];
 
 	const char *id;
 	const char *apikey;
@@ -156,8 +174,7 @@ async_publish_function (void *v)
 			content_type	= data->content_type;
 			async_exchange	= data->exchange;
 
-			strlcpy(key,id,32);
-			strlcat(key,apikey,64);
+			snprintf (key, MAX_LEN_HASH_KEY, "%s%s", id, apikey);
 
 			if ((n = ht_search(&async_connection_ht,key)) != NULL)
 			{
@@ -282,14 +299,15 @@ init (int state)
 		exit(-1);
 	}
 
-	if (! read(fd,admin_apikey,32))
+	if (! read(fd,admin_apikey,MAX_LEN_APIKEY))
 	{
 		fprintf(stderr,"could not read from admin.passwd file\n");
 		exit(-1);
 	}
 
-	admin_apikey[32] = '\0';
-	int strlen_admin_apikey = strlen(admin_apikey);
+	admin_apikey [MAX_LEN_APIKEY] = '\0';
+
+	int strlen_admin_apikey = strnlen(admin_apikey, MAX_LEN_APIKEY);
 
 	for (i = 0; i < strlen_admin_apikey; ++i)
 	{
@@ -309,14 +327,15 @@ init (int state)
 		exit(-1);
 	}
 
-	if (! read(fd,postgres_pwd,32))
+	if (! read(fd,postgres_pwd,MAX_LEN_APIKEY))
 	{
 		fprintf(stderr,"could not read from postgres.passwd\n");
 		exit(-1);
 	}
 
-	postgres_pwd[32] = '\0';
-	int strlen_postgres_pwd = strlen(postgres_pwd);
+	postgres_pwd [MAX_LEN_APIKEY] = '\0';
+
+	int strlen_postgres_pwd = strnlen(postgres_pwd, MAX_LEN_APIKEY);
 
 	for (i = 0; i < strlen_postgres_pwd; ++i)
 	{
@@ -370,9 +389,6 @@ init (int state)
 
 ///// chroot and drop priv /////
 
-	//explicit_bzero(admin_apikey,33);
-	explicit_bzero(postgres_pwd,33);
-
 	struct passwd *p;
 	if ((p = getpwnam(UNPRIVILEGED_USER)) == NULL) {
 		perror("getpwnam failed ");
@@ -420,17 +436,15 @@ init (int state)
 bool
 is_alpha_numeric (const char *str)
 {
-	int i;
-	uint8_t strlen_str = strlen(str);
+	size_t len = 0;
 
-	if (strlen_str < 3 || strlen_str > 32)
-		return false;
+	char *p = str;
 
-	for (i = 0; i < strlen_str; ++i)
+	while (*p)
 	{
-		if (! isalnum(str[i]))
+		if (! isalnum(*p))
 		{
-			switch (str[i])
+			switch (*p)
 			{
 				case '-':
 						break;
@@ -438,9 +452,18 @@ is_alpha_numeric (const char *str)
 						return false;
 			}
 		}
+
+		++p;
+		++len;
+
+		if (len  > MAX_LEN_OWNER_ID)
+			return false;
 	}
 
-	return true;
+	if (len < MIN_LEN_OWNER_ID)
+		return false;
+	else
+		return true;
 }
 
 bool
@@ -452,7 +475,7 @@ looks_like_a_valid_owner (const char *str)
 bool
 is_owner(const char *id, const char *entity)
 {
-	int strlen_id = strlen(id);
+	int strlen_id = strnlen(id,MAX_LEN_OWNER_ID);
 
 	if (strncmp(id,entity,strlen_id) != 0)
 		return false;
@@ -467,22 +490,18 @@ is_owner(const char *id, const char *entity)
 bool
 looks_like_a_valid_entity (const char *str)
 {
-	int i;
-
-	uint8_t strlen_str = strlen(str);
+	size_t	len = 0;
 
 	uint8_t front_slash_count = 0;
 
-	// format is owner/entity
-	if (strlen_str < 3 || strlen_str > 65)
-		return false;
+	char *p = str;
 
-	for (i = 0; i < strlen_str; ++i)
+	while (*p)
 	{
-		if (! isalnum(str[i]))
+		if (! isalnum(*p))
 		{
 			// support some extra chars
-			switch (str[i])
+			switch (*p)
 			{
 				case '/':
 						++front_slash_count;
@@ -494,38 +513,36 @@ looks_like_a_valid_entity (const char *str)
 			}
 		}
 
-		if (front_slash_count > 1)
+		++p;
+		++len;
+
+		if (len > MAX_LEN_ENTITY_ID || front_slash_count > 1)
 			return false;
 	}
 
 	// there should be one front slash
-	if (front_slash_count != 1)
+	if (len < MIN_LEN_ENTITY_ID || front_slash_count != 1)
 		return false;
-
-	return true;
+	else
+		return true;
 }
 
 bool
 looks_like_a_valid_resource (const char *str)
 {
-	int i;
+	size_t 	len = 0;
 
-	uint8_t strlen_str = strlen(str);
+	uint8_t dot_count 		= 0;
+	uint8_t front_slash_count 	= 0;
 
-	uint8_t front_slash_count = 0;
- 
-	uint8_t dot_count = 0;
+	char *p = str;
 
-	// format is owner/entity.public
-	if (strlen_str < 10 || strlen_str > 128)
-		return false;
-
-	for (i = 0; i < strlen_str; ++i)
+	while (*p)
 	{
-		if (! isalnum(str[i]))
+		if (! isalnum(*p))
 		{
 			// support some extra chars
-			switch (str[i])
+			switch (*p)
 			{
 				case '/':
 						++front_slash_count;
@@ -540,7 +557,16 @@ looks_like_a_valid_resource (const char *str)
 						return false;
 			}
 		}
+
+		++p;
+		++len;
+
+		if (len > MAX_LEN_RESOURCE_ID)
+			return false;
 	}
+
+	if (len < MIN_LEN_RESOURCE_ID)
+		return false;
 
 	// there should be only one front slash. Dot may or may not exist
 	if ( (front_slash_count != 1) || (dot_count > 1) ) {
@@ -562,21 +588,23 @@ gen_salt_password_and_apikey (
 
 	int n_passwd_chars = sizeof(password_chars) - 1;
 
-	for (i = 0; i < 32; ++i)
+	for (i = 0; i < MAX_LEN_APIKEY; ++i)
 	{
 		salt  [i] = password_chars[arc4random_uniform(n_passwd_chars)]; 
 		apikey[i] = password_chars[arc4random_uniform(n_passwd_chars)]; 
 	}
-	salt	[32] = '\0';
-	apikey	[32] = '\0';
 
-	strlcpy(string_to_be_hashed, apikey, 33);
-	strlcat(string_to_be_hashed, salt,   65);
-	strlcat(string_to_be_hashed, entity, 250);
+	salt	[MAX_LEN_APIKEY] = '\0';
+	apikey	[MAX_LEN_APIKEY] = '\0';
+
+	snprintf (string_to_be_hashed, 
+			MAX_LEN_HASH_INPUT,	
+				"%s%s%s",
+					apikey, salt, entity);
 
 	SHA256 (
 		(const uint8_t*)string_to_be_hashed,
-		strlen(string_to_be_hashed),
+		strnlen (string_to_be_hashed,MAX_LEN_HASH_INPUT),
 		binary_hash
 	);
 
@@ -585,7 +613,7 @@ gen_salt_password_and_apikey (
 	snprintf
 	(
 		password_hash,
-		65,
+		2*SHA256_DIGEST_LENGTH,
 		"%02x%02x%02x%02x"
 		"%02x%02x%02x%02x"
 		"%02x%02x%02x%02x"
@@ -604,7 +632,7 @@ gen_salt_password_and_apikey (
 		binary_hash[28],binary_hash[29],binary_hash[30],binary_hash[31]
 	);
 
-	password_hash [64] = '\0';
+	password_hash [2*SHA256_DIGEST_LENGTH] = '\0';
 }
 
 bool
@@ -663,13 +691,14 @@ login_success (const char *id, const char *apikey, bool *is_autonomous)
 	if (is_autonomous)
 		*is_autonomous = str_is_autonomous[0] == 't'; 
 
-	strlcpy(string_to_be_hashed, apikey, 33);
-	strlcat(string_to_be_hashed, salt,   65);
-	strlcat(string_to_be_hashed, id,    250);
+	snprintf (string_to_be_hashed, 
+			MAX_LEN_HASH_INPUT,
+				"%s%s%s",
+					apikey, salt, id);
 
 	SHA256 (
 		(const uint8_t*)string_to_be_hashed,
-		strlen(string_to_be_hashed),
+		strnlen (string_to_be_hashed,MAX_LEN_HASH_INPUT),
 		binary_hash
 	);
 
@@ -678,7 +707,7 @@ login_success (const char *id, const char *apikey, bool *is_autonomous)
 	snprintf
 	(
 		hash_string,
-		65,
+		2*SHA256_DIGEST_LENGTH,
 		"%02x%02x%02x%02x"
 		"%02x%02x%02x%02x"
 		"%02x%02x%02x%02x"
@@ -697,7 +726,7 @@ login_success (const char *id, const char *apikey, bool *is_autonomous)
 		binary_hash[28],binary_hash[29],binary_hash[30],binary_hash[31]
 	);
 
-	hash_string[64] = '\0';
+	hash_string[2*SHA256_DIGEST_LENGTH] = '\0';
 
 	debug_printf("Expecting it to be {%s} got {%s}\n",
 			password_hash,
@@ -798,9 +827,8 @@ publish (struct http_request *req)
 	node *n = NULL;
 	amqp_connection_state_t	*cached_conn = NULL;
 
-	char key[65];
-	strlcpy(key,id,32);
-	strlcat(key,apikey,64);
+	char key [MAX_LEN_HASH_KEY + 1];
+	snprintf (key, MAX_LEN_HASH_KEY, "%s%s", id, apikey);
 
 	if ((n = ht_search(&connection_ht,key)) != NULL)
 	{
@@ -1075,9 +1103,9 @@ subscribe (struct http_request *req)
 	node *n = NULL;
 	amqp_connection_state_t	*cached_conn = NULL;
 
-	char key[65];
-	strlcpy(key,id,32);
-	strlcat(key,apikey,64);
+	char key [MAX_LEN_HASH_KEY + 1];
+
+	snprintf (key, MAX_LEN_HASH_KEY, "%s%s", id, apikey);
 
 	if ((n = ht_search(&connection_ht,key)) != NULL)
 	{
@@ -1241,7 +1269,7 @@ subscribe (struct http_request *req)
 
 	// remove the last comma
 	if (i > 0)
-	    --(response->offset);
+		--(response->offset);
 
 	kore_buf_append(response,"]",1);
 
@@ -1270,9 +1298,9 @@ reset_apikey (struct http_request *req)
 	const char *apikey;
 	const char *entity;
 
-	char salt		[33];
-	char entity_apikey	[33];
-	char password_hash	[65];
+	char salt		[MAX_LEN_APIKEY + 1];
+	char entity_apikey	[MAX_LEN_APIKEY + 1];
+	char password_hash	[2*SHA256_DIGEST_LENGTH + 1];
 
 	req->status = 403;
 
@@ -1374,11 +1402,11 @@ register_entity (struct http_request *req)
 	const char *entity;
 	const char *char_is_autonomous;
 
-	char entity_name[66];
+	char entity_name 	[MAX_LEN_ENTITY_ID];
 
-	char salt		[33];
-	char entity_apikey	[33];
-	char password_hash	[65];
+	char salt		[MAX_LEN_APIKEY + 1];
+	char entity_apikey	[MAX_LEN_APIKEY + 1];
+	char password_hash	[2*SHA256_DIGEST_LENGTH + 1];
 
 	pthread_t thread;
 	bool thread_started = false; 
@@ -1400,6 +1428,8 @@ register_entity (struct http_request *req)
 	if (! looks_like_a_valid_owner(id))
 		FORBIDDEN("id is not valid");
 
+	// entity at the time of registration has the same criteria as the owner's id
+	// later on we will add owner/ in front of it
 	if (! is_alpha_numeric(entity))
 		BAD_REQUEST("entity is not valid");
 
@@ -1491,11 +1521,11 @@ register_entity (struct http_request *req)
 
 	// generate response
 	kore_buf_reset(response);
-	kore_buf_append(response,"{\"id\":\"",7);
-	kore_buf_append(response,entity_name,strlen(entity_name));
-	kore_buf_append(response,"\",\"apikey\":\"",12);
-	kore_buf_append(response,entity_apikey,strlen(entity_apikey));
-	kore_buf_append(response,"\"}\n",3);
+	kore_buf_appendf (response,
+		"{\"id\":\"%s\",\"apikey\":\"%s\"}\n",
+			entity_name,
+			entity_apikey
+	);
 
 	OK_201();
 
@@ -1717,12 +1747,7 @@ catalog (struct http_request *req)
 			char *user 	= kore_pgsql_getvalue(&sql,i,0);
 			char *schema 	= kore_pgsql_getvalue(&sql,i,1);
 
-			kore_buf_append(response,"{\"",2);
-			kore_buf_append(response,user,strlen(user));
-			kore_buf_append(response,"\":",2);
-			kore_buf_append(response,schema,strlen(schema));
-
-			kore_buf_append(response,"},",2);
+			kore_buf_appendf(response,"{\"%s\":%s},",user,schema);
 		} 
 		if (num_rows > 0)
 		{
@@ -1756,9 +1781,9 @@ register_owner(struct http_request *req)
 	const char *apikey;
 	const char *owner;
 
-	char salt		[33];
-	char owner_apikey	[33];
-	char password_hash	[65];
+	char salt		[MAX_LEN_APIKEY + 1];
+	char owner_apikey	[MAX_LEN_APIKEY + 1];
+	char password_hash	[2*SHA256_DIGEST_LENGTH + 1];
 
 	pthread_t thread;
 	bool thread_started = false;
@@ -1830,11 +1855,11 @@ register_owner(struct http_request *req)
 	RUN_QUERY (query, "could not create a new owner");
 
 	kore_buf_reset(response);
-	kore_buf_append(response,"{\"id\":\"",7);
-	kore_buf_append(response,owner,strlen(owner));
-	kore_buf_append(response,"\",\"apikey\":\"",12);
-	kore_buf_append(response,owner_apikey,strlen(owner_apikey));
-	kore_buf_append(response,"\"}\n",3);
+	kore_buf_appendf(response,
+			"{\"id\":\"%s\",\"apikey\":\"%s\"}\n",
+				owner,
+				owner_apikey
+	);
 
 	OK_201();
 
@@ -2743,8 +2768,7 @@ unfollow (struct http_request *req)
 
 	char priority_queue[129];
 
-	strlcpy(priority_queue, from, 128);
-	strlcat(priority_queue, ".priority", 128);
+	snprintf(priority_queue,128,"%s.priority", from);
 
 	acl_id		= kore_pgsql_getvalue(&sql,0,0);
 	follow_id	= kore_pgsql_getvalue(&sql,0,1);
@@ -3435,11 +3459,11 @@ permissions (struct http_request *req)
 		char *my_exchange 	= kore_pgsql_getvalue(&sql,i,0);
 		char *perm 		= kore_pgsql_getvalue(&sql,i,1);
 
-		kore_buf_append(response,"{\"entity\":\"",11);
-		kore_buf_append(response,my_exchange,strlen(my_exchange));
-		kore_buf_append(response,"\",\"permission\":\"",16);
-		kore_buf_append(response,perm,strlen(perm));
-		kore_buf_append(response,"\"},",3);
+		kore_buf_appendf(response,
+				"{\"entity\":\"%s\",\"permission\":\"%s\"},",
+					my_exchange,
+					perm
+		);
 	}
 
 	// remove the last comma
