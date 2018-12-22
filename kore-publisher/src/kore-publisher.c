@@ -1240,8 +1240,8 @@ subscribe (struct http_request *req)
 	}
 
 	// remove the last comma
-	if (int_num_messages > 0)
-		--(response->offset);
+	if (i > 0)
+	    --(response->offset);
 
 	kore_buf_append(response,"]",1);
 
