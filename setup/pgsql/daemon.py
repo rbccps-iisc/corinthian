@@ -28,7 +28,7 @@ def run():
 	    connection = pika.BlockingConnection(parameters)
 	    print("Connected")
 	    break;
-	except Exception as e:
+	except:
 	    continue
 	
     channel = connection.channel()
@@ -66,4 +66,3 @@ def run():
 
 if __name__ == '__main__':
     run()
-

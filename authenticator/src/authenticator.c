@@ -42,6 +42,12 @@
 		debug_printf("BUF => {%s}\n",buf->data);\
 }
 
+
+#define MAX_LEN_APIKEY	 	(32)
+
+#define MIN_LEN_OWNER_ID	(3)
+#define MAX_LEN_OWNER_ID	(32)
+
 int init(int);
 int auth_user(struct http_request *);
 int auth_topic(struct http_request *);
@@ -62,9 +68,9 @@ char 	hash_string		[SHA256_DIGEST_LENGTH*2 + 1];
 struct kore_buf *query = NULL;
 struct kore_pgsql sql;
 
-char postgres_pwd[33];
-char broker_ip	[100];
-char pgsql_ip	[100];
+char postgres_pwd	[MAX_LEN_APIKEY + 1];
+char broker_ip		[100];
+char pgsql_ip		[100];
 
 size_t i;
 
@@ -110,14 +116,14 @@ init (int state)
 		exit(-1);
 	}
 
-	if (! read(fd,postgres_pwd,32))
+	if (! read(fd,postgres_pwd,MAX_LEN_APIKEY))
 	{
 		fprintf(stderr,"could not read from postgres.passwd\n");
 		exit(-1);
 	}
 
-	postgres_pwd[32] = '\0';
-	int strlen_postgres_pwd = strlen(postgres_pwd);
+	postgres_pwd[MAX_LEN_APIKEY] = '\0';
+	int strlen_postgres_pwd = strnlen(postgres_pwd,MAX_LEN_APIKEY);
 
 	for (i = 0; i < strlen_postgres_pwd; ++i)
 	{
@@ -151,7 +157,7 @@ init (int state)
 inline bool
 is_alpha_numeric (const char *str)
 {
-	uint8_t strlen_str = strlen(str);
+	uint8_t strlen_str = strnlen(str, MAX_LEN_OWNER_ID);
 
 	if (strlen_str < 3 || strlen_str > 32)
 		return false;

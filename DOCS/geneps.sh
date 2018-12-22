@@ -2,7 +2,7 @@
 
 JAVA="/home/arun/jre1.8.0_191/bin/java"
 
-for d in `ls` 
+for d in $(ls) 
 do
 	if [[ -d $d ]]
 	then
@@ -12,11 +12,11 @@ do
 			mkdir eps
 		fi
 
-		for f in `ls *.plantuml`
+		for f in $(ls *.plantuml)
 		do
-			ff=`echo $f | cut -f1 -d'.'`
+			ff=$(echo $f | cut -f1 -d'.')
 			echo $f
-			cat $f | $JAVA -jar ~/plantuml.jar -pipe -Teps > eps/$ff.eps
+			$JAVA -jar ~/plantuml.jar -pipe -Teps < $f > eps/$ff.eps
 		done
 
 		echo "ok " $d

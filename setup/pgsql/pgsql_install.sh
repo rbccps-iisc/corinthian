@@ -2,12 +2,12 @@
 
 set -e 
 
-postgres_pwd="$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w ${1:-32} | head -n 1)"
-admin_pwd="$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w ${1:-32} | head -n 1)"
-salt="$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w ${1:-32} | head -n 1)"
+postgres_pwd="$(tr -dc 'a-zA-Z0-9' < /dev/urandom | fold -w ${1:-32} | head -n 1)"
+admin_pwd="$(tr -dc 'a-zA-Z0-9' < /dev/urandom | fold -w ${1:-32} | head -n 1)"
+salt="$(tr -dc 'a-zA-Z0-9' < /dev/urandom | fold -w ${1:-32} | head -n 1)"
 
 string=$admin_pwd$salt"admin"
-hash=`echo -n $string | sha256sum | cut -d ' ' -f 1`
+hash=$(echo -n $string | sha256sum | cut -d ' ' -f 1)
 
 
 echo $postgres_pwd > /vars/postgres.passwd

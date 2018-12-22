@@ -5,7 +5,7 @@ if [ -e "random.data" ]
 then
     rm random.data
 fi
-cat /dev/urandom | head -c1024 > random.data
+head -c1024 < /dev/urandom > random.data 
 chmod 400 random.data
 
 kodev build > /dev/null 2> /dev/null 
