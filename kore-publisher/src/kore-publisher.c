@@ -1456,7 +1456,7 @@ register_entity (struct http_request *req)
 
 /////////////////////////////////////////////////
 
-	snprintf(entity_name,66,"%s/%s",id,entity);
+	snprintf(entity_name,MAX_LEN_ENTITY_ID,"%s/%s",id,entity);
 
 	// create entries in to RabbitMQ
 
