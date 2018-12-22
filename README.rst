@@ -8,6 +8,7 @@ Corinthian
     :target: https://travis-ci.org/rbccps-iisc/corinthian
     
 .. |codacy| image:: https://api.codacy.com/project/badge/Grade/d69aaf669bb9416580118d55566dc648
+    :target: https://app.codacy.com/project/pct960/corinthian/dashboard
 
 .. |license| image:: https://img.shields.io/badge/license-ISC-blue.svg
     
