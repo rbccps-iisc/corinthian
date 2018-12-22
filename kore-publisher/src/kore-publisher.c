@@ -2886,9 +2886,7 @@ share (struct http_request *req)
 
 	RUN_QUERY (query,"could not run select query on follow");
 
-	int num_rows = kore_pgsql_ntuples(&sql);
-
-	if (num_rows != 1)
+	if (kore_pgsql_ntuples(&sql) != 1)
 		BAD_REQUEST("follow-id is not valid");
 
 	char *from_id		= kore_pgsql_getvalue(&sql,0,0);
