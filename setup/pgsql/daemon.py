@@ -54,9 +54,9 @@ def run():
                 channel.queue_unbind(exchange=exchange, queue=queue+".priority", routing_key = topic)
                 channel.queue_unbind(exchange=queue+".publish", queue=exchange, routing_key = exchange+"."+topic)
          
-            except Exception as e:
+            except:
                 pass
-         
+	
             cur.execute("DELETE FROM acl WHERE from_id = %s AND exchange = %s AND topic = %s",(queue, exchange, topic,))
             conn.commit()
 
