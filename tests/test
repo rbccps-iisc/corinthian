@@ -635,7 +635,6 @@ def bind_unbind_without_follow(
                     )
                 check(bind_req, 403)
 
-
 def app_subscribe(
     devices,
     app_keys,
@@ -651,7 +650,10 @@ def app_subscribe(
 
         log('APP ' + app + ' SUBSCRIBING TO ITS QUEUE', '')
 
-        for i in range(0, int(count)):
+	tries	= 0
+	i	= 0
+
+        while i < count + tries:
 
             if message_type:
                 sub_req = subscribe(app, apikey, num_messages='100',
@@ -659,9 +661,18 @@ def app_subscribe(
             else:
                 sub_req = subscribe(app, apikey, num_messages='100')
 
-            response = sub_req.json()
-            actual = actual + len(response)
             check(sub_req, 200)
+            response = sub_req.json()
+
+	    if tries > 5:
+		break
+	    
+	    if len(response) == 0:
+		tries = tries + 1
+	    else:
+		actual = actual + len(response)
+	    
+	    i = i + 1
 
         assert_exit(actual == expected, 'Actual = ' + str(actual)
                     + ' Expected = ' + str(expected))
@@ -904,7 +915,7 @@ def dev_subscribe_amqp(apps, device_keys, expected):
 
 def dev_subscribe(apps, device_keys, expected):
 
-    count = math.ceil(apps / 10.0)
+    count = math.ceil(apps / 100.0)
 
     actual = 0
 
@@ -913,12 +924,23 @@ def dev_subscribe(apps, device_keys, expected):
         log('DEVICE ' + device + ' SUBSCRIBING TO ITS COMMAND QUEUE', ''
             )
 
-        for i in range(0, int(count)):
+	tries	= 0
+	i	= 0
+
+        while i < count + tries:
+
             sub_req = subscribe(device, apikey, message_type='command',
                                 num_messages='10')
-            response = sub_req.json()
-            actual = actual + len(response)
+
             check(sub_req, 200)
+            response = sub_req.json()
+
+	    if len(response) == 0:
+		tries = tries + 1
+	    else:
+		actual = actual + len(response)
+
+	    i = i + 1
 
         assert_exit(actual == expected, 'Actual= ' + str(actual)
                     + ' Expected = ' + str(expected))
@@ -3491,17 +3513,6 @@ def is_autonomous(devices, apps):
 
     non_autonomous_reject_follow(device_keys, dev_admin_id,
                                  dev_admin_key)
-
-
-#    print '''
-#
-# '''
-#    log('''------------------------- PERMISSIONS API -------------------------
-#
-# ''',
-#        'GREEN')
-#
-#    non_autonomous_permissions(device_keys, app_keys)
 
 def security_tests():
 
