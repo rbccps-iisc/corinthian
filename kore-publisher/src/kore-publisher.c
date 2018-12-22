@@ -613,7 +613,7 @@ gen_salt_password_and_apikey (
 	snprintf
 	(
 		password_hash,
-		2*SHA256_DIGEST_LENGTH,
+		1 + 2*SHA256_DIGEST_LENGTH,
 		"%02x%02x%02x%02x"
 		"%02x%02x%02x%02x"
 		"%02x%02x%02x%02x"
@@ -707,7 +707,7 @@ login_success (const char *id, const char *apikey, bool *is_autonomous)
 	snprintf
 	(
 		hash_string,
-		2*SHA256_DIGEST_LENGTH,
+		1 + 2*SHA256_DIGEST_LENGTH,
 		"%02x%02x%02x%02x"
 		"%02x%02x%02x%02x"
 		"%02x%02x%02x%02x"
