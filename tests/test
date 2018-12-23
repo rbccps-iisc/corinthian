@@ -653,7 +653,7 @@ def app_subscribe(
 	tries	= 0
 	i	= 0
 
-        while i < count + tries:
+        while i < count:
 
             if message_type:
                 sub_req = subscribe(app, apikey, num_messages='100',
@@ -664,13 +664,7 @@ def app_subscribe(
             check(sub_req, 200)
             response = sub_req.json()
 
-	    if tries > 5:
-		break
-	    
-	    if len(response) == 0:
-		tries = tries + 1
-	    else:
-		actual = actual + len(response)
+	    actual = actual + len(response)
 	    
 	    i = i + 1
 
@@ -930,15 +924,12 @@ def dev_subscribe(apps, device_keys, expected):
         while i < count + tries:
 
             sub_req = subscribe(device, apikey, message_type='command',
-                                num_messages='10')
+                                num_messages='100')
 
             check(sub_req, 200)
             response = sub_req.json()
 
-	    if len(response) == 0:
-		tries = tries + 1
-	    else:
-		actual = actual + len(response)
+	    actual = actual + len(response)
 
 	    i = i + 1
 
@@ -3553,120 +3544,120 @@ def security_tests():
 
     # Invalid apikey tests
 
-    # invalid_apikey(
-    #    devices,
-    #    apps,
-    #    device_keys,
-    #    app_keys,
-    #    dev_admin_id,
-    #    dev_admin_key,
-    #    app_admin_id,
-    #    app_admin_key,
-    #    )
+    invalid_apikey(
+       devices,
+       apps,
+       device_keys,
+       app_keys,
+       dev_admin_id,
+       dev_admin_key,
+       app_admin_id,
+       app_admin_key,
+       )
 
-    # # Invalid ID tests
+    # Invalid ID tests
 
-    # invalid_id(
-    #    devices,
-    #    apps,
-    #    device_keys,
-    #    app_keys,
-    #    dev_admin_id,
-    #    dev_admin_key,
-    #    app_admin_id,
-    #    app_admin_key,
-    #    )
+    invalid_id(
+       devices,
+       apps,
+       device_keys,
+       app_keys,
+       dev_admin_id,
+       dev_admin_key,
+       app_admin_id,
+       app_admin_key,
+       )
 
-    # # Invalid publish
+    # Invalid publish
 
-    # invalid_publish(
-    #    devices,
-    #    apps,
-    #    device_keys,
-    #    app_keys,
-    #    dev_admin_id,
-    #    dev_admin_key,
-    #    app_admin_id,
-    #    app_admin_key,
-    #    )
+    invalid_publish(
+       devices,
+       apps,
+       device_keys,
+       app_keys,
+       dev_admin_id,
+       dev_admin_key,
+       app_admin_id,
+       app_admin_key,
+       )
 
-    # # Invalid subscribe
+    # Invalid subscribe
 
-    # invalid_subscribe(
-    #    devices,
-    #    apps,
-    #    device_keys,
-    #    app_keys,
-    #    dev_admin_id,
-    #    dev_admin_key,
-    #    app_admin_id,
-    #    app_admin_key,
-    #    )
+    invalid_subscribe(
+       devices,
+       apps,
+       device_keys,
+       app_keys,
+       dev_admin_id,
+       dev_admin_key,
+       app_admin_id,
+       app_admin_key,
+       )
 
-    # # Invalid bind
+    # Invalid bind
 
-    # invalid_bind(
-    #    devices,
-    #    apps,
-    #    device_keys,
-    #    app_keys,
-    #    dev_admin_id,
-    #    dev_admin_key,
-    #    app_admin_id,
-    #    app_admin_key,
-    #    )
+    invalid_bind(
+       devices,
+       apps,
+       device_keys,
+       app_keys,
+       dev_admin_id,
+       dev_admin_key,
+       app_admin_id,
+       app_admin_key,
+       )
 
-    # # Invalid unbind
+    # Invalid unbind
 
-    # invalid_unbind(
-    #    devices,
-    #    apps,
-    #    device_keys,
-    #    app_keys,
-    #    dev_admin_id,
-    #    dev_admin_key,
-    #    app_admin_id,
-    #    app_admin_key,
-    #    )
+    invalid_unbind(
+       devices,
+       apps,
+       device_keys,
+       app_keys,
+       dev_admin_id,
+       dev_admin_key,
+       app_admin_id,
+       app_admin_key,
+       )
 
-    # # Invalid follow
+    # Invalid follow
 
-    # invalid_follow(
-    #    devices,
-    #    apps,
-    #    device_keys,
-    #    app_keys,
-    #    dev_admin_id,
-    #    dev_admin_key,
-    #    app_admin_id,
-    #    app_admin_key,
-    #    )
+    invalid_follow(
+       devices,
+       apps,
+       device_keys,
+       app_keys,
+       dev_admin_id,
+       dev_admin_key,
+       app_admin_id,
+       app_admin_key,
+       )
 
-    # # Invalid unfollow
+    # Invalid unfollow
 
-    # invalid_unfollow(
-    #    devices,
-    #    apps,
-    #    device_keys,
-    #    app_keys,
-    #    dev_admin_id,
-    #    dev_admin_key,
-    #    app_admin_id,
-    #    app_admin_key,
-    #    )
+    invalid_unfollow(
+       devices,
+       apps,
+       device_keys,
+       app_keys,
+       dev_admin_id,
+       dev_admin_key,
+       app_admin_id,
+       app_admin_key,
+       )
 
-    # # Invalid deregistrations
+    # Invalid deregistrations
 
-    # invalid_deregistrations(
-    #    devices,
-    #    apps,
-    #    device_keys,
-    #    app_keys,
-    #    dev_admin_id,
-    #    dev_admin_key,
-    #    app_admin_id,
-    #    app_admin_key,
-    #    )
+    invalid_deregistrations(
+       devices,
+       apps,
+       device_keys,
+       app_keys,
+       dev_admin_id,
+       dev_admin_key,
+       app_admin_id,
+       app_admin_key,
+       )
 
     is_autonomous(devices, apps)
 
@@ -4786,7 +4777,6 @@ def functional_tests(*args):
         app_admin_key,
         )
 
-    is_autonomous(devices, apps)
 
     test_time = time.time() - test_time
 
@@ -4823,14 +4813,18 @@ def concurrency_tests():
 
         num_list.append([devices, apps])
 
-    processes = [mp.Process(target=functional_tests, args=(num, ))
-                 for num in num_list]
+    #processes = [mp.Process(target=functional_tests, args=(num, ))
+    #             for num in num_list]
 
-    for p in processes:
-        p.start()
+    #for p in processes:
+    #    p.start()
 
-    for p in processes:
-        p.join()
+    #for p in processes:
+    #    p.join()
+
+    pool    = mp.Pool(concurrent_processes)
+    result  = pool.map(functional_tests, num_list)
+
 
     i = 1
 
@@ -4840,7 +4834,7 @@ def concurrency_tests():
     log('=========================All tests have passed========================='
         , 'GREEN', modifier='BOLD')
 
-    for p in processes:
+    while i <= concurrent_processes :
 
         time_list = output.get()
 
