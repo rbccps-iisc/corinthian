@@ -26,6 +26,8 @@ services:
       - ../kore-publisher:/kore-publisher/
       - ../setup/kore:/scripts/
       - ../vars/:/vars/
+    env_file:
+      - .env
 
   broker:
     image: ideam/kore-broker
@@ -46,6 +48,8 @@ services:
       - ../rabbitmq:/etc/rabbitmq/
       - ../setup/broker:/scripts/
       - ../vars/:/vars/
+    env_file:
+      - .env
   
   postgres:
     image: ideam/postgres
@@ -60,3 +64,5 @@ services:
       - pgsql-data:/var/lib/postgresql
       - ../setup/pgsql:/scripts/
       - ../vars/:/vars/
+    env_file:
+      - .env

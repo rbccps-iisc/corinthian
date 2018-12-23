@@ -27,7 +27,7 @@ base_url = 'https://localhost'
 s = requests.Session()
 s.mount('https://localhost/', HTTPAdapter(pool_connections=10))
 
-admin_apikey = open('vars/admin.passwd', 'r').read()[:-1]
+admin_apikey = open('docker/.env', 'r').readline()[:-1].split("=")[1]
 
 output = mp.Queue()
 

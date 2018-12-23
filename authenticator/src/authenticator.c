@@ -17,7 +17,7 @@
 #include<sys/socket.h>
 #include<errno.h>
 
-#if 0
+#if 1
 	#define debug_printf(...)
 #else
 	#define debug_printf(...) printf(__VA_ARGS__)
@@ -108,33 +108,38 @@ init (int state)
 
 	if (query == NULL)
 		query = kore_buf_alloc(512);
-	
-	int fd = open("/vars/postgres.passwd",O_RDONLY);
-	if (fd < 0)
-	{
-		fprintf(stderr,"could not open postgres.passwd\n");
-		exit(-1);
-	}
 
-	if (! read(fd,postgres_pwd,MAX_LEN_APIKEY))
-	{
-		fprintf(stderr,"could not read from postgres.passwd\n");
-		exit(-1);
-	}
-
+	snprintf(postgres_pwd, MAX_LEN_APIKEY + 1, getenv("POSTGRES_PWD"));
 	postgres_pwd[MAX_LEN_APIKEY] = '\0';
-	int strlen_postgres_pwd = strnlen(postgres_pwd,MAX_LEN_APIKEY);
 
-	for (i = 0; i < strlen_postgres_pwd; ++i)
-	{
-		if (isspace(postgres_pwd[i]))
-		{
-			postgres_pwd[i] = '\0';
-			break;
-		}
-	}
+	debug_printf("postgres = %s\n", postgres_pwd);
+	
+	//int fd = open("/vars/postgres.passwd",O_RDONLY);
+	//if (fd < 0)
+	//{
+	//	fprintf(stderr,"could not open postgres.passwd\n");
+	//	exit(-1);
+	//}
 
-	close (fd);
+	//if (! read(fd,postgres_pwd,MAX_LEN_APIKEY))
+	//{
+	//	fprintf(stderr,"could not read from postgres.passwd\n");
+	//	exit(-1);
+	//}
+
+	//postgres_pwd[MAX_LEN_APIKEY] = '\0';
+	//int strlen_postgres_pwd = strnlen(postgres_pwd,MAX_LEN_APIKEY);
+
+	//for (i = 0; i < strlen_postgres_pwd; ++i)
+	//{
+	//	if (isspace(postgres_pwd[i]))
+	//	{
+	//		postgres_pwd[i] = '\0';
+	//		break;
+	//	}
+	//}
+
+	//close (fd);
 
 	// XXX this user must only have read permissions on DB
 
