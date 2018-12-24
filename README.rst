@@ -11,6 +11,7 @@ Corinthian
     :target: https://app.codacy.com/project/pct960/corinthian/dashboard
 
 .. |license| image:: https://img.shields.io/badge/license-ISC-blue.svg
+    :target: https://en.wikipedia.org/wiki/ISC_license#OpenBSD_license
     
 An IUDX compliant IoT middleware for smart cities
 
