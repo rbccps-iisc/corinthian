@@ -30,17 +30,14 @@ Quickstart
 #. If the host machine is not Ubuntu then install the following dependencies manually
 	#. docker
 	#. docker-compose
-	#. python
-	#. python-pip
 	
-   If you want to run the test script then also install the following python libraries
+   If you want to run the test script then install the following python libraries
 	#. requests
 	#. urllib3
     
 #. Start the installation::
 
-    cd docker
-    ./install
+    ./docker/install
 
 #. Test the middleware using::
 
