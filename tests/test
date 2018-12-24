@@ -45,7 +45,6 @@ colour[''] = ''
 
 pool = {}
 
-
 def cleanup():
 
     cmd = \
@@ -3204,6 +3203,58 @@ def invalid_deregistrations(
     check(r, 403)
     log('Received 403: OK', '')
 
+def private_exchange_tests(
+    devices,
+    apps,
+    device_keys,
+    app_keys,
+    dev_admin_id,
+    dev_admin_key,
+    app_admin_id,
+    app_admin_key,
+    ):
+
+    print '''
+
+'''
+    log('''------------------------- PRIVATE EXCHANGE TESTS -------------------------
+
+''',
+        'GREEN')
+
+    log('---------------> FOLLOW USING PRIVATE MESSAGE-TYPE', 'HEADER'
+        )
+
+    (app_name, app_key) = get_entity(device_keys, app_keys,
+            entity_type='app')
+    (dev_name, dev_key) = get_entity(device_keys, app_keys,
+            entity_type='dev')
+
+    r = follow(app_name, app_key, dev_name, 'read', message_type="private")
+    check(r, 400)
+    log('Received 403: OK', '')
+
+    log('---------------> BIND USING PRIVATE MESSAGE-TYPE', 'HEADER'
+        )
+
+    r = follow(app_name, app_key, dev_name, 'read')
+    follow_id = r.json()['follow-id-read']
+    check(r, 202)
+    log('Received 202: OK', '')
+
+    r = share(dev_name, dev_key, follow_id)
+    check(r, 200)
+
+    r = bind_unbind(
+        app_name,
+        str(app_keys[app_name]),
+        dev_name,
+        'test',
+        'bind',
+        'private',
+        )
+    check(r, 403)
+    log('Received 403: OK', '')
 
 def is_autonomous(devices, apps):
 
@@ -3649,6 +3700,19 @@ def security_tests():
     # Invalid deregistrations
 
     invalid_deregistrations(
+       devices,
+       apps,
+       device_keys,
+       app_keys,
+       dev_admin_id,
+       dev_admin_key,
+       app_admin_id,
+       app_admin_key,
+       )
+
+    #Private exchange test cases
+
+    private_exchange_tests(
        devices,
        apps,
        device_keys,
