@@ -42,7 +42,7 @@ Quickstart
 
 #. Test the middleware using::
 
-    ./tests/test fxnl --random
+    ./tests/test.py fxnl --random
 
 Use-case diagrams
 =================
