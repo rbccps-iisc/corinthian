@@ -299,14 +299,14 @@ init (int state)
 		fprintf(stderr,"admin apikey not set\n");
 		return KORE_RESULT_ERROR;
 	}
-	unsetev("ADMIN_PWD");
+	unsetenv("ADMIN_PWD");
 
 	if (! (postgres_pwd = getenv("POSTGRES_PWD")))
 	{
 		fprintf(stderr,"postgres password not set\n");
 		return KORE_RESULT_ERROR;
 	}
-	unsetev("POSTGRES_PWD");
+	unsetenv("POSTGRES_PWD");
 
 	init_admin_conn();
 
