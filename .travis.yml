@@ -14,6 +14,6 @@ before_script:
   - sleep 10
 
 script:
-  - ./tests/test fxnl --random
-  - ./tests/test sec
-  - ./tests/test concr
+  - ./tests/test.py fxnl --random
+  - ./tests/test.py sec
+  - ./tests/test.py concr
