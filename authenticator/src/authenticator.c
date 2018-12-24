@@ -68,83 +68,26 @@ char 	hash_string		[SHA256_DIGEST_LENGTH*2 + 1];
 struct kore_buf *query = NULL;
 struct kore_pgsql sql;
 
-char postgres_pwd	[MAX_LEN_APIKEY + 1];
+char *postgres_pwd;
 char broker_ip		[100];
 char pgsql_ip		[100];
 
 size_t i;
 
-int hostname_to_ip(char * hostname , char* ip)
-{
-    struct hostent *he;
-    struct in_addr **addr_list;
-    int i;
-         
-    if ( (he = gethostbyname( hostname ) ) == NULL) 
-    {
-        // get the host info
-        herror("gethostbyname");
-        return 1;
-    }
- 
-    addr_list = (struct in_addr **) he->h_addr_list;
-     
-    for(i = 0; addr_list[i] != NULL; i++) 
-    {
-        //Return the first one;
-        strcpy(ip , inet_ntoa(*addr_list[i]) );
-        return 0;
-    }
-     
-    return 1;
-}
-
 int
 init (int state)
 {
 	
-	hostname_to_ip("broker", broker_ip);
-	hostname_to_ip("postgres", pgsql_ip);
-
 	if (query == NULL)
 		query = kore_buf_alloc(512);
 
-	snprintf(postgres_pwd, MAX_LEN_APIKEY + 1, getenv("POSTGRES_PWD"));
-	postgres_pwd[MAX_LEN_APIKEY] = '\0';
-
-	debug_printf("postgres = %s\n", postgres_pwd);
-	
-	//int fd = open("/vars/postgres.passwd",O_RDONLY);
-	//if (fd < 0)
-	//{
-	//	fprintf(stderr,"could not open postgres.passwd\n");
-	//	exit(-1);
-	//}
-
-	//if (! read(fd,postgres_pwd,MAX_LEN_APIKEY))
-	//{
-	//	fprintf(stderr,"could not read from postgres.passwd\n");
-	//	exit(-1);
-	//}
-
-	//postgres_pwd[MAX_LEN_APIKEY] = '\0';
-	//int strlen_postgres_pwd = strnlen(postgres_pwd,MAX_LEN_APIKEY);
-
-	//for (i = 0; i < strlen_postgres_pwd; ++i)
-	//{
-	//	if (isspace(postgres_pwd[i]))
-	//	{
-	//		postgres_pwd[i] = '\0';
-	//		break;
-	//	}
-	//}
-
-	//close (fd);
+	postgres_pwd	= getenv("POSTGRES_PWD");
 
 	// XXX this user must only have read permissions on DB
 
 	char conn_str[129];
-        snprintf(conn_str,129,"host = %s user = postgres password = %s", pgsql_ip, postgres_pwd);
+        snprintf(conn_str, 129,"host = postgres user = postgres password = %s", postgres_pwd);
+
         kore_pgsql_register("db",conn_str);
 
 	if (chroot("./jail") < 0)

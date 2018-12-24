@@ -13,3 +13,4 @@ authenticator/resolv.conf
 vars/
 docker/daemon.log
 kore-publisher/random.data
+docker/.env

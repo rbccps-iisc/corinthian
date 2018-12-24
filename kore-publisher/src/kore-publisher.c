@@ -66,8 +66,8 @@ ht async_connection_ht;
 
 bool is_success = false;
 
-char admin_apikey [MAX_LEN_APIKEY + 1];
-char postgres_pwd [MAX_LEN_APIKEY + 1];
+char *admin_apikey;
+char *postgres_pwd;
 
 char error_string [1025];
 
@@ -294,69 +294,8 @@ init (int state)
 
 //////////////
 
-	snprintf(admin_apikey, MAX_LEN_APIKEY + 1, getenv("ADMIN_PWD"));
-	admin_apikey[MAX_LEN_APIKEY] = '\0';
-
-	snprintf(postgres_pwd, MAX_LEN_APIKEY + 1, getenv("POSTGRES_PWD"));
-	postgres_pwd[MAX_LEN_APIKEY] = '\0';
-
-	debug_printf("postgres = %s, admin = %s\n", postgres_pwd, admin_apikey);
-
-	//int fd = open("/vars/admin.passwd",O_RDONLY);
-	//if (fd < 0)
-	//{
-	//	fprintf(stderr,"could not open admin.passwd file\n");
-	//	exit(-1);
-	//}
-
-	//if (! read(fd,admin_apikey,MAX_LEN_APIKEY))
-	//{
-	//	fprintf(stderr,"could not read from admin.passwd file\n");
-	//	exit(-1);
-	//}
-
-	//admin_apikey [MAX_LEN_APIKEY] = '\0';
-
-	//int strlen_admin_apikey = strnlen(admin_apikey, MAX_LEN_APIKEY);
-
-	//for (i = 0; i < strlen_admin_apikey; ++i)
-	//{
-	//	if (isspace(admin_apikey[i]))
-	//	{
-	//		admin_apikey[i] = '\0';
-	//		break;
-	//	}
-	//}
-
-	//(void) close (fd);
-
-	//fd = open("/vars/postgres.passwd",O_RDONLY);
-	//if (fd < 0)
-	//{
-	//	fprintf(stderr,"could not open postgres.passwd\n");
-	//	exit(-1);
-	//}
-
-	//if (! read(fd,postgres_pwd,MAX_LEN_APIKEY))
-	//{
-	//	fprintf(stderr,"could not read from postgres.passwd\n");
-	//	exit(-1);
-	//}
-
-	//postgres_pwd [MAX_LEN_APIKEY] = '\0';
-
-	//int strlen_postgres_pwd = strnlen(postgres_pwd, MAX_LEN_APIKEY);
-
-	//for (i = 0; i < strlen_postgres_pwd; ++i)
-	//{
-	//	if (isspace(postgres_pwd[i]))
-	//	{
-	//		postgres_pwd[i] = '\0';
-	//		break;
-	//	}
-	//}
-
-	//(void) close (fd);
+	admin_apikey	= getenv("ADMIN_PWD");
+	postgres_pwd	= getenv("POSTGRES_PWD");
 
 	init_admin_conn();
 
