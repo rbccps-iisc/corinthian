@@ -1721,7 +1721,8 @@ catalog (struct http_request *req)
 
 		char *schema = kore_pgsql_getvalue(&sql,0,0);
 
-		kore_buf_append(response,schema,strlen(schema));
+		// max 3MB
+		kore_buf_append(response,schema,strnlen(schema,3*1024*1024));
 	}
 
 	OK();
@@ -2081,7 +2082,8 @@ queue_bind (struct http_request *req)
 		amqp_empty_table
 	))
 	{
-		ERROR("bind failed");
+		snprintf(error_string,1024,"bind failed e={%s} q={%s} t={%s}\n", exchange,queue,topic);
+		ERROR(error_string);
 	}
 
 	OK();
@@ -2892,9 +2894,11 @@ share (struct http_request *req)
 
 	if (strcmp(permission,"read") == 0)
 	{
+		/*
 		snprintf(bind_exchange,	129,"%s",		my_exchange);
 		snprintf(bind_queue,	129,"%s",		from_id); 		// TODO: what about priority queue
 		snprintf(bind_topic,	129,"%s",		topic);
+		*/
 	}
 	else if (strcmp(permission,"write") == 0)
 	{
@@ -2915,25 +2919,13 @@ share (struct http_request *req)
 			snprintf(error_string,1024,"bind failed e={%s} q={%s} t={%s}\n", bind_exchange, bind_queue, bind_topic);
 			ERROR(error_string);
 		}
+
+		debug_printf("\n--->binding {%s} with {%s} {%s}\n",bind_queue,bind_exchange,bind_topic);
 	}
 	else
 	{
 		ERROR ("wrong value of permission in db");
 	}
-
-	debug_printf("\n--->binding {%s} with {%s} {%s}\n",bind_queue,bind_exchange,bind_topic);
-
-//	if (! amqp_queue_bind (
-//		cached_admin_conn,
-//		1,
-//		amqp_cstring_bytes(bind_queue),
-//		amqp_cstring_bytes(bind_exchange),
-//		amqp_cstring_bytes(bind_topic),
-//		amqp_empty_table
-//	))
-//	{
-//		ERROR("bind failed for app.publish with device.command");
-//	}
 
 	if (is_from_autonomous)
 		snprintf (exchange, 129, "%s.notification",from_id);
@@ -3780,8 +3772,8 @@ json_sanitize (const char *string)
 bool
 is_request_from_localhost (struct http_request *req)
 {
-	switch (req->owner->family)
-	//switch (req->owner->addrtype)
+	switch (req->owner->addrtype) // OLD
+	//switch (req->owner->family)
 	{
 		case AF_INET:
 			if (req->owner->addr.ipv4.sin_addr.s_addr == htonl(INADDR_LOOPBACK))

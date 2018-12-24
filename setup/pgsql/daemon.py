@@ -28,9 +28,9 @@ def run():
 	    connection = pika.BlockingConnection(parameters)
 	    print("Connected")
 	    break;
-	except:
+	except Exception:
             sys.stderr.write("Failed to connect to broker\n")
-	
+
     channel = connection.channel()
 
     queue       = ""
@@ -53,7 +53,7 @@ def run():
                 channel.queue_unbind(exchange=exchange, queue=queue, routing_key = topic)
                 channel.queue_unbind(exchange=exchange, queue=queue+".priority", routing_key = topic)
                 channel.queue_unbind(exchange=queue+".publish", queue=exchange, routing_key = exchange+"."+topic)
-            except Exception as e:
+            except Exception:
                 sys.stderr.write("Failed to unbind q="+queue+" e="+exchange+" t="+topic)
 
             cur.execute("DELETE FROM acl WHERE from_id = %s AND exchange = %s AND topic = %s",(queue, exchange, topic,))

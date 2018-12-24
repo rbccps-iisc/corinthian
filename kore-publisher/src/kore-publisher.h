@@ -128,40 +128,32 @@ bool is_request_from_localhost (struct http_request *);
 #define OK_201() 	{req->status=201; goto done;}
 #define OK_202() 	{req->status=202; goto done;}
 
-#define BAD_REQUEST(x) { 				\
-	req->status = 400;				\
-	kore_buf_reset(response); 			\
-	kore_buf_append(response,"{\"error\":\"",10); 	\
-	kore_buf_append(response,x,strlen(x));	 	\
-	kore_buf_append(response,"\"}\n",3);	 	\
-	goto done;					\
+#define BAD_REQUEST(x) { 					\
+	req->status = 400;					\
+	kore_buf_reset(response); 				\
+	kore_buf_appendf(response,"{\"error\":\"%s\"}\n",x);	\
+	goto done;						\
 }
 
-#define FORBIDDEN(x) {					\
-	req->status = 403;				\
-	kore_buf_reset(response); 			\
-	kore_buf_append(response,"{\"error\":\"",10); 	\
-	kore_buf_append(response,x,strlen(x));	 	\
-	kore_buf_append(response,"\"}\n",3);	 	\
-	goto done;					\
+#define FORBIDDEN(x) {						\
+	req->status = 403;					\
+	kore_buf_reset(response); 				\
+	kore_buf_appendf(response,"{\"error\":\"%s\"}\n",x);	\
+	goto done;						\
 }
 
-#define CONFLICT(x) { 					\
-	req->status = 409;				\
-	kore_buf_reset(response); 			\
-	kore_buf_append(response,"{\"error\":\"",10); 	\
-	kore_buf_append(response,x,strlen(x));	 	\
-	kore_buf_append(response,"\"}\n",3);	 	\
-	goto done;					\
+#define CONFLICT(x) { 						\
+	req->status = 409;					\
+	kore_buf_reset(response); 				\
+	kore_buf_appendf(response,"{\"error\":\"%s\"}\n",x);	\
+	goto done;						\
 }
 
-#define ERROR(x) { 					\
-	req->status = 500;				\
-	kore_buf_reset(response); 			\
-	kore_buf_append(response,"{\"error\":\"",10); 	\
-	kore_buf_append(response,x,strlen(x));	 	\
-	kore_buf_append(response,"\"}\n",3);	 	\
-	goto done;					\
+#define ERROR(x) { 						\
+	req->status = 500;					\
+	kore_buf_reset(response); 				\
+	kore_buf_appendf(response,"{\"error\":\"%s\"}\n",x);	\
+	goto done;						\
 }
 
 #define REDIRECT(x) {					\

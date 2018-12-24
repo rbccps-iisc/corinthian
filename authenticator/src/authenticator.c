@@ -17,6 +17,25 @@
 #include<sys/socket.h>
 #include<errno.h>
 
+#define MAX_LEN_SALT		(32)
+#define MAX_LEN_APIKEY	 	(32)
+
+#define MIN_LEN_OWNER_ID	(3)
+#define MAX_LEN_OWNER_ID	(32)
+
+/* min = abc/efg */
+#define MIN_LEN_ENTITY_ID 	(7)
+#define MAX_LEN_ENTITY_ID 	(65)
+
+#define MIN_LEN_RESOURCE_ID	(MIN_LEN_ENTITY_ID)
+#define MAX_LEN_RESOURCE_ID	(128)
+
+#define MAX_LEN_HASH_KEY 	(MAX_LEN_ENTITY_ID + MAX_LEN_APIKEY)
+
+#define MAX_LEN_HASH_INPUT	(MAX_LEN_APIKEY + MAX_LEN_SALT + MAX_LEN_ENTITY_ID)
+
+#define MAX_LEN_FOLLOW_ID	(10)
+
 #if 1
 	#define debug_printf(...)
 #else
@@ -105,9 +124,9 @@ init (int state)
 inline bool
 is_alpha_numeric (const char *str)
 {
-	uint8_t strlen_str = strnlen(str, MAX_LEN_OWNER_ID);
+	uint8_t strlen_str = strnlen(str, MAX_LEN_OWNER_ID + 1);
 
-	if (strlen_str < 3 || strlen_str > 32)
+	if (strlen_str < MIN_LEN_OWNER_ID || strlen_str > MAX_LEN_OWNER_ID)
 		return false;
 
 	for (i = 0; i < strlen_str; ++i)
@@ -138,40 +157,41 @@ looks_like_a_valid_owner (const char *str)
 bool
 looks_like_a_valid_entity (const char *str)
 {
-	uint8_t strlen_str = strlen(str);
+	size_t	len = 0;
 
 	uint8_t front_slash_count = 0;
 
-	if (strlen_str < 3 || strlen_str > 65)
-		return false;
+	char *p = str;
 
-	for (i = 0; i < strlen_str; ++i)
+	while (*p)
 	{
-		if (! isalnum(str[i]))
+		if (! isalnum(*p))
 		{
 			// support some extra chars
-			switch (str[i])
+			switch (*p)
 			{
 				case '/':
 						++front_slash_count;
 						break;
 				case '-':
 						break;
-				
 				default:
-						return false;	
+						return false;
 			}
 		}
 
-		if (front_slash_count > 1)
+		++p;
+		++len;
+
+		if (len > MAX_LEN_ENTITY_ID || front_slash_count > 1)
 			return false;
 	}
 
 	// there should be one front slash
-	if (front_slash_count != 1)
+	if (len < MIN_LEN_ENTITY_ID || front_slash_count != 1)
 		return false;
-
-	return true;
+	else
+		return true;
 }
 
 bool
@@ -217,21 +237,22 @@ login_success (const char *id, const char *apikey)
 	if (salt[0] == '\0' || password_hash[0] == '\0')
 		goto done;
 
-	debug_printf("strlen of salt = %d (%s)\n",strlen(salt),salt);
-	debug_printf("strlen of apikey = %d (%s)\n",strlen(apikey),apikey);
-
-	strlcpy(string_to_be_hashed, apikey, 33);
-	strlcat(string_to_be_hashed, salt,   65);
-	strlcat(string_to_be_hashed, id,    250);
-
-	SHA256((const uint8_t*)string_to_be_hashed,strlen(string_to_be_hashed),binary_hash);
+	snprintf (string_to_be_hashed, 
+			MAX_LEN_HASH_INPUT,	
+				"%s%s%s",
+					apikey, salt, id);
+	SHA256 (
+		(const uint8_t*)string_to_be_hashed,
+		strnlen (string_to_be_hashed,MAX_LEN_HASH_INPUT),
+		binary_hash
+	);
 
 	debug_printf("login_success STRING TO BE HASHED = {%s}\n",string_to_be_hashed);
 
 	snprintf
 	(
 		hash_string,
-		65,
+		1 + 2*SHA256_DIGEST_LENGTH,
 		"%02x%02x%02x%02x"
 		"%02x%02x%02x%02x"
 		"%02x%02x%02x%02x"
@@ -280,7 +301,7 @@ auth_user(struct http_request *req)
 
 	GET_MANDATORY_FIELD(password);
 
-	if (strlen(username) > 65) 
+	if (strnlen(username,65) >= 65) 
 		BAD_REQUEST();
 
 	if (login_success(username,password))	
@@ -345,7 +366,8 @@ auth_resource(struct http_request *req)
 		DENY();
 	
 	// kore's conf file contains a regex
-	if (strlen(username) < 3 || strlen(name) > 65)
+	strlen_username = strnlen(username,64);
+	if (strlen_username < 3 || strnlen(name,65) >= 65)
 		DENY()
 
 	// name should not look like a owner 
@@ -377,7 +399,6 @@ auth_resource(struct http_request *req)
 	if (kore_pgsql_ntuples(&sql) != 1)
 		DENY();
 
-	strlen_username = strlen(username);
 	if (strcmp(resource,"queue") == 0)
 	{
 		// don't allow writes on queue
