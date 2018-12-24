@@ -12,10 +12,13 @@
 #include <bsd/stdlib.h>
 
 #include <ctype.h>
-#include<arpa/inet.h>
-#include<netdb.h>
-#include<sys/socket.h>
-#include<errno.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <sys/socket.h>
+#include <errno.h>
+#include <pwd.h>
+
+#define UNPRIVILEGED_USER ("nobody")
 
 #define MAX_LEN_SALT		(32)
 #define MAX_LEN_APIKEY	 	(32)
@@ -114,14 +117,30 @@ init (int state)
 
         kore_pgsql_register("db",conn_str);
 
-	if (chroot("./jail") < 0)
-		perror("Chroot ");
-	
-	if (setgid(65534) < 0)
-		perror("Setgid ");
+///// chroot and drop priv /////
 
-	if (setuid(65534) < 0)
-		perror("Setuid ");
+	struct passwd *p;
+	if ((p = getpwnam(UNPRIVILEGED_USER)) == NULL) {
+		perror("getpwnam failed ");
+		return KORE_RESULT_ERROR;
+	}
+
+	if (chroot("./jail") < 0) {
+		perror("chroot failed ");
+		return KORE_RESULT_ERROR;
+	}
+
+	if (setgid(p->pw_gid) < 0) {
+		perror("setgid failed ");
+		return KORE_RESULT_ERROR;
+	}
+
+	if (setuid(p->pw_uid) < 0) {
+		perror("setuid failed ");
+		return KORE_RESULT_ERROR;
+	}
+
+/////////////////////////////////
 
 	return KORE_RESULT_OK;
 }
