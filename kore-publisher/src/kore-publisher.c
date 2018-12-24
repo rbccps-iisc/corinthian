@@ -2467,7 +2467,8 @@ follow (struct http_request *req)
 				amqp_empty_table
 			))
 			{
-				ERROR("bind failed for app.publish with device.command");
+				snprintf(error_string,1024,"bind failed e={%s} q={%s} t={%s}\n", write_exchange, command_queue, write_topic);
+				ERROR(error_string);
 			}
 
 			CREATE_STRING (query,
@@ -2911,7 +2912,8 @@ share (struct http_request *req)
 		    )
 		)
 		{
-			ERROR("bind failed for app.publish with device.command");
+			snprintf(error_string,1024,"bind failed e={%s} q={%s} t={%s}\n", bind_exchange, bind_queue, bind_topic);
+			ERROR(error_string);
 		}
 	}
 	else
