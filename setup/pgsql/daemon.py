@@ -18,7 +18,6 @@ def run():
     conn = psycopg2.connect(database="postgres", user = "postgres", password = postgres_passwd, host = "127.0.0.1", port = "5432")
 
     cur = conn.cursor()
-    
     credentials = pika.PlainCredentials('admin', admin_passwd)
     parameters = pika.ConnectionParameters('broker',5672, '/', credentials)
 
