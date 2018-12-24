@@ -100,7 +100,12 @@ init (int state)
 	if (query == NULL)
 		query = kore_buf_alloc(512);
 
-	postgres_pwd	= getenv("POSTGRES_PWD");
+	if (! (postgres_pwd = getenv("POSTGRES_PWD"))
+	{
+		fprintf(stderr,"postgres password not set\n");
+		return KORE_RESULT_ERROR;
+	}
+	unsetev("POSTGRES_PWD");
 
 	// XXX this user must only have read permissions on DB
 
