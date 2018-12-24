@@ -88,9 +88,9 @@ def check_register(device_keys, app_keys):
     exchanges	= [".public", ".private", ".protected", ".notification", ".publish", ".diagnostics"]
     queues	= ["", ".private", ".priority", ".command", ".notification"]
 
-    count = 0
-
     for device in device_keys:
+
+	count = 0
 
 	for exchange in exchanges:
     	    
@@ -106,9 +106,9 @@ def check_register(device_keys, app_keys):
     	
     	assert(count == len(exchanges))
 
-    	count = 0
-
-    	for queue in queues:
+	count = 0
+    	
+	for queue in queues:
     	    
     	    channel = get_channel("admin"+":"+admin_apikey)
 
@@ -122,9 +122,9 @@ def check_register(device_keys, app_keys):
     	
     	assert(count == len(queues))
 
-    count = 0
-
     for app in app_keys:
+	
+	count = 0
 
 	for exchange in exchanges:
     	    
@@ -161,9 +161,9 @@ def check_deregister(device_keys, app_keys):
     exchanges	= [".public", ".private", ".protected", ".notification", ".publish", ".diagnostics"]
     queues	= ["", ".private", ".priority", ".command", ".notification"]
 
-    count = 0
-
     for device in device_keys:
+
+	count = 0
 
 	for exchange in exchanges:
     	    
@@ -193,9 +193,9 @@ def check_deregister(device_keys, app_keys):
     	
     	assert(count == len(queues))
 
-    count = 0
-
     for app in app_keys:
+
+	count = 0
 
 	for exchange in exchanges:
     	    
