@@ -83,7 +83,146 @@ def check(response, code):
                 + response.text + ' Status code ='
                 + str(response.status_code))
 
+def check_register(device_keys, app_keys):
 
+    exchanges	= [".public", ".private", ".protected", ".notification", ".publish", ".diagnostics"]
+    queues	= ["", ".private", ".priority", ".command", ".notification"]
+
+    count = 0
+
+    for device in device_keys:
+
+	for exchange in exchanges:
+    	    
+    	    channel = get_channel("admin"+":"+admin_apikey)
+    	    
+	    log('CHECKING FOR EXISTENCE OF  ' + device+exchange + " EXCHANGE", '')
+    	    
+	    try:
+    	        channel.exchange_declare(exchange=device+exchange, exchange_type='topic', passive=True, durable=True, auto_delete=False, internal=False, arguments=None)
+    	        count = count + 1
+    	    except Exception:
+    	        raise
+    	
+    	assert(count == len(exchanges))
+
+    	count = 0
+
+    	for queue in queues:
+    	    
+    	    channel = get_channel("admin"+":"+admin_apikey)
+
+	    log('CHECKING FOR EXISTENCE OF  ' + device+queue + " QUEUE", '')
+    	    
+    	    try:
+    	        channel.queue_declare(queue=device+queue, passive=True, durable=True, auto_delete=False, arguments=None)
+    	        count = count + 1
+    	    except Exception:
+    	        raise
+    	
+    	assert(count == len(queues))
+
+    count = 0
+
+    for app in app_keys:
+
+	for exchange in exchanges:
+    	    
+    	    channel = get_channel("admin"+":"+admin_apikey)
+
+	    log('CHECKING FOR EXISTENCE OF  ' + app+exchange + " EXCHANGE", '')
+    	    
+    	    try:
+    	        channel.exchange_declare(exchange=app+exchange, exchange_type='topic', passive=True, durable=True, auto_delete=False, internal=False, arguments=None)
+    	        count = count + 1
+    	    except Exception:
+    	        raise
+    	
+    	assert(count == len(exchanges))
+
+    	count = 0
+
+    	for queue in queues:
+    	    
+    	    channel = get_channel("admin"+":"+admin_apikey)
+
+	    log('CHECKING FOR EXISTENCE OF  ' + app+queue + " QUEUE", '')
+    	    
+    	    try:
+    	        channel.queue_declare(queue=app+queue, passive=True, durable=True, auto_delete=False, arguments=None)
+    	        count = count + 1
+    	    except Exception:
+    	        raise
+    	
+    	assert(count == len(queues))
+
+def check_deregister(device_keys, app_keys):
+
+    exchanges	= [".public", ".private", ".protected", ".notification", ".publish", ".diagnostics"]
+    queues	= ["", ".private", ".priority", ".command", ".notification"]
+
+    count = 0
+
+    for device in device_keys:
+
+	for exchange in exchanges:
+    	    
+    	    channel = get_channel("admin"+":"+admin_apikey)
+
+	    log('CHECKING FOR NON EXISTENCE OF  ' + device+exchange+ " EXCHANGE", '')
+    	    
+    	    try:
+    	        channel.exchange_declare(exchange=device+exchange, exchange_type='topic', passive=True, durable=True, auto_delete=False, internal=False, arguments=None)
+    	    except Exception:
+    	        count = count + 1
+    	
+    	assert(count == len(exchanges))
+
+    	count = 0
+
+    	for queue in queues:
+    	    
+    	    channel = get_channel("admin"+":"+admin_apikey)
+
+	    log('CHECKING FOR NON EXISTENCE OF  ' + device+queue+ " QUEUE", '')
+    	    
+    	    try:
+    	        channel.queue_declare(queue=device+queue, passive=True, durable=True, auto_delete=False, arguments=None)
+    	    except Exception:
+    	        count = count + 1
+    	
+    	assert(count == len(queues))
+
+    count = 0
+
+    for app in app_keys:
+
+	for exchange in exchanges:
+    	    
+    	    channel = get_channel("admin"+":"+admin_apikey)
+
+	    log('CHECKING FOR NON EXISTENCE OF  ' + app+exchange+ " EXCHANGE", '')
+    	    
+    	    try:
+    	        channel.exchange_declare(exchange=app+exchange, exchange_type='topic', passive=True, durable=True, auto_delete=False, internal=False, arguments=None)
+    	    except Exception:
+    	        count = count + 1
+    	
+    	assert(count == len(exchanges))
+
+    	count = 0
+
+    	for queue in queues:
+    	    
+    	    channel = get_channel("admin"+":"+admin_apikey)
+    	    
+    	    try:
+    	        channel.queue_declare(queue=app+queue, passive=True, durable=True, auto_delete=False, arguments=None)
+    	    except Exception:
+    	        count = count + 1
+    	
+    	assert(count == len(queues))
+	
 def assert_exit(condition, error_message):
 
     try:
@@ -120,7 +259,7 @@ def get_channel(token):
 
     global pool
 
-    if token not in pool:
+    if (token not in pool) or (pool[token].is_closed):
 
         credentials = pika.PlainCredentials(username, apikey)
         parameters = pika.ConnectionParameters(host='localhost',
@@ -4722,6 +4861,8 @@ def functional_tests(*args):
         )
     reg_time = time.time() - reg_time
 
+    check_register(device_keys, app_keys)
+
     test_time = time.time()
 
     # Read follow requests. Also tests bind using admin keys
@@ -4858,6 +4999,8 @@ def functional_tests(*args):
         )
 
     dereg_time = time.time() - dereg_time
+
+    check_deregister(device_keys, app_keys)
 
     time_list = [reg_time, test_time, dereg_time]
 
@@ -5045,7 +5188,7 @@ if __name__ == '__main__':
                         datefmt='%Y-%m-%d %H:%M:%S')
     logging.getLogger('requests').setLevel(logging.WARNING)
     logging.getLogger('urllib3').setLevel(logging.WARNING)
-    logging.getLogger('pika').setLevel(logging.WARNING)
+    logging.getLogger('pika').setLevel(logging.CRITICAL)
 
     start_tests(devices, apps, args)
 

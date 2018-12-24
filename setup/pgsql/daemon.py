@@ -23,7 +23,6 @@ def run():
     parameters = pika.ConnectionParameters('broker',5672, '/', credentials)
 
     while True:
-	
 	try:
 	    print("Connecting to broker ...")
 	    connection = pika.BlockingConnection(parameters)
