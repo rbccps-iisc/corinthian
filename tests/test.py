@@ -48,7 +48,7 @@ def cleanup():
         """ docker exec postgres psql -U postgres -c "delete from follow where status = 'pending';" """
 
     try:
-        subprocess.check_output(cmd, shell=False)
+        subprocess.check_output(cmd, shell=True)
     except Exception, e:
         print 'failed to cleanup'
         sys.exit(1)
