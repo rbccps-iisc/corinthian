@@ -4827,7 +4827,7 @@ def public_exchange_tests(
 
 def functional_tests(*args):
 
-    if type(args[0]) is list:
+    if isinstance(args[0],list):
         devices = args[0][0]
         apps = args[0][1]
     else:

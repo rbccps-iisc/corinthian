@@ -37,8 +37,6 @@
 
 #define MAX_LEN_HASH_INPUT	(MAX_LEN_APIKEY + MAX_LEN_SALT + MAX_LEN_ENTITY_ID)
 
-#define MAX_LEN_FOLLOW_ID	(10)
-
 #if 1
 	#define debug_printf(...)
 #else
@@ -47,7 +45,7 @@
 
 #define OK()    { req->status=200; goto done; }
 #define DENY()  { debug_printf("DENY %d\n",__LINE__);req->status=403; goto done; }
-#define ERROR() { req->status=500; goto done; }
+#define ERROR() { debug_printf("ERROR %d\n",__LINE__);req->status=500; goto done; }
 #define BAD_REQUEST() {debug_printf("BAD %d\n",__LINE__);req->status=400; goto done;}
 
 #define GET_MANDATORY_FIELD(x) \
@@ -285,14 +283,14 @@ login_success (const char *id, const char *apikey)
 		"%02x%02x%02x%02x"
 		"%02x%02x%02x%02x"
 		"%02x%02x%02x%02x",
-		binary_hash[ 0], binary_hash[ 1], binary_hash[ 2], binary_hash[ 3],
-		binary_hash[ 4], binary_hash[ 5], binary_hash[ 6], binary_hash[ 7],
-		binary_hash[ 8], binary_hash[ 9], binary_hash[10], binary_hash[11],
-		binary_hash[12], binary_hash[13], binary_hash[14], binary_hash[15],
-		binary_hash[16], binary_hash[17], binary_hash[18], binary_hash[19],
-		binary_hash[20], binary_hash[21], binary_hash[22], binary_hash[23],
-		binary_hash[24], binary_hash[25], binary_hash[26], binary_hash[27],
-		binary_hash[28], binary_hash[29], binary_hash[30], binary_hash[31]
+		binary_hash[ 0],binary_hash[ 1],binary_hash[ 2],binary_hash[ 3],
+		binary_hash[ 4],binary_hash[ 5],binary_hash[ 6],binary_hash[ 7],
+		binary_hash[ 8],binary_hash[ 9],binary_hash[10],binary_hash[11],
+		binary_hash[12],binary_hash[13],binary_hash[14],binary_hash[15],
+		binary_hash[16],binary_hash[17],binary_hash[18],binary_hash[19],
+		binary_hash[20],binary_hash[21],binary_hash[22],binary_hash[23],
+		binary_hash[24],binary_hash[25],binary_hash[26],binary_hash[27],
+		binary_hash[28],binary_hash[29],binary_hash[30],binary_hash[31]
 	);
 
 	hash_string[64] = '\0';
@@ -372,8 +370,6 @@ auth_resource(struct http_request *req)
 
 	req->status = 403;
 
-	size_t strlen_username;
-	
 	http_populate_get(req);
 
 	GET_MANDATORY_FIELD(username);
@@ -390,8 +386,8 @@ auth_resource(struct http_request *req)
 		DENY();
 	
 	// kore's conf file contains a regex
-	strlen_username = strnlen(username,64);
-	if (strlen_username < 3 || strnlen(name,65) >= 65)
+	size_t strlen_username = strnlen(username, MAX_LEN_ENTITY_ID);
+	if (strlen_username < MIN_LEN_ENTITY_ID || strnlen(name,65) >= 65)
 		DENY()
 
 	// name should not look like a owner 
