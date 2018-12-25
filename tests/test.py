@@ -5,12 +5,9 @@ import math
 import argparse
 import random
 import string
-import argparse
-import hashlib
 import logging
 import time
 import sys
-import warnings
 import pika
 import requests
 import urllib3
@@ -51,7 +48,7 @@ def cleanup():
         """ docker exec postgres psql -U postgres -c "delete from follow where status = 'pending';" """
 
     try:
-        subprocess.check_output(cmd, shell=True)
+        subprocess.check_output(cmd, shell=False)
     except Exception, e:
         print 'failed to cleanup'
         sys.exit(1)
@@ -788,7 +785,6 @@ def app_subscribe(
 
         log('APP ' + app + ' SUBSCRIBING TO ITS QUEUE', '')
 
-	tries	= 0
 	i	= 0
 
         while i < count:
@@ -5031,7 +5027,6 @@ def concurrency_tests():
 
     pool    = mp.Pool(concurrent_processes)
     result  = pool.map(functional_tests, num_list)
-
 
     i = 1
 
