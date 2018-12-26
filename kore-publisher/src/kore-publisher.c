@@ -1438,7 +1438,16 @@ register_entity (struct http_request *req)
 
 	// create entries in to RabbitMQ
 
-	create_exchanges_and_queues((void *)entity_name);
+	if (0 == pthread_create(&thread,NULL,create_exchanges_and_queues,(void *)entity_name))
+		thread_started = true;
+	else
+	{
+		create_exchanges_and_queues((void *)entity_name);
+
+		if (! is_success)
+			ERROR("could not create exchanges and queues");
+	}
+
 
 	// conflict if entity_name already exist
 
@@ -1642,7 +1651,16 @@ deregister_entity (struct http_request *req)
 		BAD_REQUEST("invalid entity");
 
 	// delete entries in to RabbitMQ
-	delete_exchanges_and_queues((void *)entity);
+	if (0 == pthread_create(&thread,NULL,delete_exchanges_and_queues,(void *)entity))
+		thread_started = true;
+	else
+	{
+		delete_exchanges_and_queues((void *)entity);
+
+		if (! is_success)
+			ERROR("could not delete exchanges and queues");
+	}
+
 
 	CREATE_STRING (query,
 		"DELETE FROM acl WHERE from_id = '%s' OR exchange LIKE '%s.%%'",
