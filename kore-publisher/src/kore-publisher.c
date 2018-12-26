@@ -22,7 +22,7 @@
 
 #define MAX_LEN_FOLLOW_ID	(10)
 
-#define MAX_AMQP_RETRIES	(2)
+#define MAX_AMQP_RETRIES	(3)
 
 char password_chars[] = "abcdefghijklmnopqrstuvwxyz"
 			"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
