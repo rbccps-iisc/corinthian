@@ -143,6 +143,9 @@ init_admin_conn ()
 void*
 async_publish_function (void *v)
 {
+/*
+	// XXX: this api is not tested and must not be used
+
 	Q *q = (Q *)v;
 
 	publish_async_data_t *data = NULL; 
@@ -157,8 +160,6 @@ async_publish_function (void *v)
 	const char *content_type;
 
 	char *async_exchange;
-
-	// TODO : yet to be tested !
 
 	amqp_connection_state_t	*async_cached_conn = NULL;
 	
@@ -242,16 +243,18 @@ async_publish_function (void *v)
 			async_props.user_id 		= amqp_cstring_bytes(id);
 			async_props.content_type 	= amqp_cstring_bytes(content_type);
 
-			amqp_basic_publish (
-				*async_cached_conn,
-				1,
-				amqp_cstring_bytes(async_exchange),
-        			amqp_cstring_bytes(subject),
-				0,
-				0,
-				&async_props,
-				amqp_cstring_bytes(message)
-			);
+			if ( AMQP_STATUS_OK != amqp_basic_publish (
+					*async_cached_conn,
+					1,
+					amqp_cstring_bytes(async_exchange),
+        				amqp_cstring_bytes(subject),
+					0,
+					0,
+					&async_props,
+					amqp_cstring_bytes(message)
+				)
+			)
+				goto done;
 
 done:
 			free (data);
@@ -261,6 +264,7 @@ done:
 	}
 
 	return NULL;
+*/
 }
 
 int
@@ -715,6 +719,119 @@ done:
 	return login_result;
 }
 
+bool
+async_login_success (const char *id, const char *apikey, bool *is_autonomous)
+{
+/*
+	char *salt;
+	char *password_hash;
+	char *str_is_autonomous;
+
+	bool login_result = false;
+
+	if (id == NULL || apikey == NULL || *id == '\0' || *apikey == '\0')
+		goto done;
+
+	if (id[0] < 'a' || id[0] > 'z')
+		goto done;	
+
+	if (! is_string_safe(id))
+		goto done;
+
+	CREATE_STRING (async_query,
+		"SELECT salt,password_hash,is_autonomous FROM users "
+			"WHERE id='%s' AND blocked='f'",
+				id
+	);
+
+	debug_printf("async login query = {%s}\n",async_query->data);
+
+	kore_pgsql_cleanup(&async_sql);
+	kore_pgsql_init(&async_sql);
+	if (! kore_pgsql_setup(&async_sql,"db",KORE_PGSQL_SYNC))
+	{
+		kore_pgsql_logerror(&async_sql);
+		goto done;
+	}
+	if (! kore_pgsql_query(&async_sql,(const char *)async_query->data))
+	{
+		kore_pgsql_logerror(&async_sql);
+		goto done;
+	}
+
+	if (kore_pgsql_ntuples(&async_sql) == 0)
+		goto done;
+
+	salt 	 		= kore_pgsql_getvalue(&async_sql,0,0);
+	password_hash		= kore_pgsql_getvalue(&async_sql,0,1);
+	str_is_autonomous 	= kore_pgsql_getvalue(&async_sql,0,2);
+
+	if (is_autonomous)
+		*is_autonomous = false; 
+
+	// there is no salt or password hash in db ?
+	if (salt[0] == '\0' || password_hash[0] == '\0')
+		goto done;
+
+	if (is_autonomous)
+		*is_autonomous = str_is_autonomous[0] == 't'; 
+
+	snprintf (string_to_be_hashed, 
+			MAX_LEN_HASH_INPUT + 1,
+				"%s%s%s",
+					apikey, salt, id);
+
+	SHA256 (
+		(const uint8_t*)string_to_be_hashed,
+		strnlen (string_to_be_hashed,MAX_LEN_HASH_INPUT),
+		binary_hash
+	);
+
+	debug_printf("login success STRING TO BE HASHED = {%s}\n",
+			string_to_be_hashed);
+	snprintf
+	(
+		hash_string,
+		1 + 2*SHA256_DIGEST_LENGTH,
+		"%02x%02x%02x%02x"
+		"%02x%02x%02x%02x"
+		"%02x%02x%02x%02x"
+		"%02x%02x%02x%02x"
+		"%02x%02x%02x%02x"
+		"%02x%02x%02x%02x"
+		"%02x%02x%02x%02x"
+		"%02x%02x%02x%02x",
+		binary_hash[ 0],binary_hash[ 1],binary_hash[ 2],binary_hash[ 3],
+		binary_hash[ 4],binary_hash[ 5],binary_hash[ 6],binary_hash[ 7],
+		binary_hash[ 8],binary_hash[ 9],binary_hash[10],binary_hash[11],
+		binary_hash[12],binary_hash[13],binary_hash[14],binary_hash[15],
+		binary_hash[16],binary_hash[17],binary_hash[18],binary_hash[19],
+		binary_hash[20],binary_hash[21],binary_hash[22],binary_hash[23],
+		binary_hash[24],binary_hash[25],binary_hash[26],binary_hash[27],
+		binary_hash[28],binary_hash[29],binary_hash[30],binary_hash[31]
+	);
+
+	hash_string[2*SHA256_DIGEST_LENGTH] = '\0';
+
+	debug_printf("Expecting it to be {%s} got {%s}\n",
+			password_hash,
+				hash_string
+	);
+
+	if (strncmp(hash_string,password_hash,64) == 0) {
+		login_result = true;
+		debug_printf("Login OK\n");
+	}
+
+done:
+	kore_buf_reset(async_query);
+	kore_pgsql_cleanup(&async_sql);
+
+	return login_result;
+*/
+	return false;
+}
+
 int
 publish (struct http_request *req)
 {
@@ -898,6 +1015,8 @@ done:
 int
 publish_async (struct http_request *req)
 {
+
+/*
 	const char *id;
 	const char *apikey;
 	const char *to;
@@ -1013,6 +1132,9 @@ done:
 		}
 	}
 
+*/
+	OK();
+done:
 	END();
 }
 
@@ -2139,14 +2261,18 @@ queue_bind (struct http_request *req)
 
 	for (tries = 1; tries <= MAX_AMQP_RETRIES; ++tries)
 	{
-		if (amqp_queue_bind (
+		amqp_queue_bind (
 			cached_admin_conn,
 			1,
 			amqp_cstring_bytes(queue),
 			amqp_cstring_bytes(exchange),
 			amqp_cstring_bytes(topic),
 			amqp_empty_table
-		))
+		);
+
+		r = amqp_get_rpc_reply(cached_admin_conn);
+
+		if (r.reply_type == AMQP_RESPONSE_NORMAL)
 			break;
 		else
 		{
@@ -2301,14 +2427,18 @@ queue_unbind (struct http_request *req)
 
 	for (tries = 1; tries <= MAX_AMQP_RETRIES; ++tries)
 	{
-		if (amqp_queue_unbind (
+		amqp_queue_unbind (
 			cached_admin_conn,
 			1,
 			amqp_cstring_bytes(queue),
 			amqp_cstring_bytes(exchange),
 			amqp_cstring_bytes(topic),
 			amqp_empty_table
-		))
+		);
+
+		r = amqp_get_rpc_reply(cached_admin_conn);
+
+		if (r.reply_type == AMQP_RESPONSE_NORMAL)
 			break;
 		else
 		{
@@ -2540,14 +2670,18 @@ follow (struct http_request *req)
 
 			for (tries = 1; tries <= MAX_AMQP_RETRIES; ++tries)
 			{
-				if (amqp_queue_bind (
+				amqp_queue_bind (
 					cached_admin_conn,
 					1,
 					amqp_cstring_bytes(command_queue),
 					amqp_cstring_bytes(write_exchange),
 					amqp_cstring_bytes(write_topic),
 					amqp_empty_table
-				))
+				);
+
+				r = amqp_get_rpc_reply(cached_admin_conn);
+
+				if (r.reply_type == AMQP_RESPONSE_NORMAL)
 					break;
 				else
 				{
@@ -2760,14 +2894,18 @@ unfollow (struct http_request *req)
 
 		for (tries = 1; tries <= MAX_AMQP_RETRIES; ++tries)
 		{
-			if (amqp_queue_unbind (
+			amqp_queue_unbind (
 				cached_admin_conn,
 				1,
 				amqp_cstring_bytes(command_queue),
 				amqp_cstring_bytes(write_exchange),
 				amqp_cstring_bytes(write_topic),
 				amqp_empty_table
-			))
+			);
+
+			r = amqp_get_rpc_reply(cached_admin_conn);
+
+			if (r.reply_type == AMQP_RESPONSE_NORMAL)
 				break;
 			else
 			{
@@ -2832,14 +2970,18 @@ unfollow (struct http_request *req)
 
 	for (tries = 1; tries <= MAX_AMQP_RETRIES; ++tries)
 	{
-		if (amqp_queue_unbind (
+		amqp_queue_unbind (
 			cached_admin_conn,
 			1,
 			amqp_cstring_bytes(from),
 			amqp_cstring_bytes(exchange),
 			amqp_cstring_bytes(topic),
 			amqp_empty_table
-		))
+		);
+
+		r = amqp_get_rpc_reply(cached_admin_conn);
+
+		if (r.reply_type == AMQP_RESPONSE_NORMAL)
 			break;
 		else
 		{
@@ -2856,14 +2998,18 @@ unfollow (struct http_request *req)
 
 	for (tries = 1; tries <= MAX_AMQP_RETRIES ; ++tries)
 	{
-		if (amqp_queue_unbind (
+		amqp_queue_unbind (
 			cached_admin_conn,
 			1,
 			amqp_cstring_bytes(priority_queue),
 			amqp_cstring_bytes(exchange),
 			amqp_cstring_bytes(topic),
 			amqp_empty_table
-		))
+		);
+
+		r = amqp_get_rpc_reply(cached_admin_conn);
+
+		if (r.reply_type == AMQP_RESPONSE_NORMAL)
 			break;
 		else
 		{
@@ -3009,14 +3155,18 @@ share (struct http_request *req)
 
 		for (tries = 1; tries <= MAX_AMQP_RETRIES; ++tries)
 		{
-			if (amqp_queue_bind (
+			amqp_queue_bind (
 				cached_admin_conn,
 				1,
 				amqp_cstring_bytes(bind_queue),
 				amqp_cstring_bytes(bind_exchange),
 				amqp_cstring_bytes(bind_topic),
 				amqp_empty_table
-			))
+			);
+
+			r = amqp_get_rpc_reply(cached_admin_conn);
+
+			if (r.reply_type == AMQP_RESPONSE_NORMAL)
 				break;
 			else
 			{
@@ -3540,6 +3690,7 @@ void *
 create_exchanges_and_queues (void *v)
 {
 	int i;
+	int my_tries;
 
 	const char *id = (const char *)v;
 
@@ -3559,24 +3710,25 @@ create_exchanges_and_queues (void *v)
 		debug_printf("[owner] creating exchange {%s}\n",my_exchange);
 
 		amqp_exchange_declare (
-			cached_admin_conn,
-			1,
-			amqp_cstring_bytes(my_exchange),
-			amqp_cstring_bytes("topic"),
-			0,
-			1, /* durable */
-			0,
-			0,
-			amqp_empty_table
+				cached_admin_conn,
+				1,
+				amqp_cstring_bytes(my_exchange),
+				amqp_cstring_bytes("topic"),
+				0,
+				1, /* durable */
+				0,
+				0,
+				amqp_empty_table
 		);
 
 		my_r = amqp_get_rpc_reply (cached_admin_conn);
 
 		if (my_r.reply_type != AMQP_RESPONSE_NORMAL)
 		{
-			fprintf(stderr,"amqp_exchange_declare failed {%s}\n",my_exchange);
+			fprintf(stderr,"[owner] amqp_exchange_declare failed {%s}\n",my_exchange);
 			goto done;
 		}
+
 		debug_printf("[owner] done creating exchange {%s}\n",my_exchange);
 
 		// create notification queue
@@ -3778,8 +3930,13 @@ delete_exchanges_and_queues (void *v)
 			0
 		))
 		{
-			fprintf(stderr,"amqp_exchange_delete failed {%s}\n",my_exchange);
-			goto done;
+			my_r = amqp_get_rpc_reply (cached_admin_conn);
+
+			if (my_r.reply_type != AMQP_RESPONSE_NORMAL)
+			{
+				fprintf(stderr,"amqp_exchange_delete failed {%s}\n",my_exchange);
+				goto done;
+			}
 		}
 
 		debug_printf("[owner] done deleting exchange {%s}\n",my_exchange);
@@ -3796,9 +3953,15 @@ delete_exchanges_and_queues (void *v)
 			0
 		))
 		{
-			fprintf(stderr,"amqp_queue_delete failed {%s}\n",my_queue);
-			goto done;
+			my_r = amqp_get_rpc_reply (cached_admin_conn);
+
+			if (my_r.reply_type != AMQP_RESPONSE_NORMAL)
+			{
+				fprintf(stderr,"amqp_queue_delete failed {%s}\n",my_queue);
+				goto done;
+			}
 		}
+
 		debug_printf("[owner] DONE deleting queue {%s}\n",my_queue);
 	}
 	else
@@ -3816,9 +3979,15 @@ delete_exchanges_and_queues (void *v)
 					0
 			))
 			{
-				fprintf(stderr,"something went wrong with exchange deletion {%s}\n",my_exchange);
-				goto done;
+				my_r = amqp_get_rpc_reply (cached_admin_conn);
+
+				if (my_r.reply_type != AMQP_RESPONSE_NORMAL)
+				{
+					fprintf(stderr,"something went wrong with exchange deletion {%s}\n",my_exchange);
+					goto done;
+				}
 			}
+
 			debug_printf("[entity] DONE deleting exchange {%s}\n",my_exchange);
 		}
 
@@ -3836,9 +4005,15 @@ delete_exchanges_and_queues (void *v)
 				0
 			))
 			{
-				fprintf(stderr,"amqp_queue_delete failed {%s}\n",my_queue);
-				goto done;
+				my_r = amqp_get_rpc_reply (cached_admin_conn);
+
+				if (my_r.reply_type != AMQP_RESPONSE_NORMAL)
+				{
+					fprintf(stderr,"amqp_queue_delete failed {%s}\n",my_queue);
+					goto done;
+				}
 			}
+
 			debug_printf("[entity] DONE deleting queue {%s}\n",my_queue);
 		}
 	}
