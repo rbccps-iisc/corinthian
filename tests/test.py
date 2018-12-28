@@ -542,20 +542,22 @@ def dev_publish_amqp(device_keys, message_type='protected'):
                      'test message from ' + device)
 
 
-def non_autonomous_permissions(device_keys, app_keys):
+def autonomous_permissions(device_keys, app_keys, expected=403):
 
     for (device, apikey) in device_keys.items():
 
         r = permissions(device, apikey)
-        check(r, 403)
+        check(r, expected)
+	logger.info("Received "+str(expected)+": OK")
 
     for (app, apikey) in app_keys.items():
 
         r = permissions(app, apikey)
-        check(r, 403)
+        check(r, expected)
+	logger.info("Received "+str(expected)+": OK")
 
 
-def non_autonomous_reject_follow(device_keys, admin_id, admin_key):
+def autonomous_reject_follow(device_keys, admin_id, admin_key, expected=403):
 
     r = follow_requests(admin_id, admin_key, 'requests')
     response = r.json()
@@ -566,15 +568,16 @@ def non_autonomous_reject_follow(device_keys, admin_id, admin_key):
         apikey = str(device_keys[device])
         follow_id = str(follow_request['follow-id'])
 
-        log('NON AUTONOMOUS DEVICE ' + device
+        log('DEVICE ' + device
             + ' TRYING TO REJECT FOLLOW REQUESTS', '')
 
         r = reject_follow(device, apikey, follow_id)
-        check(r, 403)
+        check(r, expected)
+	logger.info("Received "+str(expected)+": OK")
 
 
-def non_autonomous_follow_status(device_keys, app_keys,
-                                 req_type='status'):
+def autonomous_follow_status(device_keys, app_keys,
+                                 req_type='status', expected=403):
 
     if req_type == 'requests':
 
@@ -585,7 +588,8 @@ def non_autonomous_follow_status(device_keys, app_keys,
 
             r = follow_requests(device, apikey, 'requests')
 
-            check(r, 403)
+            check(r, expected)
+	    logger.info("Received "+str(expected)+": OK")
 
     if req_type == 'status':
 
@@ -595,16 +599,17 @@ def non_autonomous_follow_status(device_keys, app_keys,
 
             r = follow_requests(app, apikey, 'status')
 
-            check(r, 403)
+            check(r, expected)
+	    logger.info("Received "+str(expected)+": OK")
 
 
-def non_autonomous_bind_unbind(
+def autonomous_bind_unbind(
     device_keys,
     app_keys,
     req_type,
     message_type='protected',
     is_priority='false',
-    ):
+    expected=403):
 
     for (app, apikey) in app_keys.items():
 
@@ -622,7 +627,8 @@ def non_autonomous_bind_unbind(
                 is_priority=is_priority,
                 )
 
-            check(bind_req, 403)
+            check(bind_req, expected)
+	    logger.info("Received "+str(expected)+": OK")
 
 
 def bind_unbind_dev(
@@ -913,7 +919,7 @@ def unfollow_dev(
                 check(r, expected)
 
 
-def non_autonomous_share(device_keys, admin_id, admin_key):
+def autonomous_share(device_keys, admin_id, admin_key, expected=403):
 
     r = follow_requests(admin_id, admin_key, 'requests')
     response = r.json()
@@ -928,7 +934,10 @@ def non_autonomous_share(device_keys, admin_id, admin_key):
             + ' TRYING TO INVOKE SHARE', '')
 
         share_req = share(device, apikey, follow_id)
-        check(share_req, 403)
+        
+	check(share_req, expected)
+	logger.info("Received "+str(expected)+": OK")
+
 
 
 def share_dev(
@@ -1141,6 +1150,7 @@ def registrations(
     dev_admin_key,
     app_admin_id,
     app_admin_key,
+    is_autonomous="true"
     ):
 
     device_keys = {}
@@ -1157,7 +1167,7 @@ def registrations(
                                    + string.digits) for _ in range(8)) \
             + str(i)
 
-        r = register(dev_admin_id, dev_admin_key, dev_name)
+        r = register(dev_admin_id, dev_admin_key, dev_name, is_autonomous=is_autonomous)
         response = r.json()
         log(json.dumps(response), '')
         check(r, 201)
@@ -1175,7 +1185,7 @@ def registrations(
                                    + string.digits) for _ in range(8)) \
             + str(i)
 
-        r = register(app_admin_id, app_admin_key, app_name)
+        r = register(app_admin_id, app_admin_key, app_name, is_autonomous=is_autonomous)
         response = r.json()
         log(json.dumps(response), '')
         check(r, 201)
@@ -3391,55 +3401,8 @@ def private_exchange_tests(
     check(r, 403)
     log('Received 403: OK', '')
 
-def is_autonomous(devices, apps):
 
-    print '''
-
-'''
-    log('''========================= IS-AUTONOMOUS TEST CASES =========================
-
-''',
-        'GREEN', modifier='BOLD')
-
-    device_keys = {}
-    app_keys = {}
-
-    (dev_admin_id, dev_admin_key) = gen_owner()
-    (app_admin_id, app_admin_key) = gen_owner()
-
-    log('---------------> REGISTERING DEVICES ', 'HEADER')
-
-    for i in range(devices):
-        log('REGISTERING DEVICE ' + str(i), '')
-        dev_name = 'dev' + ''.join(random.choice(string.ascii_uppercase
-                                   + string.ascii_lowercase
-                                   + string.digits) for _ in range(8)) \
-            + str(i)
-
-        r = register(dev_admin_id, dev_admin_key, dev_name,
-                     is_autonomous='false')
-        response = r.json()
-        log(json.dumps(response), '')
-        check(r, 201)
-
-        device_keys[response['id']] = response['apikey']
-
-    log('---------------> REGISTERING APPS', 'HEADER')
-
-    for i in range(apps):
-        log('REGISTERING APP ' + str(i), '')
-        dev_name = 'app' + ''.join(random.choice(string.ascii_uppercase
-                                   + string.ascii_lowercase
-                                   + string.digits) for _ in range(8)) \
-            + str(i)
-
-        r = register(app_admin_id, app_admin_key, dev_name,
-                     is_autonomous='false')
-        response = r.json()
-        log(json.dumps(response), '')
-        check(r, 201)
-
-        app_keys[response['id']] = response['apikey']
+def is_autonomous(device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key, expected=403):
 
     print '''
 
@@ -3452,8 +3415,13 @@ def is_autonomous(devices, apps):
     log('---------------> DEVICES TRY TO FOLLOW WITH READ PERMISSION ',
         'HEADER')
 
-    follow_dev(device_keys, app_keys, as_admin=False, permission='read'
-               , expected=403)
+    if expected == 403:
+	follow_dev(device_keys, app_keys, as_admin=False, permission='read'
+               , expected=expected)
+    else:
+	follow_dev(device_keys, app_keys, as_admin=False, permission='read'
+               , expected=202)
+
 
     print '''
 
@@ -3483,7 +3451,7 @@ def is_autonomous(devices, apps):
     log('---------------> APPS TRY TO UNFOLLOW DEVICES', 'HEADER')
 
     unfollow_dev(device_keys, app_keys, as_admin=False,
-                 permission='read', expected=403)
+                 permission='read', expected=expected)
 
     log('---------------> APPS UNFOLLOW DEVICES USING ADMIN APIKEY',
         'HEADER')
@@ -3518,7 +3486,7 @@ def is_autonomous(devices, apps):
 
     log('---------------> DEVICES TRY TO INVOKE SHARE ', 'HEADER')
 
-    non_autonomous_share(device_keys, dev_admin_id, dev_admin_key)
+    autonomous_share(device_keys, dev_admin_id, dev_admin_key, expected=expected)
 
     print '''
 
@@ -3549,7 +3517,7 @@ def is_autonomous(devices, apps):
 
     log('---------------> NON AUTONOMOUS APPS TRY TO BIND ', 'HEADER')
 
-    non_autonomous_bind_unbind(device_keys, app_keys, 'bind')
+    autonomous_bind_unbind(device_keys, app_keys, 'bind', expected=expected)
 
     log('---------------> APPS UNFOLLOW DEVICES USING ADMIN APIKEY',
         'HEADER')
@@ -3605,7 +3573,7 @@ def is_autonomous(devices, apps):
 
     log('---------------> NON AUTONOMOUS APPS TRY TO UNBIND ', 'HEADER')
 
-    non_autonomous_bind_unbind(device_keys, app_keys, 'unbind')
+    autonomous_bind_unbind(device_keys, app_keys, 'unbind', expected=expected)
 
     log('---------------> APPS UNFOLLOW DEVICES USING ADMIN APIKEY',
         'HEADER')
@@ -3640,8 +3608,8 @@ def is_autonomous(devices, apps):
         admin_key=app_admin_key,
         )
 
-    non_autonomous_follow_status(device_keys, app_keys,
-                                 req_type='requests')
+    autonomous_follow_status(device_keys, app_keys,
+                                 req_type='requests', expected=expected)
 
     print '''
 
@@ -3664,8 +3632,8 @@ def is_autonomous(devices, apps):
         admin_key=app_admin_key,
         )
 
-    non_autonomous_follow_status(device_keys, app_keys,
-                                 req_type='status')
+    autonomous_follow_status(device_keys, app_keys,
+                                 req_type='status', expected=expected)
 
     print '''
 
@@ -3688,8 +3656,40 @@ def is_autonomous(devices, apps):
         admin_key=app_admin_key,
         )
 
-    non_autonomous_reject_follow(device_keys, dev_admin_id,
-                                 dev_admin_key)
+    autonomous_reject_follow(device_keys, dev_admin_id,
+                                 dev_admin_key, expected=expected)
+
+def autonomous_tests(devices, apps, is_autonomous="false"):
+
+    print '''
+
+'''
+    log('''========================= IS-AUTONOMOUS TEST CASES =========================
+
+''',
+        'GREEN', modifier='BOLD')
+
+    (dev_admin_id, dev_admin_key) = gen_owner()
+    (app_admin_id, app_admin_key) = gen_owner()
+
+    (device_keys, app_keys) = registrations(
+        devices,
+        apps,
+        dev_admin_id,
+        dev_admin_key,
+        app_admin_id,
+        app_admin_key,
+	is_autonomous=is_autonomous
+        )
+
+    if is_autonomous == "false":
+	is_autonomous(device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, dev_admin_key, expected=403) 
+    else:
+	is_autonomous(device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, dev_admin_key, expected=200) 
+
+
+    deregistrations(device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
+
 
 def security_tests():
 
@@ -3858,7 +3858,7 @@ def security_tests():
        app_admin_key,
        )
 
-    is_autonomous(devices, apps)
+    autonomous_tests(devices, apps, is_autonomous="false")
 
     test_time = time.time() - test_time
 
@@ -4827,7 +4827,7 @@ def public_exchange_tests(
 
 def functional_tests(*args):
 
-    if isinstance(args[0],list):
+    if type(args[0]) is list:
         devices = args[0][0]
         apps = args[0][1]
     else:
