@@ -306,6 +306,12 @@ def deregister(ID, apikey, entity_id):
     r = s.post(url=url, headers=headers, verify=False)
     return r
 
+def set_autonomous(ID, apikey, entity_id, autonomous="true"):
+
+    url = base_url + '/owner/set-autonomous'
+    headers = {'id': ID, 'apikey': apikey, 'entity': entity_id, "is-autonomous": autonomous}
+    r = s.post(url=url, headers=headers, verify=False)
+    return r
 
 def block_unblock(
     ID,
@@ -541,6 +547,22 @@ def dev_publish_amqp(device_keys, message_type='protected'):
         amqp_publish(device, apikey, message_type, 'test',
                      'test message from ' + device)
 
+
+def set_autonomous_dev(device_keys, dev_admin_id, dev_admin_key, autonomous="true"):
+
+    for device in device_keys:
+
+        log('SETTING IS-AUTONOMOUS TO ' + autonomous +" FOR "+ device, '')
+	r = set_autonomous(dev_admin_id, dev_admin_key, device, autonomous)
+	check(r, 200)
+
+def set_autonomous_app(app_keys, app_admin_id, app_admin_key, autonomous="true"):
+
+    for app in app_keys:
+
+        log('SETTING IS-AUTONOMOUS TO ' + autonomous +" FOR "+ app, '')
+	r = set_autonomous(app_admin_id, app_admin_key, app, autonomous)
+	check(r, 200)
 
 def autonomous_permissions(device_keys, app_keys, expected=403):
 
@@ -1150,7 +1172,7 @@ def registrations(
     dev_admin_key,
     app_admin_id,
     app_admin_key,
-    is_autonomous="true"
+    autonomous="true"
     ):
 
     device_keys = {}
@@ -1167,7 +1189,7 @@ def registrations(
                                    + string.digits) for _ in range(8)) \
             + str(i)
 
-        r = register(dev_admin_id, dev_admin_key, dev_name, is_autonomous=is_autonomous)
+        r = register(dev_admin_id, dev_admin_key, dev_name, is_autonomous=autonomous)
         response = r.json()
         log(json.dumps(response), '')
         check(r, 201)
@@ -1185,7 +1207,7 @@ def registrations(
                                    + string.digits) for _ in range(8)) \
             + str(i)
 
-        r = register(app_admin_id, app_admin_key, app_name, is_autonomous=is_autonomous)
+        r = register(app_admin_id, app_admin_key, app_name, is_autonomous=autonomous)
         response = r.json()
         log(json.dumps(response), '')
         check(r, 201)
@@ -3402,7 +3424,7 @@ def private_exchange_tests(
     log('Received 403: OK', '')
 
 
-def is_autonomous(device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key, expected=403):
+def is_autonomous(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key):
 
     print '''
 
@@ -3415,12 +3437,7 @@ def is_autonomous(device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_
     log('---------------> DEVICES TRY TO FOLLOW WITH READ PERMISSION ',
         'HEADER')
 
-    if expected == 403:
-	follow_dev(device_keys, app_keys, as_admin=False, permission='read'
-               , expected=expected)
-    else:
-	follow_dev(device_keys, app_keys, as_admin=False, permission='read'
-               , expected=202)
+    follow_dev(device_keys, app_keys, as_admin=False, permission='read', expected=403)
 
 
     print '''
@@ -3445,13 +3462,13 @@ def is_autonomous(device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_
     log('---------------> DEVICES READ FOLLOW REQUESTS AND ISSUE SHARE TO APPS'
         , 'HEADER')
 
-    share_dev(device_keys, apps * devices, as_admin=True,
+    share_dev(device_keys, (apps * devices), as_admin=True,
               admin_id=dev_admin_id, admin_key=dev_admin_key)
 
     log('---------------> APPS TRY TO UNFOLLOW DEVICES', 'HEADER')
 
     unfollow_dev(device_keys, app_keys, as_admin=False,
-                 permission='read', expected=expected)
+                 permission='read', expected=403)
 
     log('---------------> APPS UNFOLLOW DEVICES USING ADMIN APIKEY',
         'HEADER')
@@ -3486,7 +3503,7 @@ def is_autonomous(device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_
 
     log('---------------> DEVICES TRY TO INVOKE SHARE ', 'HEADER')
 
-    autonomous_share(device_keys, dev_admin_id, dev_admin_key, expected=expected)
+    autonomous_share(device_keys, dev_admin_id, dev_admin_key, expected=403)
 
     print '''
 
@@ -3517,7 +3534,7 @@ def is_autonomous(device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_
 
     log('---------------> NON AUTONOMOUS APPS TRY TO BIND ', 'HEADER')
 
-    autonomous_bind_unbind(device_keys, app_keys, 'bind', expected=expected)
+    autonomous_bind_unbind(device_keys, app_keys, 'bind', expected=403)
 
     log('---------------> APPS UNFOLLOW DEVICES USING ADMIN APIKEY',
         'HEADER')
@@ -3573,7 +3590,7 @@ def is_autonomous(device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_
 
     log('---------------> NON AUTONOMOUS APPS TRY TO UNBIND ', 'HEADER')
 
-    autonomous_bind_unbind(device_keys, app_keys, 'unbind', expected=expected)
+    autonomous_bind_unbind(device_keys, app_keys, 'unbind', expected=403)
 
     log('---------------> APPS UNFOLLOW DEVICES USING ADMIN APIKEY',
         'HEADER')
@@ -3609,7 +3626,7 @@ def is_autonomous(device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_
         )
 
     autonomous_follow_status(device_keys, app_keys,
-                                 req_type='requests', expected=expected)
+                                 req_type='requests', expected=403)
 
     print '''
 
@@ -3633,7 +3650,7 @@ def is_autonomous(device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_
         )
 
     autonomous_follow_status(device_keys, app_keys,
-                                 req_type='status', expected=expected)
+                                 req_type='status', expected=403)
 
     print '''
 
@@ -3657,9 +3674,293 @@ def is_autonomous(device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_
         )
 
     autonomous_reject_follow(device_keys, dev_admin_id,
-                                 dev_admin_key, expected=expected)
+                                 dev_admin_key, expected=403)
 
-def autonomous_tests(devices, apps, is_autonomous="false"):
+
+def set_autonomous_tests(devices, apps):
+
+    print '''
+
+'''
+    log('''========================= SET-AUTONOMOUS TEST CASES =========================
+
+''',
+        'GREEN', modifier='BOLD')
+
+    (dev_admin_id, dev_admin_key) = gen_owner()
+    (app_admin_id, app_admin_key) = gen_owner()
+
+    (device_keys, app_keys) = registrations(
+        devices,
+        apps,
+        dev_admin_id,
+        dev_admin_key,
+        app_admin_id,
+        app_admin_key,
+	autonomous="false"
+        )
+    
+    is_autonomous(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
+
+    print '''
+
+'''
+    log('''------------------------- SETTING IS-AUTONOMOUS TO TRUE FOR DEVICES AND APPS -------------------------
+
+''',
+        'GREEN')
+
+    set_autonomous_dev(device_keys, dev_admin_id, dev_admin_key)
+    set_autonomous_app(app_keys, app_admin_id, app_admin_key)
+
+    print '''
+
+'''
+    log('''------------------------- FOLLOW API -------------------------
+
+''',
+        'GREEN')
+
+    log('---------------> DEVICES TRY TO FOLLOW WITH READ PERMISSION ',
+        'HEADER')
+
+    follow_dev(device_keys, app_keys, as_admin=False, permission='read', expected=202)
+
+
+    print '''
+
+'''
+    log('''------------------------- UNFOLLOW API -------------------------
+
+''',
+        'GREEN')
+
+    cleanup()
+
+    log('---------------> FOLLOW REQUESTS AS ADMIN ', 'HEADER')
+
+    follow_dev(
+        device_keys,
+        app_keys,
+        as_admin=True,
+        permission='read',
+        admin_id=app_admin_id,
+        admin_key=app_admin_key,
+        )
+
+    log('---------------> DEVICES READ FOLLOW REQUESTS AND ISSUE SHARE TO APPS'
+        , 'HEADER')
+
+    share_dev(device_keys, (apps * devices), as_admin=True,
+              admin_id=dev_admin_id, admin_key=dev_admin_key)
+
+    log('---------------> APPS TRY TO UNFOLLOW DEVICES', 'HEADER')
+
+    unfollow_dev(device_keys, app_keys, as_admin=False,
+                 permission='read', expected=200)
+
+    print '''
+
+'''
+    log('''------------------------- SHARE API -------------------------
+
+''',
+        'GREEN')
+
+    cleanup()
+
+    log('---------------> FOLLOW REQUESTS AS ADMIN ', 'HEADER')
+
+    follow_dev(
+        device_keys,
+        app_keys,
+        as_admin=True,
+        permission='read',
+        admin_id=app_admin_id,
+        admin_key=app_admin_key,
+        )
+
+    log('---------------> DEVICES TRY TO INVOKE SHARE ', 'HEADER')
+
+    autonomous_share(device_keys, dev_admin_id, dev_admin_key, expected=200)
+
+    log('---------------> APPS TRY TO UNFOLLOW DEVICES', 'HEADER')
+
+    unfollow_dev(device_keys, app_keys, as_admin=False,
+                 permission='read', expected=200)
+
+    print '''
+
+'''
+    log('''------------------------- BIND API -------------------------
+
+''',
+        'GREEN')
+
+    cleanup()
+
+    log('---------------> FOLLOW REQUESTS AS ADMIN ', 'HEADER')
+
+    follow_dev(
+        device_keys,
+        app_keys,
+        as_admin=True,
+        permission='read',
+        admin_id=app_admin_id,
+        admin_key=app_admin_key,
+        )
+
+    log('---------------> DEVICES READ FOLLOW REQUESTS AND ISSUE SHARE TO APPS'
+        , 'HEADER')
+
+    share_dev(device_keys, apps * devices, as_admin=True,
+              admin_id=dev_admin_id, admin_key=dev_admin_key)
+
+    log('---------------> NON AUTONOMOUS APPS TRY TO BIND ', 'HEADER')
+
+    autonomous_bind_unbind(device_keys, app_keys, 'bind', expected=200)
+
+    log('---------------> APPS UNFOLLOW DEVICES USING ADMIN APIKEY',
+        'HEADER')
+
+    unfollow_dev(
+        device_keys,
+        app_keys,
+        as_admin=True,
+        permission='read',
+        admin_id=app_admin_id,
+        admin_key=app_admin_key,
+        )
+
+    print '''
+
+'''
+    log('''------------------------- UNBIND API -------------------------
+
+''',
+        'GREEN')
+
+    cleanup()
+
+    log('---------------> FOLLOW REQUESTS AS ADMIN ', 'HEADER')
+
+    follow_dev(
+        device_keys,
+        app_keys,
+        as_admin=True,
+        permission='read',
+        admin_id=app_admin_id,
+        admin_key=app_admin_key,
+        )
+
+    log('---------------> DEVICES READ FOLLOW REQUESTS AND ISSUE SHARE TO APPS'
+        , 'HEADER')
+
+    share_dev(device_keys, apps * devices, as_admin=True,
+              admin_id=dev_admin_id, admin_key=dev_admin_key)
+
+    log('---------------> APPS BIND TO DEVICES USING ADMIN APIKEY',
+        'HEADER')
+
+    bind_unbind_dev(
+        device_keys,
+        app_keys,
+        expected=devices * apps,
+        as_admin=True,
+        req_type='bind',
+        admin_id=app_admin_id,
+        admin_key=app_admin_key,
+        )
+
+    log('---------------> NON AUTONOMOUS APPS TRY TO UNBIND ', 'HEADER')
+
+    autonomous_bind_unbind(device_keys, app_keys, 'unbind', expected=200)
+
+    log('---------------> APPS UNFOLLOW DEVICES USING ADMIN APIKEY',
+        'HEADER')
+
+    unfollow_dev(
+        device_keys,
+        app_keys,
+        as_admin=True,
+        permission='read',
+        admin_id=app_admin_id,
+        admin_key=app_admin_key,
+        )
+
+    print '''
+
+'''
+    log('''------------------------- FOLLOW REQUESTS API -------------------------
+
+''',
+        'GREEN')
+
+    cleanup()
+
+    log('---------------> FOLLOW REQUESTS AS ADMIN ', 'HEADER')
+
+    follow_dev(
+        device_keys,
+        app_keys,
+        as_admin=True,
+        permission='read',
+        admin_id=app_admin_id,
+        admin_key=app_admin_key,
+        )
+
+    autonomous_follow_status(device_keys, app_keys,
+                                 req_type='requests', expected=200)
+
+    print '''
+
+'''
+    log('''------------------------- FOLLOW STATUS API -------------------------
+
+''',
+        'GREEN')
+
+    cleanup()
+
+    log('---------------> FOLLOW REQUESTS AS ADMIN ', 'HEADER')
+
+    follow_dev(
+        device_keys,
+        app_keys,
+        as_admin=True,
+        permission='read',
+        admin_id=app_admin_id,
+        admin_key=app_admin_key,
+        )
+
+    autonomous_follow_status(device_keys, app_keys,
+                                 req_type='status', expected=200)
+
+    print '''
+
+'''
+    log('''------------------------- REJECT FOLLOW API -------------------------
+
+''',
+        'GREEN')
+
+    cleanup()
+
+    log('---------------> FOLLOW REQUESTS AS ADMIN ', 'HEADER')
+
+    follow_dev(
+        device_keys,
+        app_keys,
+        as_admin=True,
+        permission='read',
+        admin_id=app_admin_id,
+        admin_key=app_admin_key,
+        )
+
+    autonomous_reject_follow(device_keys, dev_admin_id,
+                                 dev_admin_key, expected=200)
+
+def is_autonomous_tests(devices, apps):
 
     print '''
 
@@ -3679,14 +3980,10 @@ def autonomous_tests(devices, apps, is_autonomous="false"):
         dev_admin_key,
         app_admin_id,
         app_admin_key,
-	is_autonomous=is_autonomous
+	autonomous="false"
         )
 
-    if is_autonomous == "false":
-	is_autonomous(device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, dev_admin_key, expected=403) 
-    else:
-	is_autonomous(device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, dev_admin_key, expected=200) 
-
+    is_autonomous(devices, apps, device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key) 
 
     deregistrations(device_keys, app_keys, dev_admin_id, dev_admin_key, app_admin_id, app_admin_key)
 
@@ -3717,14 +4014,6 @@ def security_tests():
         app_admin_key,
         )
     reg_time = time.time() - reg_time
-
-    # Trying to register an owner from outside the localhost
-
-    # logger.info(colour.HEADER + "---------------> OWNER REGISTRATION FROM OUTSIDE LOCALHOST " + colour.ENDC)
-
-    # r = register_owner(admin_key, "owner"+dummy_id)
-    # check(r,403)
-    # logger.info("Received 403: OK")
 
     test_time = time.time()
 
@@ -3858,7 +4147,9 @@ def security_tests():
        app_admin_key,
        )
 
-    autonomous_tests(devices, apps, is_autonomous="false")
+    is_autonomous_tests(devices, apps)
+
+    set_autonomous_tests(devices, apps)
 
     test_time = time.time() - test_time
 
