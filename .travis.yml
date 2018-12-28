@@ -12,6 +12,9 @@ install:
 
 before_script:
   - sleep 10
+  - cd test-suite
+  - git pull origin master
+  - cd ..
 
 script:
   - ./test-suite/test fxnl --random
