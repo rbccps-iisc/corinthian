@@ -45,7 +45,7 @@ pool = {}
 def cleanup():
 
     cmd = \
-        """ docker exec postgres psql -U postgres -c "delete from follow where status = 'pending';" """
+        """ docker exec postgres psql -U postgres -c "delete from follow where status = 'pending' or status = 'rejected';" """
 
     try:
         subprocess.check_output(cmd, shell=True)
@@ -651,6 +651,92 @@ def autonomous_bind_unbind(
 
             check(bind_req, expected)
 	    logger.info("Received "+str(expected)+": OK")
+
+def reject_follow_requests(
+    device_keys,
+    expected_requests,
+    as_admin=False,
+    admin_id='',
+    admin_key='',
+    expected_code=200,
+    ):
+
+    if as_admin == False:
+
+        for (device, apikey) in device_keys.items():
+
+            r = follow_requests(device, apikey, 'requests')
+            response = r.json()
+            count = 0
+
+            check(r, 200)
+
+            for follow_req in response:
+
+                count = count + 1
+
+                log('REJECT FOLLOW FROM DEVICE ' + device + ' TO APP '
+                    + str(follow_req['from']), '')
+
+                r = reject_follow(device, apikey,
+                                  str(follow_req['follow-id']))
+
+                check(r, expected_code)
+
+            assert_exit(count == expected_requests, 'Actual = '
+                        + str(count) + ' Expected = '
+                        + str(expected_requests))
+
+    elif as_admin == True:
+
+        r = follow_requests(admin_id, admin_key, 'requests')
+        response = r.json()
+        count = 0
+
+        check(r, 200)
+
+        for follow_req in response:
+
+            count = count + 1
+
+            log('REJECT FOLLOW FROM DEVICE ' + str(follow_req['to']).split('.'
+                )[0] + ' TO APP ' + str(follow_req['from']), '')
+
+            r = reject_follow(admin_id, admin_key,
+                              str(follow_req['follow-id']))
+
+            check(r, expected_code)
+
+        assert_exit(count == expected_requests, 'Actual = '
+                    + str(count) + ' Expected = '
+                    + str(expected_requests))
+
+def check_follow_status(app_keys, expected="approved", expected_counts=0):
+
+   count = 0
+
+   for app, apikey in app_keys.items():
+	
+	log('APP ' + app + ' CHECKING APPROVAL STATUS OF FOLLOW REQUESTS', '')
+
+        follow_status = follow_requests(app, apikey, 'status')
+        response = follow_status.json()
+        check(follow_status, 200)
+
+        for entry in response:
+            if entry['status'] == expected:
+                count = count + 1
+
+        assert_exit(count == expected_counts, 'Received = '
+                            + str(count) + ' Expected = '
+                            + str(expected_counts))
+
+        if expected == "approved":
+	    log('APP ' + app + ' HAS RECEIVED ' + str(count) + ' APPROVALS', '')
+	else:
+	    log('APP ' + app + ' HAS RECEIVED ' + str(count) + ' REJECTIONS', '')
+	
+	count = 0
 
 
 def bind_unbind_dev(
@@ -4483,6 +4569,65 @@ def follow_with_read_write(
                                req_type='bind')
 
 
+def reject_follow_tests(
+    devices,
+    apps,
+    device_keys,
+    app_keys,
+    dev_admin_id,
+    dev_admin_key,
+    app_admin_id,
+    app_admin_key,
+    ):
+
+    print '''
+
+'''
+    log('''------------------------- REJECT FOLLOW TESTS -------------------------
+
+''',
+        'GREEN')
+
+    # Follow requests from apps to devices using apps' respective apikeys
+
+    log('---------------> FOLLOW REQUESTS WITH READ PERMISSION ',
+        'HEADER')
+    follow_dev(device_keys, app_keys, as_admin=False, permission='read')
+
+    # Devices read all follow requests and reject them
+
+    log('---------------> DEVICES READ FOLLOW REQUESTS AND REJECT ALL FOLLOW REQUESTS'
+        , 'HEADER')
+
+    reject_follow_requests(device_keys, apps, admin_id=dev_admin_id, admin_key=dev_admin_key) 
+
+    log('---------------> APPS CHECK THE STATUS OF FOLLOW REQUESTS', 'HEADER')
+
+    check_follow_status(app_keys, expected="rejected", expected_counts=devices)
+
+    cleanup()
+
+    log('---------------> REJECT FOLLOW AS ADMIN', 'HEADER')
+
+    # Follow requests from apps to devices using apps' respective apikeys
+
+    log('---------------> FOLLOW REQUESTS WITH READ PERMISSION ',
+        'HEADER')
+    follow_dev(device_keys, app_keys, as_admin=False, permission='read')
+
+    # Devices read all follow requests and share with apps
+
+    log('---------------> DEVICES READ FOLLOW REQUESTS AND REJECT ALL FOLLOW REQUESTS'
+        , 'HEADER')
+
+    reject_follow_requests(device_keys, (apps*devices), admin_id=dev_admin_id, admin_key=dev_admin_key, as_admin=True) 
+
+    log('---------------> APPS CHECK THE STATUS OF FOLLOW REQUESTS', 'HEADER')
+
+    check_follow_status(app_keys, expected="rejected", expected_counts=devices)
+
+    cleanup()
+
 def bind_as_admin(
     devices,
     apps,
@@ -5269,6 +5414,16 @@ def functional_tests(*args):
         app_admin_key,
         )
 
+    reject_follow_tests(
+        devices,
+        apps,
+        device_keys,
+        app_keys,
+        dev_admin_id,
+        dev_admin_key,
+        app_admin_id,
+        app_admin_key,
+        )
 
     test_time = time.time() - test_time
 
