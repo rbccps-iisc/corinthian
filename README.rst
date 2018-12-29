@@ -22,11 +22,14 @@ Quickstart
 
 #. Clone the repository::
 
-    git clone https://github.com/rbccps-iisc/corinthian && cd corinthian
+    git clone https://github.com/rbccps-iisc/corinthian
+    cd corinthian
+    git submodule init
+    git submodule update
     
 #. Install required dependencies (If you are running Ubuntu)::
 
-    ./tests/require-docker.sh
+    ./test-suite/require.sh
 
 #. If the host machine is not Ubuntu then install the following dependencies manually
 	#. docker
@@ -42,7 +45,7 @@ Quickstart
 
 #. Test the middleware using::
 
-    ./tests/test.py fxnl --random
+    ./test-suite/test fxnl --random
 
 Use-case diagrams
 =================
