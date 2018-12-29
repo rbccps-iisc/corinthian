@@ -27,17 +27,20 @@ Quickstart
     git submodule init
     git submodule update
     
-#. Install required dependencies (If you are running Ubuntu)::
+#. Install the required dependencies (Host OS must be Ubuntu)::
 
     ./test-suite/require.sh
 
-#. If the host machine is not Ubuntu then install the following dependencies manually
-	#. docker
-	#. docker-compose
+#. If the host OS is not Ubuntu then install the following dependencies manually
+
+	- docker
+	- docker-compose
 	
-   If you want to run the test script then install the following python libraries
-	#. requests
-	#. urllib3
+   Also install the following dependencies if the tests need to be run
+   
+	- requests
+	- urllib3
+	- pika
     
 #. Start the installation::
 
