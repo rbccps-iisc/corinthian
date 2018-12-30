@@ -25,7 +25,6 @@ services:
     volumes:
       - ../kore-publisher:/kore-publisher/
       - ../setup/kore:/scripts/
-      - ../vars/:/vars/
     env_file:
       - .env
 
@@ -45,9 +44,8 @@ services:
     volumes:
       - broker-data:/var/lib/rabbitmq/
       - ../authenticator:/authenticator/
-      - ../rabbitmq:/etc/rabbitmq/
+      - ./conf/rabbitmq:/etc/rabbitmq/
       - ../setup/broker:/scripts/
-      - ../vars/:/vars/
     env_file:
       - .env
   
@@ -63,6 +61,5 @@ services:
     volumes:
       - pgsql-data:/var/lib/postgresql
       - ../setup/pgsql:/scripts/
-      - ../vars/:/vars/
     env_file:
       - .env
