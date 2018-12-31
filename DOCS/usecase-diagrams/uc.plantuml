@@ -4,7 +4,7 @@ left to right direction
 actor owner as "owner (a legal entity)"
 
 
-rectangle "Manage xowners" {
+rectangle "Manage owners" {
 
 	(Register owner)
 	(Deregister owner)
