@@ -51,6 +51,16 @@ char *_q[] = {
 		NULL
 };
 
+char *_invalid_owner_names [] = {
+		"admin",
+		"amq",
+		"amqp",
+		"mqtt",
+		"database",
+		"validator",
+		NULL
+};
+
 struct kore_pgsql sql;
 
 char queue	[MAX_LEN_RESOURCE_ID + 1];
@@ -1916,6 +1926,8 @@ done:
 int
 register_owner(struct http_request *req)
 {
+	int i;
+
 	const char *id;
 	const char *apikey;
 	const char *owner;
@@ -1950,9 +1962,12 @@ register_owner(struct http_request *req)
 
 	string_to_lower(owner);
 
-	// cannot create an admin, validator or database
-	if (strcmp(owner,"admin") == 0 || strcmp(owner,"validator") == 0 || strcmp(owner,"database") == 0)
-		FORBIDDEN("cannot create the user");
+	for (i = 0; _invalid_owner_names [i]; ++i)
+	{
+		if (strcmp(owner,_invalid_owner_names[i]) == 0)
+			FORBIDDEN("cannot create owner");
+	}
+
 
 	// it should look like an owner
 	if (! looks_like_a_valid_owner(owner))
@@ -2055,9 +2070,11 @@ deregister_owner(struct http_request *req)
 	if (strcmp(id,"admin") != 0)
 		FORBIDDEN("only admin can call this API");
 
-	// cannot delete an admin, validator or database
-	if (strcmp(owner,"admin") == 0 || strcmp(owner,"validator") == 0 || strcmp(owner,"database") == 0)
-		FORBIDDEN("cannot delete user");
+	for (i = 0; _invalid_owner_names[i]; ++i)
+	{
+		if (strcmp(owner,_invalid_owner_names[i]) == 0)
+			FORBIDDEN("cannot delete owner");
+	}
 
 	// it should look like an owner
 	if (! looks_like_a_valid_owner(owner))
