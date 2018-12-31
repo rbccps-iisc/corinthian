@@ -97,6 +97,8 @@ size_t i;
 int
 init (int state)
 {
+	// mask server name 
+	http_server_version("");
 	
 	if (query == NULL)
 		query = kore_buf_alloc(512);
@@ -114,31 +116,6 @@ init (int state)
         snprintf(conn_str, 129,"host = postgres user = postgres password = %s", postgres_pwd);
 
         kore_pgsql_register("db",conn_str);
-
-///// chroot and drop priv /////
-
-	struct passwd *p;
-	if ((p = getpwnam(UNPRIVILEGED_USER)) == NULL) {
-		perror("getpwnam failed ");
-		return KORE_RESULT_ERROR;
-	}
-
-	if (chroot("./jail") < 0) {
-		perror("chroot failed ");
-		return KORE_RESULT_ERROR;
-	}
-
-	if (setgid(p->pw_gid) < 0) {
-		perror("setgid failed ");
-		return KORE_RESULT_ERROR;
-	}
-
-	if (setuid(p->pw_uid) < 0) {
-		perror("setuid failed ");
-		return KORE_RESULT_ERROR;
-	}
-
-/////////////////////////////////
 
 	return KORE_RESULT_OK;
 }
