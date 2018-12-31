@@ -3,13 +3,22 @@
 directory=`dirname $0`
 cd $directory
 
+sudo chown -R 0:0 ../kore-publisher/jail-keymgr
+sudo chmod 1555   ../kore-publisher/jail-keymgr
+sudo chmod 1444   ../kore-publisher/jail-keymgr/random.data
+sudo chmod 1444   ../kore-publisher/jail-keymgr/dh2048.pem
+
+sudo chmod 1555   ../kore-publisher/jail-keymgr/cert
+sudo chmod 1444   ../kore-publisher/jail-keymgr/cert/key.pem
+sudo chmod 1444   ../kore-publisher/jail-keymgr/cert/certificate.pem
+
 sudo chown -R 0:0 ../kore-publisher/jail
-sudo chmod 1555 ../kore-publisher/jail
-sudo chmod 1555 ../kore-publisher/jail/etc
+sudo chmod 1555   ../kore-publisher/jail
+sudo chmod 1555   ../kore-publisher/jail/etc
 
 sudo chown -R 0:0 ../authenticator/jail
-sudo chmod 1555 ../authenticator/jail
-sudo chmod 1555 ../authenticator/jail/etc
+sudo chmod 1555   ../authenticator/jail
+sudo chmod 1555   ../authenticator/jail/etc
 
 admin_passwd=`cat /dev/urandom | env LC_CTYPE=C tr -dc a-zA-Z0-9 | head -c 32; echo`
 postgres_passwd=`cat /dev/urandom | env LC_CTYPE=C tr -dc a-zA-Z0-9 | head -c 32; echo`

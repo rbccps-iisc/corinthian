@@ -387,30 +387,7 @@ init (int state)
 	memset(&props, 0, sizeof props);
 	props._flags = AMQP_BASIC_CONTENT_TYPE_FLAG | AMQP_BASIC_USER_ID_FLAG;
 
-///// chroot and drop priv /////
-
-	struct passwd *p;
-	if ((p = getpwnam(UNPRIVILEGED_USER)) == NULL) {
-		perror("getpwnam failed ");
-		return KORE_RESULT_ERROR;
-	}
-
-	if (chroot("./jail") < 0) {
-		perror("chroot failed ");
-		return KORE_RESULT_ERROR;
-	}
-
-	if (setgid(p->pw_gid) < 0) {
-		perror("setgid failed ");
-		return KORE_RESULT_ERROR;
-	}
-
-	if (setuid(p->pw_uid) < 0) {
-		perror("setuid failed ");
-		return KORE_RESULT_ERROR;
-	}
-
-/////////////////////////////////
+////////////// For async publish ///////////////////
 
 	for (i = 0; i < MAX_ASYNC_THREADS; ++i)
 	{
@@ -429,6 +406,8 @@ init (int state)
 			return KORE_RESULT_ERROR;
 		}
 	}
+
+////////////////////////////////////////////////////
 
 	return KORE_RESULT_OK;
 }
