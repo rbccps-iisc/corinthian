@@ -1,6 +1,8 @@
 #!/bin/ash
 cd kore-publisher 
 
+sysctl net.core.somaxconn=4096
+
 if [ -e "jail-keymgr/random.data" ]
 then
     rm jail-keymgr/random.data
