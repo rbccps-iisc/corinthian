@@ -1,7 +1,7 @@
 @startuml
 left to right direction
 
-entity owner as "owner\n(a legal entity)"
+actor owner as "owner (a legal entity)"
 
 
 rectangle "Manage xowners" {
