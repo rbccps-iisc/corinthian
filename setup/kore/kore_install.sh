@@ -23,5 +23,4 @@ chown kore_keymgr:kore_keymgr jail-keymgr
 chown kore_keymgr:kore_keymgr jail-keymgr/random.data
 chmod u+rw jail-keymgr/random.data
 
-kodev build > /dev/null 2> /dev/null 
 tmux new-session -d -s kore 'cd /kore-publisher && kodev build && kore -fc conf/kore-publisher.conf'
