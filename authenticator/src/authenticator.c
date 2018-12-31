@@ -88,7 +88,7 @@ char 	hash_string		[SHA256_DIGEST_LENGTH*2 + 1];
 struct kore_buf *query = NULL;
 struct kore_pgsql sql;
 
-char *postgres_pwd;
+char *postgres_readonly_pwd;
 char broker_ip		[100];
 char pgsql_ip		[100];
 
@@ -103,17 +103,19 @@ init (int state)
 	if (query == NULL)
 		query = kore_buf_alloc(512);
 
-	if (! (postgres_pwd = getenv("POSTGRES_PWD")))
+	// we dont need these 2 variables
+	unsetenv("ADMIN_PWD");
+	unsetenv("POSTGRES_PWD");
+
+	if (! (postgres_readonly_pwd = getenv("POSTGRES_READONLY_PWD")))
 	{
 		fprintf(stderr,"postgres password not set\n");
 		return KORE_RESULT_ERROR;
 	}
-	unsetenv("POSTGRES_PWD");
-
-	// XXX this user must only have read permissions on DB
+	unsetenv("POSTGRES_READONLY_PWD");
 
 	char conn_str[129];
-        snprintf(conn_str, 129,"host = postgres user = postgres password = %s", postgres_pwd);
+        snprintf(conn_str, 129,"host = postgres user = readonly dbname = postgres password = %s", postgres_readonly_pwd);
 
         kore_pgsql_register("db",conn_str);
 
