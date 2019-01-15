@@ -1,5 +1,5 @@
 const ui_urls = angular.module("ui_urls", []);
-const origin = "https://localhost:443"
+// const origin = "https://localhost"
 const api = {
 	"admin": {
 		"register-owner": "/admin/register-owner",
@@ -21,7 +21,7 @@ const api = {
 		"follow-requests": "/owner/follow-requests",
 		"register-entity": "/owner/register-entity",
 		"deregister-entity": "/owner/deregister-entity",
-		"login": "/owner/entities/"
+		"login": "/owner/entities"
 	},
 	"auto-entity": {
 		"follow": "/owner/follow",
@@ -33,7 +33,8 @@ const api = {
 		"permissions": "owner/permissions",
 		"reject-follow": "/owner/reject-follow",
 		"follow-status": "/owner/follow-status",
-		"follow-requests": "/owner/follow-requests"
+		"follow-requests": "/owner/follow-requests",
+		"login": "/owner/entities"
 	},
 	"general_apis": {
 		"catalog": "/catalog"

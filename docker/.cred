@@ -1,0 +1,71 @@
+OWNER
+{"id":"jishnu","apikey":"3DRDTI7BiCGRjbn7SO0qX73kVQv2GpNj"}
+
+ENTITY
+{"id":"jishnu/ent1","apikey":"HkRIjrPVHZ-6mp5pX1SMc9kEm0yJffT3"}
+
+
+
+2019-01-09 16:02:15 INFO   ---------------> REGISTERING DEVICES 
+2019-01-09 16:02:15 INFO   REGISTERING DEVICE 0
+2019-01-09 16:02:16 INFO   {"apikey": "KJ1SHV09d40qdsNUh-DqjBOTiyrAoutQ", "id": "vjhzwkti/devykaffho70"}
+2019-01-09 16:02:16 INFO   REGISTERING DEVICE 1
+2019-01-09 16:02:17 INFO   {"apikey": "lZvDac2kEpORKonkmuYBPQXcZZWYXDvm", "id": "vjhzwkti/devakclklrt1"}
+2019-01-09 16:02:17 INFO   REGISTERING DEVICE 2
+2019-01-09 16:02:17 INFO   {"apikey": "UTQXyHWpjyHb0bj9mO8RPQjyIWEUaeX5", "id": "vjhzwkti/dev3amuqbgx2"}
+2019-01-09 16:02:17 INFO   REGISTERING DEVICE 3
+2019-01-09 16:02:18 INFO   {"apikey": "SK1Dkvt6lw7j6eAQrDNbQBkwqsc-xYzN", "id": "vjhzwkti/devrpugtfir3"}
+2019-01-09 16:02:18 INFO   REGISTERING DEVICE 4
+2019-01-09 16:02:19 INFO   {"apikey": "HBM21dcHP-TD6Xrn7TTuahSjhJQvx6vO", "id": "vjhzwkti/devikyj7ndk4"}
+2019-01-09 16:02:19 INFO   REGISTERING DEVICE 5
+2019-01-09 16:02:20 INFO   {"apikey": "fzUJSUWiMm-nMiVmSTjjmgthigQu7Hiu", "id": "vjhzwkti/devpxsfkim55"}
+2019-01-09 16:02:20 INFO   REGISTERING DEVICE 6
+2019-01-09 16:02:21 INFO   {"apikey": "n62MMDnCgBfb11wTjjPvaNwHuwMcO-Ag", "id": "vjhzwkti/devzrhdybpt6"}
+2019-01-09 16:02:21 INFO   REGISTERING DEVICE 7
+2019-01-09 16:02:22 INFO   {"apikey": "VfxVntdbulGe3tO3W352f8PdnKGwbDwN", "id": "vjhzwkti/devuaopwiuz7"}
+2019-01-09 16:02:22 INFO   REGISTERING DEVICE 8
+2019-01-09 16:02:23 INFO   {"apikey": "0jECp0dgttr3OS5P4I48SgzYLa66OOSU", "id": "vjhzwkti/devk8jd8xic8"}
+2019-01-09 16:02:23 INFO   REGISTERING DEVICE 9
+2019-01-09 16:02:23 INFO   {"apikey": "2hnN81MNAy26y30G21AabUA1fxOlZeGc", "id": "vjhzwkti/dev5f1hb8l99"}
+2019-01-09 16:02:23 INFO   REGISTERING DEVICE 10
+2019-01-09 16:02:24 INFO   {"apikey": "caBc2fFBEUzLszXKUWPxowFMXG-FUr2E", "id": "vjhzwkti/dev0roptlvv10"}
+2019-01-09 16:02:24 INFO   REGISTERING DEVICE 11
+2019-01-09 16:02:25 INFO   {"apikey": "agRGKjwAMpzTIXRElWr23aJ15-9nSfj8", "id": "vjhzwkti/dev8twuvdxp11"}
+2019-01-09 16:02:25 INFO   REGISTERING DEVICE 12
+2019-01-09 16:02:26 INFO   {"apikey": "nl1saManxCgLcSr140wK2fIJyNKD4F8k", "id": "vjhzwkti/devt1dnclro12"}
+2019-01-09 16:02:26 INFO   REGISTERING DEVICE 13
+2019-01-09 16:02:27 INFO   {"apikey": "xoZK8xRnedeadL8bqpvOmZXPJMCtBnSP", "id": "vjhzwkti/devomaqbxkz13"}
+2019-01-09 16:02:27 INFO   REGISTERING DEVICE 14
+2019-01-09 16:02:28 INFO   {"apikey": "GVaqQ9G-B0E9kOHIygiQ9j4JflpVJ3kH", "id": "vjhzwkti/devtsj3gmrv14"}
+2019-01-09 16:02:28 INFO   REGISTERING DEVICE 15
+2019-01-09 16:02:28 INFO   {"apikey": "VlyfOqWJYcPdmDn4-i9duIo6Abi3n4op", "id": "vjhzwkti/devk3qxwexa15"}
+2019-01-09 16:02:28 INFO   REGISTERING DEVICE 16
+2019-01-09 16:02:29 INFO   {"apikey": "4khHvV7-kf9EzlqIfZNgGSo4ZN64Cnv3", "id": "vjhzwkti/devldy7swgk16"}
+2019-01-09 16:02:29 INFO   REGISTERING DEVICE 17
+2019-01-09 16:02:30 INFO   {"apikey": "95c96eMhz-q419HQU99qsLrAtGpBAr5x", "id": "vjhzwkti/dev8teu28om17"}
+2019-01-09 16:02:30 INFO   ---------------> REGISTERING APPS
+2019-01-09 16:02:30 INFO   REGISTERING APP 0
+2019-01-09 16:02:31 INFO   {"apikey": "-Vax7JDKyF3y8a7GaYsChVXlZhuJB-Zg", "id": "ymwojucn/appvz1ditjz0"}
+2019-01-09 16:02:31 INFO   REGISTERING APP 1
+2019-01-09 16:02:32 INFO   {"apikey": "XKq4zIpQlv2mAwJOwetpjPefLqren0PD", "id": "ymwojucn/appwuf19dup1"}
+2019-01-09 16:02:32 INFO   REGISTERING APP 2
+2019-01-09 16:02:33 INFO   {"apikey": "idD83zA43RLrhpRdNXh9MBKG6tQT0QNr", "id": "ymwojucn/appvbhh86wm2"}
+2019-01-09 16:02:33 INFO   REGISTERING APP 3
+2019-01-09 16:02:34 INFO   {"apikey": "uaWlJJuhk1y2pOQRZVztm6SiKGdPlB7r", "id": "ymwojucn/appqobha6nt3"}
+2019-01-09 16:02:34 INFO   REGISTERING APP 4
+2019-01-09 16:02:34 INFO   {"apikey": "K96mQhYZAF9YBvvQ1ZSUh0Ku7OYG5FCF", "id": "ymwojucn/app6ghcxd6z4"}
+2019-01-09 16:02:34 INFO   REGISTERING APP 5
+2019-01-09 16:02:35 INFO   {"apikey": "QrzvrCSLhTUYRFC8XI9RF6aP4O0vEfO5", "id": "ymwojucn/appc12edhbi5"}
+2019-01-09 16:02:35 INFO   REGISTERING APP 6
+2019-01-09 16:02:36 INFO   {"apikey": "HD3VMccHecTx2fv8uVPNxsOK9G93-41R", "id": "ymwojucn/appwr5e3x0s6"}
+2019-01-09 16:02:36 INFO   REGISTERING APP 7
+2019-01-09 16:02:37 INFO   {"apikey": "nUPxA0a7MAciVWRV9E5BPiYnlQttOhyB", "id": "ymwojucn/app51nptzrk7"}
+2019-01-09 16:02:37 INFO   REGISTERING APP 8
+2019-01-09 16:02:38 INFO   {"apikey": "zII1Ukp6tfEPTmEIDw0raH4vsCAdCBmy", "id": "ymwojucn/app9jq1s3mg8"}
+2019-01-09 16:02:38 INFO   REGISTERING APP 9
+2019-01-09 16:02:39 INFO   {"apikey": "o-L3RagM4oCfQkfxdu742PdhOTezAGfx", "id": "ymwojucn/app3nvdhqbk9"}
+2019-01-09 16:02:39 INFO   REGISTERING APP 10
+2019-01-09 16:02:40 INFO   {"apikey": "gbsuXTwBMsDqzs8KXOWocscaWSP4Z6-h", "id": "ymwojucn/appgwzlj3ju10"}
+2019-01-09 16:02:40 INFO   REGISTERING APP 11
+2019-01-09 16:02:41 INFO   {"apikey": "3HlFXrH1DLh5n4mpWcpHtVwF4V95FWSr", "id": "ymwojucn/appejb0m91h11"}
+

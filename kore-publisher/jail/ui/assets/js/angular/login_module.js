@@ -15,76 +15,37 @@ login.controller('loginCtrl', function($scope, $http, origin, api){
 
     	if(id=='admin'){
 			//Trigger admin login
-			$http({
-			    method: 'GET',
-			    url: origin+api['admin']['login'],
-			    data: {'test':'test'},
-			    headers: {
-			        // "X-Login-Ajax-call": 'true',
-			        "id": id,
-			        "apikey": apikey 
-				}
-			}).then(function(response) {
-			    if (response.data == 'ok') {
-			        // success
-			        console.log(response)
-			    } else {
-			        // failed
-			        console.log(response)
-			    }
-			});
+			
 		}else if(id.includes('/')){
 			//Trigger auto entity login
 		}else{
-			//Trigger owner login
-			$.ajax(
-
-		    {
-
-		    //url : 'https://smartcity.rbccps.org/api/0.1.0/publish',
-
-		    url : origin+api['owner']['login'],
-
-		    type: 'GET',
-
-		    headers: {"id": id, "apikey": apikey},
-
-		    dataType:"jsonp",
-
-		    data: {},
-
-		    //data: "{\"apikey\": \"eb91a7a83ed542a0aa7180608c5a2885\", \"body\": \"Sample Data from Sensor sensorOnboarding_101\", \"resourceid\":\"openday_application\"}",
-
-		    success: function( data, textStatus, jQxhr ){
-		      alert("Success" + data);
-		    },
-
-		    error: function( jqXhr, textStatus, errorThrown ){
-		      //console.log( errorThrown + " | " + jqXhr + " | " + textStatus + " | ");
-		      console.log(jqXhr);
-		    }
-
-		    });
-			// $http({
-			//     method: 'GET',
-			//     url: origin+api['owner']['login'],
-			//     data: {},
-			//     headers: {
-			//         // "X-Login-Ajax-call": 'true',
-			//         "id": id,
-			//         "apikey": apikey 
-			// 	}
-			// }).then(function(response) {
-			//     if (response.data == 'ok') {
-			//         // success
-			//         console.log(response)
-			//     } else {
-			//         // failed
-			//         console.log(response)
-			//     }
-			// });
+			$http({
+			    method: 'GET',
+			    url: api['owner']['login'],
+			    headers: {
+			        'id': id,
+			        'apikey': apikey,
+			    },
+			    // data: {} 
+			}).then(function (response)
+            {
+                $scope.response_data  = {'status':true, 'data': response.data}; 
+				if (typeof(Storage) !== "undefined") {
+				  // Save user credentials to sessionStorage
+				  sessionStorage.setItem("id", id);
+				  sessionStorage.setItem("apikey", apikey);
+				  window.location = location.origin + "/ui/pages/admin";
+				} else {
+				  // Sorry! No Web Storage support..
+				  alert("Sorry! No Web Storage support.");
+				}
+                // console.log(response.data)
+            }, function(error){
+            	 $scope.response_data = {'status':false, 'data': error['data']}; 
+            	 // window.location = location.origin + "/ui/pages/login";
+                 // console.log(error, error['data']); 
+            });
+			
 		}
-    	// alert(JSON.stringify(api));
-        // alert("validateUser");
     };
 });

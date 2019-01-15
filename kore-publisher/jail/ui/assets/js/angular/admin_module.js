@@ -1,4 +1,4 @@
-const admin = angular.module("admin", ['footer']);
+const admin = angular.module("admin", ['session_checker', 'footer', 'logout']);
 
 admin.controller('loginCtrl', function($scope, $http){
     $scope.brand = "IUDX";
