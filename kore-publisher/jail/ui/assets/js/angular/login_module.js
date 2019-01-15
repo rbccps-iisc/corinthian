@@ -1,4 +1,4 @@
-const login = angular.module("login", ['footer', 'ui_urls']);
+const login = angular.module("login", ['footer', 'ui_urls', 'session_checker']);
 
 login.controller('loginCtrl', function($scope, $http, origin, api){
     $scope.brand = "IUDX";
@@ -29,7 +29,7 @@ login.controller('loginCtrl', function($scope, $http, origin, api){
 			    // data: {} 
 			}).then(function (response)
             {
-                $scope.response_data  = {'status':true, 'data': response.data}; 
+                $scope.response_data  = {'status':'Success', 'data': response.data}; 
 				if (typeof(Storage) !== "undefined") {
 				  // Save user credentials to sessionStorage
 				  sessionStorage.setItem("id", id);
@@ -41,9 +41,9 @@ login.controller('loginCtrl', function($scope, $http, origin, api){
 				}
                 // console.log(response.data)
             }, function(error){
-            	 $scope.response_data = {'status':false, 'data': error['data']}; 
+            	 $scope.response_data = {'status': "Error: " + error['data']['error'], 'data': error['data']}; 
             	 // window.location = location.origin + "/ui/pages/login";
-                 // console.log(error, error['data']); 
+                 // console.log(error, error['data']['error']); 
             });
 			
 		}

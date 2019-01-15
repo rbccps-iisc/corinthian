@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html ng-app="admin" ng-controller="session_checkerCtrl">
+<html ng-app="admin" ng-controller="session_checkerCtrl" data-ng-init="check_session()">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
@@ -20,7 +20,7 @@
   <!-- Argon CSS -->
   <link type="text/css" href="../../assets/css/argon.min.css?v=1.0.0" rel="stylesheet">
 </head>
-<body class="bg-default" data-ng-init="check_session()">
+<body class="bg-default" ng-controller="logoutCtrl">
   
   
   <!-- Sidenav -->
@@ -55,7 +55,7 @@
               </span>
             </div>
           </a>
-          <div class="dropdown-menu dropdown-menu-arrow dropdown-menu-right">
+          <div class="dropdown-menu dropdown-menu-arrow dropdown-menu-right" >
             <div class=" dropdown-header noti-title">
               <h6 class="text-overflow m-0">Welcome!</h6>
             </div>
@@ -76,7 +76,7 @@
               <span>Support</span>
             </a-->
             <div class="dropdown-divider"></div>
-            <a href="#!" class="dropdown-item" ng-controller="logoutCtrl" ng-click="_logout()">
+            <a href="#!" class="dropdown-item" ng-click="_logout()">
               <i class="ni ni-user-run"></i>
               <span>Logout</span>
             </a>

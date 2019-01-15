@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html ng-app="login" >
+<html ng-app="login"  ng-controller="session_checkerCtrl" data-ng-init="check_session()">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
@@ -128,7 +128,11 @@
                   </label>
                 </div> -->
                 <div class="text-center">
-                  <input type="submit" class="btn btn-primary my-4" value="Login" ng-click="loginForm.$valid && validateUser()" data-container="body" data-toggle="popover" data-color="primary" data-placement="top" data-content="{{response_data.data}}">
+                  <input type="submit" class="btn btn-primary my-4" value="Login" ng-click="loginForm.$valid && validateUser()">
+                
+                <div class="toast" role="alert" aria-live="polite" aria-atomic="true" data-autohide="true" data-delay="1000">
+                  <div role="alert" aria-live="assertive" aria-atomic="true">{{response_data.status}}</div>
+                </div>
                 </div>
               </form>
             </div>
@@ -178,6 +182,7 @@
   <script src="../../assets/js/angular/login_module.js"></script>
   <script src="../../assets/js/angular/footer_module.js"></script>
   <script src="../../assets/js/angular/ui_urls_module.js"></script>
+  <script src="../../assets/js/angular/session_checker_module.js"></script>
   <!-- <script src="../../assets/js/lib/ajax/login.js"></script> -->
 </body>
 
