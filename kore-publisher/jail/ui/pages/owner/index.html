@@ -113,15 +113,15 @@
           </div>
         </form>
         <!-- Navigation -->
-        <ul class="navbar-nav">
+        <ul class="navbar-nav" ng-controller="owner_sidebarCtrl">
           <!--li class="nav-item">
             <a class="nav-link" href="/owner">
               <i class="ni ni-tv-2 text-primary"></i> Dashboard
             </a>
           </li-->
-          <li class="nav-item">
-            <a class="nav-link" href="/add-owner">
-              <i class="ni ni-fat-add text-green"></i> ADD Entity
+          <li class="nav-item" ng-repeat="option in sidebar">
+            <a class="nav-link" href="{{option.href}}">
+              <i class="ni ni-{{option.legend}} text-{{option.color}}"></i> {{option.text}}
             </a>
           </li>
           <!--li class="nav-item">
@@ -497,6 +497,7 @@
   <script src="../../assets/js/angular/footer_module.js"></script>
   <script src="../../assets/js/angular/logout_module.js"></script>
   <script src="../../assets/js/angular/ui_urls_module.js"></script>
+  <script src="../../assets/js/angular/owner_sidebar_module.js"></script>
   <script src="../../assets/js/angular/session_checker_module.js"></script>
   <script type="text/javascript">
     // Disable ctrl+s to prevent downloading source code 

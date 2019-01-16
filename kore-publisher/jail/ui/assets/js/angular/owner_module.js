@@ -1,4 +1,4 @@
-const owner = angular.module("owner", ['session_checker', 'footer', 'logout', 'ui_urls']);
+const owner = angular.module("owner", ['session_checker', 'footer', 'logout', 'ui_urls', 'owner_sidebar']);
 
 var d;
 
