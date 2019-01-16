@@ -20,7 +20,7 @@
   <!-- Argon CSS -->
   <link type="text/css" href="../../assets/css/argon.min.css?v=1.0.0" rel="stylesheet">
 </head>
-<body ng-controller="loginCtrl" class="bg-default">
+<body ng-controller="loginCtrl" class="bg-default" oncontextmenu="return false">
   <div class="main-content">
     <!-- Navbar -->
     <nav class="navbar navbar-top navbar-horizontal navbar-expand-md navbar-dark">
@@ -184,6 +184,16 @@
   <script src="../../assets/js/angular/ui_urls_module.js"></script>
   <script src="../../assets/js/angular/session_checker_module.js"></script>
   <!-- <script src="../../assets/js/lib/ajax/login.js"></script> -->
+  <script type="text/javascript">
+    // Disable ctrl+s to prevent downloading source code 
+    $(document).bind('keydown', function(e) {
+      if(e.ctrlKey && (e.which == 83)) {
+        e.preventDefault();
+        // alert('Ctrl+S');
+        return false;
+      }
+    });
+  </script>
 </body>
 
 </html>

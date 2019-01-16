@@ -8,6 +8,45 @@ login.controller('loginCtrl', function($scope, $http, origin, api){
     	{"text":"Link-2","href":"#", "legend":"compass-04"},
     	{"text":"Link-3","href":"#", "legend":"diamond"}
     ];
+
+    $scope.data=[]
+    $scope._login=function(_URL, _ID, _APIKEY, _ROLE){
+    	$http({
+			    method: 'GET',
+			    url: _URL,
+			    headers: {
+			        'id': _ID,
+			        'apikey': _APIKEY,
+			    },
+			    // data: {} 
+			}).then(function (response)
+            {
+                $scope.response_data  = {'status':'Success'}; 
+				if (typeof(Storage) !== "undefined") {
+				  // Save user credentials to sessionStorage
+				  sessionStorage.setItem("id", _ID);
+				  sessionStorage.setItem("apikey", _APIKEY);
+				  var _data = [];
+				  var ent_dic;
+				  for(var i in response.data){
+				  	ent_dic = {'ent':Object.keys(response.data[i])[0], 'is_autonomous':Object.values(response.data[i])[0], 'index': i};
+				  	_data.push(ent_dic);
+				  }
+				  
+				  localStorage.setItem("data", JSON.stringify(_data));
+				  window.location = location.origin + "/ui/pages/"+_ROLE;
+				} else {
+				  // Sorry! No Web Storage support..
+				  alert("Sorry! No Web Storage support.");
+				}
+                // console.log(typeof(response.data))
+            }, function(error){
+            	 $scope.response_data = {'status': "Error: " + error['data']['error']}; 
+            	 // window.location = location.origin + "/ui/pages/login";
+                 // console.log(error, error['data']['error']); 
+            });
+    }
+
     $scope.validateUser = function(){
     	let id = $scope.id;
     	let apikey = $scope.apikey;
@@ -15,37 +54,14 @@ login.controller('loginCtrl', function($scope, $http, origin, api){
 
     	if(id=='admin'){
 			//Trigger admin login
+			$scope._login(api['admin']['login'], id, apikey, 'admin');
 			
 		}else if(id.includes('/')){
 			//Trigger auto entity login
+			$scope._login(api['auto-entity']['login'], id, apikey, 'auto-entity');
 		}else{
-			$http({
-			    method: 'GET',
-			    url: api['owner']['login'],
-			    headers: {
-			        'id': id,
-			        'apikey': apikey,
-			    },
-			    // data: {} 
-			}).then(function (response)
-            {
-                $scope.response_data  = {'status':'Success', 'data': response.data}; 
-				if (typeof(Storage) !== "undefined") {
-				  // Save user credentials to sessionStorage
-				  sessionStorage.setItem("id", id);
-				  sessionStorage.setItem("apikey", apikey);
-				  window.location = location.origin + "/ui/pages/admin";
-				} else {
-				  // Sorry! No Web Storage support..
-				  alert("Sorry! No Web Storage support.");
-				}
-                // console.log(response.data)
-            }, function(error){
-            	 $scope.response_data = {'status': "Error: " + error['data']['error'], 'data': error['data']}; 
-            	 // window.location = location.origin + "/ui/pages/login";
-                 // console.log(error, error['data']['error']); 
-            });
-			
+			//Trigger owner login
+			$scope._login(api['owner']['login'], id, apikey, 'owner');
 		}
     };
 });

@@ -11,6 +11,7 @@ const api = {
 	"owner": {
 		"follow": "/owner/follow",
 		"block": "/owner/block",
+		"unblock": "/owner/unblock",
 		"unfollow": "/owner/unfollow",
 		"share": "/owner/share",
 		"bind": "/owner/bind",
@@ -34,7 +35,7 @@ const api = {
 		"reject-follow": "/owner/reject-follow",
 		"follow-status": "/owner/follow-status",
 		"follow-requests": "/owner/follow-requests",
-		"login": "/owner/entities"
+		"login": "/entity/ae"
 	},
 	"general_apis": {
 		"catalog": "/catalog"
