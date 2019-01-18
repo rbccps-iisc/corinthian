@@ -246,15 +246,24 @@
       <div class="container-fluid">
         <div class="header-body">
           <!-- Card stats -->
-          <form>
+          <form name="addEntityForm" role="form">
   <div class="row">
     <div class="col-md-6">
       <div class="form-group has-success">
-        <input type="text" placeholder="Entity-Name" class="form-control is-valid" required/>
+        <input type="text" placeholder="Entity-Name" class="form-control is-valid" ng-model='entity_name' required/>
       </div>
     </div>
-    <div class="col-md-6">
-      <button class="btn btn-icon btn-3 btn-success" type="submit">
+    <div class="col-md-3">
+    <label class="custom-toggle">
+      <div class="custom-control custom-control-alternative custom-checkbox mb-3" style="padding: 10px">
+      <input class="custom-control-input" id="customCheck5" type="checkbox" ng-model='is_autonomous'>
+      <label class="custom-control-label" for="customCheck5" style="color:white;">is_autonomous</label>
+    </div>
+    </label>
+      
+    </div>
+    <div class="col-md-3">
+      <button class="btn btn-icon btn-3 btn-success" type="submit"  ng-click="addEntityForm.$valid && addEntity()">
       <span class="btn-inner--icon"><i class="ni ni-fat-add"></i></span>
   
       <span class="btn-inner--text">Add Entity</span>
@@ -275,7 +284,7 @@
           <div class="card shadow">
             <div class="card-header border-0">
               <h3 class="mb-0">Entities registered </h3>
-              
+
               <span id="alert_message"></span> 
 
             </div>
@@ -294,7 +303,7 @@
                   </tr>
                 </thead>
                 <tbody id="entity_list">
-                     <tr ng-repeat="x in data" id="{{x.index}}">
+                     <tr ng-repeat="x in data | orderBy:'-'" id="{{x.index}}">
                     <th scope="row">
                       <div class="media align-items-center">
                         <a href="#" class="avatar rounded-circle mr-3">
