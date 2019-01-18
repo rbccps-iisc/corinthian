@@ -34,16 +34,37 @@ owner.controller('ownerCtrl', function($scope, $http){
                 	if (d[i]['ent']==entity['ent']){
 	                	d.splice(i, 1);
 	                	localStorage.setItem('data', JSON.stringify(d));
-	                	$( "#"+ entity['index']).fadeOut(150, function() { $(this).remove(); });
+	                	$( "#"+ entity['index']).fadeOut(1, function() { $(this).remove(); });
+	                	$("#alert_message").html(`<br><div class="alert alert-success alert-dismissible fade show in" role="alert">
+												    <span class="alert-inner--icon"><i class="ni ni-like-2"></i></span>
+												    <span class="alert-inner--text"><strong>Success! </strong>` + entity['ent'] + ` deleted.</span>
+												    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+												        <span aria-hidden="true">&times;</span>
+												    </button>
+												</div>`);
+	                	// $( "#alert_message").fadeOut();
+	                	
 	                	window.setTimeout(function(){
 	                		$( "#delete_modal"+ entity['index']).modal('hide');
 	                		$('.modal-backdrop').remove();
-	                	}, 100);
+	                	}, 1);
+	                	window.setTimeout(function(){
+	                		$( "#alert_message").fadeIn();
+	                		$( "#alert_message").fadeOut(750);
+	                	}, 1);
+	                	break;
                 	}
                 }
                 
             }, function(error){
-                 console.log(error['data']['error']); 
+                 // console.log(error['data']['error']); 
+                 $( "#alert_message").html(`<br><div class="alert alert-danger alert-dismissible fade show" role="alert">
+												    <span class="alert-inner--icon"><i class="fas fa-exclamation-triangle"></i></span>
+												    <span class="alert-inner--text"><strong>Error! </strong>` + error['data']['error'] + `</span>
+												    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+												        <span aria-hidden="true">&times;</span>
+												    </button>
+												</div>`);
         });
 	}
 
@@ -60,12 +81,31 @@ owner.controller('ownerCtrl', function($scope, $http){
 			    data: {} 
 			}).then(function (response)
             {
+            	$( "#alert_message").html(`<br><div class="alert alert-success alert-dismissible fade show" role="alert">
+												    <span class="alert-inner--icon"><i class="ni ni-like-2"></i></span>
+												    <span class="alert-inner--text"><strong>Success! </strong>` + entity['ent'] + ` blocked.</span>
+												    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+												        <span aria-hidden="true">&times;</span>
+												    </button>
+												</div>`);
 	        	window.setTimeout(function(){
 	        		$( "#block_modal"+ entity['index']).modal('hide');
 	        		$('.modal-backdrop').remove();
-	        	}, 100);            
+	        	}, 100);    
+	        	window.setTimeout(function(){
+	                		$( "#alert_message").fadeIn(250);
+	                		$( "#alert_message").fadeOut(750);
+	                	}, 1);
+    	    	       
             }, function(error){
-                 console.log(error['data']['error']); 
+                 // console.log(error['data']['error']); 
+                 $( "#alert_message").html(`<br><div class="alert alert-danger alert-dismissible fade show" role="alert">
+												    <span class="alert-inner--icon"><i class="fas fa-exclamation-triangle"></i></span>
+												    <span class="alert-inner--text"><strong>Error! </strong>` + error['data']['error'] + `</span>
+												    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+												        <span aria-hidden="true">&times;</span>
+												    </button>
+												</div>`);
         });
 	}
 
@@ -82,12 +122,31 @@ owner.controller('ownerCtrl', function($scope, $http){
 			    data: {} 
 			}).then(function (response)
             {
+            	$( "#alert_message").html(`<br><div class="alert alert-success alert-dismissible fade show" role="alert">
+												    <span class="alert-inner--icon"><i class="ni ni-like-2"></i></span>
+												    <span class="alert-inner--text"><strong>Success! </strong>` + entity['ent'] + ` unblocked.</span>
+												    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+												        <span aria-hidden="true">&times;</span>
+												    </button>
+												</div>`);
 	        	window.setTimeout(function(){
 	        		$( "#unblock_modal"+ entity['index']).modal('hide');
 	        		$('.modal-backdrop').remove();
-	        	}, 100);            
+	        	}, 100);   
+	        	window.setTimeout(function(){
+	                		$( "#alert_message").fadeIn(250);
+	                		$( "#alert_message").fadeOut(750);
+	                	}, 1);
+            	        
             }, function(error){
-                 console.log(error['data']['error']); 
+                 // console.log(error['data']['error']); 
+                 $( "#alert_message").html(`<br><div class="alert alert-danger alert-dismissible fade show" role="alert">
+												    <span class="alert-inner--icon"><i class="fas fa-exclamation-triangle"></i></span>
+												    <span class="alert-inner--text"><strong>Error! </strong>` + error['data']['error'] + `</span>
+												    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+												        <span aria-hidden="true">&times;</span>
+												    </button>
+												</div>`);
         });
 	}
 

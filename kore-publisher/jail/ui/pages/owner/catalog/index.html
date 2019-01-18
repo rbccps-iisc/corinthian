@@ -17,9 +17,29 @@
   <!-- Icons -->
   <link href="../../../assets/vendor/nucleo/css/nucleo.css" rel="stylesheet">
   <link href="../../../assets/vendor/@fortawesome/fontawesome-free/css/all.min.css" rel="stylesheet">
+  <!-- <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css"> -->
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
   <!-- Argon CSS -->
   <link type="text/css" href="../../../assets/css/argon.min.css?v=1.0.0" rel="stylesheet">
+  <style type="text/css">
+    #legend {
+            font-family: Arial, sans-serif;
+            background: #fff;
+            padding: 10px;
+            margin: 10px;
+            border: 3px solid #000;
+        }
 
+        #legend h3 {
+            margin-top: 0;
+        }
+
+        #legend img {
+            vertical-align: middle;
+        }
+
+  </style>
 </head>
 <body class="bg-default" ng-controller="logoutCtrl"  oncontextmenu="return false">
   
@@ -274,7 +294,10 @@
       <div class="row">
         <div class="col">
           <div class="card shadow border-0">
-            <div id="map" style="height: 600px;"></div>
+            <div id="map" style="height: 600px; "></div>
+            <div id="legend">
+              <h4>Legend</h4>
+          </div>
           </div>
         </div>
       </div>
@@ -342,483 +365,431 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
 
   <script>
-        const marker_image = 'https://developers.google.com/maps/documentation/javascript/examples/full/images/beachflag.png';
-        const rbc_marker_image = 'https://i1.wp.com/www.rbccps.org/wp-content/uploads/2016/12/cropped-BCCPS-Logo.png?fit=24%2C24';
-        const rbccps_title = "Robert Bosch Centre for Cyber Physical Systems"
-        const rbccps_lat_lng = {
-            lat: 13.0138,
-            lng: 77.5703
+const marker_image = 'https://developers.google.com/maps/documentation/javascript/examples/full/images/beachflag.png';
+const rbc_marker_image = 'https://i1.wp.com/www.rbccps.org/wp-content/uploads/2016/12/cropped-BCCPS-Logo.png?fit=24%2C24';
+const rbccps_title = "Robert Bosch Centre for Cyber Physical Systems"
+const rbccps_lat_lng = {
+    lat: 13.0138,
+    lng: 77.5703
+}
+
+var legends = {
+    "e toilet": "https://image.flaticon.com/icons/svg/1335/1335662.svg",
+    "surveillance": "https://image.flaticon.com/icons/svg/1166/1166454.svg",
+    "garbage collection": "https://image.flaticon.com/icons/svg/1208/1208469.svg",
+    "air quality": "https://image.flaticon.com/icons/svg/1113/1113716.svg",
+    "onstreet": "https://image.flaticon.com/icons/svg/1339/1339969.svg",
+    "onstreet sensor": "https://image.flaticon.com/icons/svg/1339/1339969.svg",
+    "new category": marker_image
+}
+
+// var legends = {
+//     "e toilet": window.location.origin + "/ui/assets/img/logo/streetlight.png",
+//     "surveillance": window.location.origin + "/ui/assets/img/logo/streetlight.png",
+//     "garbage collection": window.location.origin + "/ui/assets/img/logo/streetlight.png",
+//     "air quality": window.location.origin + "/ui/assets/img/logo/streetlight.png",
+//     "onstreet": window.location.origin + "/ui/assets/img/logo/streetlight.png",
+//     "onstreet sensor": window.location.origin + "/ui/assets/img/logo/streetlight.png",
+//     "new category": window.location.origin + "/ui/assets/img/logo/streetlight.png",
+// }
+
+// Function that takes tags json from cat and return respective icon link 
+function getMarkerImage(tags) {
+    if (tags.includes("e toilet")) {
+        //console.log("e-toilet", tags, tags.includes("e toilet"));
+        return legends["e toilet"];
+    } else if (tags.includes("surveillance")) {
+        //console.log("surveillance", tags, tags.includes("surveillance"));
+        return legends["surveillance"];
+    } else if (tags.includes("garbage collection")) {
+        //console.log("GC", tags, tags.includes("garbage collection"));
+        return legends["garbage collection"];
+    } else if (tags.includes("operations")) {
+        //console.log("OP", tags, tags.includes("operations"));
+        return legends["operations"];
+    } else if (tags.includes("air quality")) {
+        //console.log("AQ", tags, tags.includes("air quality"));
+        return legends["air quality"];
+    } else if (tags.includes("onstreet")) {
+        //console.log("OS", tags, tags.includes("onstreet"));
+        return legends["onstreet"];
+    } else if (tags.includes("onstreet sensor")) {
+        //console.log("OS2", tags, tags.includes("onstreet sensor"));
+        return legends["onstreet sensor"];
+    } else {
+        //console.log("DEF", tags);
+        return legends["default"];
+    }
+}
+
+M.AutoInit();
+
+
+// Or with jQuery
+
+$(document).ready(function() {
+    $('select').formSelect();
+});
+
+
+var ret_data;
+
+
+function load_form(id) {
+    //console.log($(id)[0].id,'#'+$(id)[0].id,$(id)[0].id.replace('_1','_2'));
+    //$('#'+$(id)[0].id).css('display,block');
+    //$('#'+$(id)[0].id).attr("hidden",false);
+    id = "#" + id;
+    var _1 = ($(id)[0].id.replace('_2', '_1'))
+    //$('#'+_1).attr("hidden",true);
+    $('#' + _1).hide(1000);
+    $('#' + $(id)[0].id).hide(1000);
+    $('#' + $(id)[0].id).show(1000);
+    //console.log($('#'+$(id)[0].hidden));
+    //.log($(id)[0].id,document.getElementById(($(id)[0].id)+'_1'));
+
+    //console.log("$('#"+$($(id)[0].id).css('visibility,hidden'));
+    //console.log("$('#"+$($(id)[0].id.replace('_2','_1')).css('display,block'));
+}
+
+function send_req_details(id) {
+    var e_id = $(id).children().find("#e_id").val()
+    var c_no = $(id).children().find("#contact").val()
+    var email = $(id).children().find("#email").val()
+    var req_id = $(id).children().find("#req_id").val()
+    var v = $(id).children().find("#validity").val()
+    var v_u = $('input[name=validity_unit]:checked', '#' + $(id)[0].id).val();
+    var p = $('input[name=permission]:checked', '#' + $(id)[0].id).val();
+    //console.log(e_id, c_no, email, req_id, v, v_u, p);
+
+    var follow_req_response = $.ajax({
+        async: false,
+        url: '/cat/follow_req',
+        type: 'GET',
+        dataType: "JSON",
+        headers: {
+            "Access-Control-Allow-Origin": "*",
+            "apikey": "6UugLVBMIdechjaQPNlDUb7WxMzPrzvf",
+            "Content-Type": "application/json"
+        },
+        data: {
+            "e": e_id,
+            "p": p,
+            "v": "" + v + v_u + "",
+            "r": req_id,
+            "email": email,
+            "c": c_no
         }
-
-        var legends = {
-            "e toilet": "https://image.flaticon.com/icons/svg/1335/1335662.svg",
-            "surveillance": "https://image.flaticon.com/icons/svg/1166/1166454.svg",
-            "garbage collection": "https://image.flaticon.com/icons/svg/1208/1208469.svg",
-            "air quality": "https://image.flaticon.com/icons/svg/1113/1113716.svg",
-            "onstreet": "https://image.flaticon.com/icons/svg/1339/1339969.svg",
-            "onstreet sensor": "https://image.flaticon.com/icons/svg/1339/1339969.svg",
-            "new category": marker_image
-        }
-
-        // Function that takes tags json from cat and return respective icon link 
-        function getMarkerImage(tags) {
-            if (tags.includes("e toilet")) {
-                //console.log("e-toilet", tags, tags.includes("e toilet"));
-                return legends["e toilet"];
-            } else if (tags.includes("surveillance")) {
-                //console.log("surveillance", tags, tags.includes("surveillance"));
-                return legends["surveillance"];
-            } else if (tags.includes("garbage collection")) {
-                //console.log("GC", tags, tags.includes("garbage collection"));
-                return legends["garbage collection"];
-            } else if (tags.includes("operations")) {
-                //console.log("OP", tags, tags.includes("operations"));
-                return legends["operations"];
-            } else if (tags.includes("air quality")) {
-                //console.log("AQ", tags, tags.includes("air quality"));
-                return legends["air quality"];
-            } else if (tags.includes("onstreet")) {
-                //console.log("OS", tags, tags.includes("onstreet"));
-                return legends["onstreet"];
-            } else if (tags.includes("onstreet sensor")) {
-                //console.log("OS2", tags, tags.includes("onstreet sensor"));
-                return legends["onstreet sensor"];
-            } else {
-                //console.log("DEF", tags);
-                return legends["default"];
-            }
-        }
-
-        M.AutoInit();
-
-
-        // Or with jQuery
-
-        $(document).ready(function() {
-            $('select').formSelect();
-        });
-
-  
-
-  var ret_data;
-
-
-
-  function validate(e) {
-      var tag = e.target.value;
+    }).responseJSON;
+    //console.log(follow_req_response);
+    //console.log(follow_req_response['value'], follow_req_response['status']);
     M.toast({
-     html: 'Updating map with '+tag
-      })
-                updateMap(ret_data, tag);
-      //validation of the input...
-  }
+        html: 'Follow request has been made.<br> Please wait for the owner to approve it.'
+    })
 
+    return false;
+}
 
-        function load_form(id) {
-            //console.log($(id)[0].id,'#'+$(id)[0].id,$(id)[0].id.replace('_1','_2'));
-            //$('#'+$(id)[0].id).css('display,block');
-            //$('#'+$(id)[0].id).attr("hidden",false);
-      id="#"+id;
-            var _1 = ($(id)[0].id.replace('_2', '_1'))
-            //$('#'+_1).attr("hidden",true);
-            $('#' + _1).hide(1000);
-            $('#' + $(id)[0].id).hide(1000);
-            $('#' + $(id)[0].id).show(1000);
-            //console.log($('#'+$(id)[0].hidden));
-            //.log($(id)[0].id,document.getElementById(($(id)[0].id)+'_1'));
+// https://stackoverflow.com/questions/2014570/save-data-from-ajax-request-in-variable-jquery
+M.AutoInit();
 
-            //console.log("$('#"+$($(id)[0].id).css('visibility,hidden'));
-            //console.log("$('#"+$($(id)[0].id.replace('_2','_1')).css('display,block'));
-        }
+var map;
 
-        function send_req_details(id) {
-            var e_id = $(id).children().find("#e_id").val()
-            var c_no = $(id).children().find("#contact").val()
-            var email = $(id).children().find("#email").val()
-            var req_id = $(id).children().find("#req_id").val()
-            var v = $(id).children().find("#validity").val()
-            var v_u = $('input[name=validity_unit]:checked', '#' + $(id)[0].id).val();
-            var p = $('input[name=permission]:checked', '#' + $(id)[0].id).val();
-            //console.log(e_id, c_no, email, req_id, v, v_u, p);
-
-            var follow_req_response = $.ajax({
-                async: false,
-                url: '/cat/follow_req',
-                type: 'GET',
-                dataType: "JSON",
-                headers: {
-                    "Access-Control-Allow-Origin": "*",
-                    "apikey": "6UugLVBMIdechjaQPNlDUb7WxMzPrzvf",
-                    "Content-Type": "application/json"
-                },
-                data: {
-                    "e": e_id,
-                    "p": p,
-                    "v": "" + v + v_u + "",
-                    "r": req_id,
-                    "email": email,
-                    "c": c_no
-                }
-            }).responseJSON;
-            //console.log(follow_req_response);
-            //console.log(follow_req_response['value'], follow_req_response['status']);
-            M.toast({
-                html: 'Follow request has been made.<br> Please wait for the owner to approve it.'
-            })
-
-            return false;
-        }
-
-        // https://stackoverflow.com/questions/2014570/save-data-from-ajax-request-in-variable-jquery
-        M.AutoInit();
-        var jqxhr = $.getJSON( window.location.origin+"/ui/assets/js/get-cat-json.json", function() {
-          // console.log( "success" );
-        }).done(function(data) {
-        // console.log( "second success" , data);
-        ret_data = data;
+function initMap() {
+    var styledMapType = new google.maps.StyledMapType(
+        [{
+                "elementType": "geometry",
+                "stylers": [{
+                    "color": "#ebe3cd"
+                }]
+            },
+            {
+                "elementType": "labels.text.fill",
+                "stylers": [{
+                    "color": "#523735"
+                }]
+            },
+            {
+                "elementType": "labels.text.stroke",
+                "stylers": [{
+                    "color": "#f5f1e6"
+                }]
+            },
+            {
+                "featureType": "administrative",
+                "elementType": "geometry",
+                "stylers": [{
+                    "visibility": "off"
+                }]
+            },
+            {
+                "featureType": "administrative",
+                "elementType": "geometry.stroke",
+                "stylers": [{
+                    "color": "#c9b2a6"
+                }]
+            },
+            {
+                "featureType": "administrative.land_parcel",
+                "elementType": "geometry.stroke",
+                "stylers": [{
+                        "color": "#dcd2be"
+                    },
+                    {
+                        "visibility": "off"
+                    }
+                ]
+            },
+            {
+                "featureType": "administrative.land_parcel",
+                "elementType": "labels.text.fill",
+                "stylers": [{
+                    "color": "#ae9e90"
+                }]
+            },
+            {
+                "featureType": "landscape.natural",
+                "elementType": "geometry",
+                "stylers": [{
+                    "color": "#dfd2ae"
+                }]
+            },
+            {
+                "featureType": "poi",
+                "stylers": [{
+                    "visibility": "off"
+                }]
+            },
+            {
+                "featureType": "poi",
+                "elementType": "geometry",
+                "stylers": [{
+                    "color": "#dfd2ae"
+                }]
+            },
+            {
+                "featureType": "poi",
+                "elementType": "labels.text.fill",
+                "stylers": [{
+                    "color": "#93817c"
+                }]
+            },
+            {
+                "featureType": "poi.park",
+                "elementType": "geometry.fill",
+                "stylers": [{
+                    "color": "#a5b076"
+                }]
+            },
+            {
+                "featureType": "poi.park",
+                "elementType": "labels.text.fill",
+                "stylers": [{
+                    "color": "#447530"
+                }]
+            },
+            {
+                "featureType": "road",
+                "elementType": "geometry",
+                "stylers": [{
+                    "color": "#f5f1e6"
+                }]
+            },
+            {
+                "featureType": "road",
+                "elementType": "labels.icon",
+                "stylers": [{
+                    "visibility": "off"
+                }]
+            },
+            {
+                "featureType": "road.arterial",
+                "elementType": "geometry",
+                "stylers": [{
+                    "color": "#fdfcf8"
+                }]
+            },
+            {
+                "featureType": "road.highway",
+                "elementType": "geometry",
+                "stylers": [{
+                    "color": "#f8c967"
+                }]
+            },
+            {
+                "featureType": "road.highway",
+                "elementType": "geometry.stroke",
+                "stylers": [{
+                    "color": "#e9bc62"
+                }]
+            },
+            {
+                "featureType": "road.highway.controlled_access",
+                "elementType": "geometry",
+                "stylers": [{
+                    "color": "#e98d58"
+                }]
+            },
+            {
+                "featureType": "road.highway.controlled_access",
+                "elementType": "geometry.stroke",
+                "stylers": [{
+                    "color": "#db8555"
+                }]
+            },
+            {
+                "featureType": "road.local",
+                "elementType": "labels.text.fill",
+                "stylers": [{
+                    "color": "#806b63"
+                }]
+            },
+            {
+                "featureType": "transit",
+                "stylers": [{
+                    "visibility": "off"
+                }]
+            },
+            {
+                "featureType": "transit.line",
+                "elementType": "geometry",
+                "stylers": [{
+                    "color": "#dfd2ae"
+                }]
+            },
+            {
+                "featureType": "transit.line",
+                "elementType": "labels.text.fill",
+                "stylers": [{
+                    "color": "#8f7d77"
+                }]
+            },
+            {
+                "featureType": "transit.line",
+                "elementType": "labels.text.stroke",
+                "stylers": [{
+                    "color": "#ebe3cd"
+                }]
+            },
+            {
+                "featureType": "transit.station",
+                "elementType": "geometry",
+                "stylers": [{
+                    "color": "#dfd2ae"
+                }]
+            },
+            {
+                "featureType": "water",
+                "elementType": "geometry.fill",
+                "stylers": [{
+                    "color": "#b9d3c2"
+                }]
+            },
+            {
+                "featureType": "water",
+                "elementType": "labels.text.fill",
+                "stylers": [{
+                    "color": "#92998d"
+                }]
+            }
+        ], {
+            name: 'Styled Map'
         });
-        
-        // ret_data = $.ajax({
-        //     async: false,
-        //     url: '/cat/get-cat-json',
-        //     type: 'GET',
-        //     dataType: "JSON"
-        // }).responseJSON;
-        var map;
 
-        function initMap() {
- var styledMapType = new google.maps.StyledMapType(
-            [
-  {
-    "elementType": "geometry",
-    "stylers": [
-      {
-        "color": "#ebe3cd"
-      }
-    ]
-  },
-  {
-    "elementType": "labels.text.fill",
-    "stylers": [
-      {
-        "color": "#523735"
-      }
-    ]
-  },
-  {
-    "elementType": "labels.text.stroke",
-    "stylers": [
-      {
-        "color": "#f5f1e6"
-      }
-    ]
-  },
-  {
-    "featureType": "administrative",
-    "elementType": "geometry",
-    "stylers": [
-      {
-        "visibility": "off"
-      }
-    ]
-  },
-  {
-    "featureType": "administrative",
-    "elementType": "geometry.stroke",
-    "stylers": [
-      {
-        "color": "#c9b2a6"
-      }
-    ]
-  },
-  {
-    "featureType": "administrative.land_parcel",
-    "elementType": "geometry.stroke",
-    "stylers": [
-      {
-        "color": "#dcd2be"
-      },
-      {
-        "visibility": "off"
-      }
-    ]
-  },
-  {
-    "featureType": "administrative.land_parcel",
-    "elementType": "labels.text.fill",
-    "stylers": [
-      {
-        "color": "#ae9e90"
-      }
-    ]
-  },
-  {
-    "featureType": "landscape.natural",
-    "elementType": "geometry",
-    "stylers": [
-      {
-        "color": "#dfd2ae"
-      }
-    ]
-  },
-  {
-    "featureType": "poi",
-    "stylers": [
-      {
-        "visibility": "off"
-      }
-    ]
-  },
-  {
-    "featureType": "poi",
-    "elementType": "geometry",
-    "stylers": [
-      {
-        "color": "#dfd2ae"
-      }
-    ]
-  },
-  {
-    "featureType": "poi",
-    "elementType": "labels.text.fill",
-    "stylers": [
-      {
-        "color": "#93817c"
-      }
-    ]
-  },
-  {
-    "featureType": "poi.park",
-    "elementType": "geometry.fill",
-    "stylers": [
-      {
-        "color": "#a5b076"
-      }
-    ]
-  },
-  {
-    "featureType": "poi.park",
-    "elementType": "labels.text.fill",
-    "stylers": [
-      {
-        "color": "#447530"
-      }
-    ]
-  },
-  {
-    "featureType": "road",
-    "elementType": "geometry",
-    "stylers": [
-      {
-        "color": "#f5f1e6"
-      }
-    ]
-  },
-  {
-    "featureType": "road",
-    "elementType": "labels.icon",
-    "stylers": [
-      {
-        "visibility": "off"
-      }
-    ]
-  },
-  {
-    "featureType": "road.arterial",
-    "elementType": "geometry",
-    "stylers": [
-      {
-        "color": "#fdfcf8"
-      }
-    ]
-  },
-  {
-    "featureType": "road.highway",
-    "elementType": "geometry",
-    "stylers": [
-      {
-        "color": "#f8c967"
-      }
-    ]
-  },
-  {
-    "featureType": "road.highway",
-    "elementType": "geometry.stroke",
-    "stylers": [
-      {
-        "color": "#e9bc62"
-      }
-    ]
-  },
-  {
-    "featureType": "road.highway.controlled_access",
-    "elementType": "geometry",
-    "stylers": [
-      {
-        "color": "#e98d58"
-      }
-    ]
-  },
-  {
-    "featureType": "road.highway.controlled_access",
-    "elementType": "geometry.stroke",
-    "stylers": [
-      {
-        "color": "#db8555"
-      }
-    ]
-  },
-  {
-    "featureType": "road.local",
-    "elementType": "labels.text.fill",
-    "stylers": [
-      {
-        "color": "#806b63"
-      }
-    ]
-  },
-  {
-    "featureType": "transit",
-    "stylers": [
-      {
-        "visibility": "off"
-      }
-    ]
-  },
-  {
-    "featureType": "transit.line",
-    "elementType": "geometry",
-    "stylers": [
-      {
-        "color": "#dfd2ae"
-      }
-    ]
-  },
-  {
-    "featureType": "transit.line",
-    "elementType": "labels.text.fill",
-    "stylers": [
-      {
-        "color": "#8f7d77"
-      }
-    ]
-  },
-  {
-    "featureType": "transit.line",
-    "elementType": "labels.text.stroke",
-    "stylers": [
-      {
-        "color": "#ebe3cd"
-      }
-    ]
-  },
-  {
-    "featureType": "transit.station",
-    "elementType": "geometry",
-    "stylers": [
-      {
-        "color": "#dfd2ae"
-      }
-    ]
-  },
-  {
-    "featureType": "water",
-    "elementType": "geometry.fill",
-    "stylers": [
-      {
-        "color": "#b9d3c2"
-      }
-    ]
-  },
-  {
-    "featureType": "water",
-    "elementType": "labels.text.fill",
-    "stylers": [
-      {
-        "color": "#92998d"
-      }
-    ]
-  }
-],
-            {name: 'Styled Map'});
-
-            map = new google.maps.Map(document.getElementById('map'), {
-                center: {
+    map = new google.maps.Map(document.getElementById('map'), {
+        center: {
             lat: 12.844095,
             lng: 77.66556
-            },
-                zoom: 16,
-                mapTypeId: 'terrain',
- mapTypeControlOptions: {
+        },
+        zoom: 16,
+        // zoom: 12,
+        mapTypeId: 'terrain',
+        mapTypeControlOptions: {
             mapTypeIds: ['roadmap', 'satellite', 'hybrid', 'terrain',
-                    'styled_map']
-          }
-            });
+                'styled_map'
+            ]
+        }
+    });
 
- map.mapTypes.set('styled_map', styledMapType);
-        map.setMapTypeId('styled_map');
-            if(ret_data!=undefined){
-            var plot_data = ret_data['value']
+    map.mapTypes.set('styled_map', styledMapType);
+    map.setMapTypeId('styled_map');
 
-            var id, lat, long, _marker;
-            var _contentString, _infowindow;
+    var jqxhr = $.getJSON(window.location.origin + "/ui/assets/js/get-cat-json.json", function() {
+    // console.log( "success" );
+}).done(function(data) {
+    // console.log( "second success" , data);
+    ret_data = data;
+    sessionStorage.setItem('cat_data', JSON.stringify(data));
+    // console.log('sssssssssss', ret_data)
+});
 
-            _contentString = '<h6>' + rbccps_title + '</h6>'
+    // localStorage.setItem('cat_data', JSON.stringify(ret_data));
 
-            _infowindow = new google.maps.InfoWindow({
-                content: _contentString
-            });
+    var plot_data = JSON.parse(sessionStorage.getItem('cat_data'))['value'];
 
-            _marker = new google.maps.Marker({
-                position: rbccps_lat_lng,
-                map: map,
-                title: rbccps_title,
-                icon: rbc_marker_image,
-                zIndex: 1
-            });
+    // console.log('PPPPP', ret_data['value'])
+
+    // var plot_data = JSON.parse(localStorage.getItem('cat_data'))
+    // plot_data = plot_data['value']
+    var id, lat, long, _marker;
+    var _contentString, _infowindow;
+
+    _contentString = '<h6>' + rbccps_title + '</h6>'
+
+    _infowindow = new google.maps.InfoWindow({
+        content: _contentString
+    });
+
+    _marker = new google.maps.Marker({
+        position: rbccps_lat_lng,
+        map: map,
+        title: rbccps_title,
+        icon: rbc_marker_image,
+        zIndex: 1
+    });
 
 
-            _marker.addListener('click', function() {
-                _infowindow.open(map, _marker);
-            });
+    _marker.addListener('click', function() {
+        _infowindow.open(map, _marker);
+    });
 
 
-            var _id_selected;
-            var req_details = '<div class="row">' +
-                '<form id="form_' + id + '" class="col s12" onsubmit="return send_req_details(this)">' +
-                '<div class="row">' +
-                '<div class="input-field col s6" required>' +
-                '<input placeholder="" id="e_id" type="text" class="validate" name="e_id" value="wastemanagement">' +
-                '<label for="e_id">Entity-ID</label>' +
-                '</div>' +
-                '<div class="input-field col s6">'
-                //+'<input id="contact" type="number" class="validate" value="9916355644" name="contact_no" required>'
-                +
-                '<input id="contact" type="number" class="validate" value="9916355644" name="contact_no" required>' +
-                '<label for="contact">Contact Number</label>' +
-                '</div>' +
-                '</div>' +
-                '<div class="row">' +
-                '<div class="input-field col s12">'
-                //+'<input id="email" type="email" class="validate" value="swaminathanvasanth.r@gmail.com" name="email" required>'
-                +
-                '<input id="email" type="email" class="validate" value="vasanth.rajaraman@rbccps.org" name="email" required>' +
-                '<label for="email">Email</label>' +
-                '</div>' +
-                '</div>' +
-                '<div class="row">' +
-                '<div class="input-field col s6">' +
-                '<input placeholder="" id="req_id" type="text" class="validate" name="req_id" value="sirpianalyticsapp" required>' +
-                '<label for="req_id">Requester-ID</label>' +
-                '</div>' +
-                '<div class="input-field col s6">' +
-                '<input id="validity" type="number" class="validate" value="10" name="validity"required>' +
-                '<label for="vldty">Validity</label>' +
-                '</div>' +
-                '</div>' +
-                '<div class="row">' +
-                '<div class="input-field col s6">' +
-                '<p> Choose Validity Unit <br><br>\
+    var _id_selected;
+    var req_details = '<div class="row">' +
+        '<form id="form_' + id + '" class="col s12" onsubmit="return send_req_details(this)">' +
+        '<div class="row">' +
+        '<div class="input-field col s6" required>' +
+        '<input placeholder="" id="e_id" type="text" class="validate" name="e_id" value="wastemanagement">' +
+        '<label for="e_id">Entity-ID</label>' +
+        '</div>' +
+        '<div class="input-field col s6">'
+        //+'<input id="contact" type="number" class="validate" value="9916355644" name="contact_no" required>'
+        +
+        '<input id="contact" type="number" class="validate" value="9916355644" name="contact_no" required>' +
+        '<label for="contact">Contact Number</label>' +
+        '</div>' +
+        '</div>' +
+        '<div class="row">' +
+        '<div class="input-field col s12">'
+        //+'<input id="email" type="email" class="validate" value="swaminathanvasanth.r@gmail.com" name="email" required>'
+        +
+        '<input id="email" type="email" class="validate" value="vasanth.rajaraman@rbccps.org" name="email" required>' +
+        '<label for="email">Email</label>' +
+        '</div>' +
+        '</div>' +
+        '<div class="row">' +
+        '<div class="input-field col s6">' +
+        '<input placeholder="" id="req_id" type="text" class="validate" name="req_id" value="sirpianalyticsapp" required>' +
+        '<label for="req_id">Requester-ID</label>' +
+        '</div>' +
+        '<div class="input-field col s6">' +
+        '<input id="validity" type="number" class="validate" value="10" name="validity"required>' +
+        '<label for="vldty">Validity</label>' +
+        '</div>' +
+        '</div>' +
+        '<div class="row">' +
+        '<div class="input-field col s6">' +
+        '<p> Choose Validity Unit <br><br>\
     <label>\
       <input class="with-gap" name="validity_unit" type="radio" value="D" checked/>\
       <span>DAYS</span>\
@@ -836,11 +807,11 @@
       <span>YEARS</span>\
     </label>\
   </p>' +
-                '</div>'
+        '</div>'
 
-                +
-                '<div class="input-field col s6">' +
-                '<p> Choose Permission <br><br>\
+        +
+        '<div class="input-field col s6">' +
+        '<p> Choose Permission <br><br>\
     <label>\
       <input class="with-gap" name="permission" type="radio" value="read" checked/>\
       <span>READ</span>\
@@ -858,62 +829,61 @@
       <span>READ/WRITE</span>\
     </label>\
   </p>' +
-                '</div>' +
-                '</div>'
-                //+ '<button id="' + id + '_cancel" class="btn waves-effect waves-light">Cancel<i class="material-icons right">send</i></button>'
-                +
-                '<button id="' + id + '_submit" class="btn waves-effect waves-light" type="submit">Submit<i class="material-icons right">send</i></button>' +
-                '</form>' +
-                '</div>'
+        '</div>' +
+        '</div>'
+        //+ '<button id="' + id + '_cancel" class="btn waves-effect waves-light">Cancel<i class="material-icons right">send</i></button>'
+        +
+        '<button id="' + id + '_submit" class="btn waves-effect waves-light" type="submit">Submit<i class="material-icons right">send</i></button>' +
+        '</form>' +
+        '</div>'
 
-      var tags_dict={};
-            for (var i = 0; i < plot_data['items'].length; i++) {
-              console.log(i,plot_data['items'][i])
-                id = plot_data['items'][i]['id'];
-                lat = plot_data['items'][i]['latitude']
-                long = plot_data['items'][i]['longitude']
-                tags = plot_data['items'][i]['tags']
-                for(var index=0; index < tags.length; index++){
-      tags_dict[tags[index]]=null;
+    var tags_dict = {};
+    for (var i = 0; i < plot_data['items'].length; i++) {
+        id = plot_data['items'][i]['id'];
+        lat = plot_data['items'][i]['latitude']
+        long = plot_data['items'][i]['longitude']
+        tags = plot_data['items'][i]['tags']
+        for (var index = 0; index < tags.length; index++) {
+            tags_dict[tags[index]] = null;
+        }
+        //console.log(tags);
+        //console.log(id = plot_data['items'][i]['id']);
+        if (id != undefined && lat != undefined && long != undefined) {
+            var lat_lng = new google.maps.LatLng(lat['value'], long['value'])
+            // console.log(plot_data['items'][i]['id'], plot_data['items'][i]['latitude']['value'], plot_data['items'][i]['longitude']['value'])
+            // var contentString = '<h4>' + id + " | " + lat['value'] + "," + long['value'] + '</h4><a class="waves-effect waves-light btn">Follow</a>'
+            var contentString = '<a href=' + JSON.parse(sessionStorage.getItem('cat_data'))['url'] + '?id=' + id + ' target="_blank"><h5>' + id + '<i class="large material-icons"><h5>launch</h5></i></h5></a><div id="' + id + '_1"><strong>OWNER</strong>: ' +
+                plot_data['items'][i]['owner']['name'] + ' <br> <strong>WEBSITE</strong>: <a href="' + plot_data['items'][i]['owner']['website'] + '" target="_blank">' + plot_data['items'][i]['owner']['website'] + '</a><br><br>' +
+                '<button class="waves-effect waves-ligh btn" style="text.align:center;font-weight: bold; id="' + id + '_follow" onclick="load_form(\'' + id + '_2\')"">Follow  <i class="material-icons right">arrow_forward</i></button></div>' +
+                '<div id="' + id + '_2" style="display:none;"' + req_details + '</div>'
+            var infowindow = new google.maps.InfoWindow({
+                content: contentString
+            });
+
+            var marker = new google.maps.Marker({
+                position: lat_lng,
+                map: map,
+                title: id,
+                //    icon:marker_image,
+                icon: {
+                    url: getMarkerImage(tags),
+                    scaledSize: new google.maps.Size(35, 35)
+                },
+                zIndex: 1
+            });
+
+            google.maps.event.addListener(marker, 'click', (function(marker, content, infowindow) {
+                return function() {
+                    infowindow.setContent(content);
+                    infowindow.open(map, marker);
+                };
+            })(marker, contentString, infowindow));
+            //$('#'+id+'_2').hide();
+
+        }
     }
-                //console.log(tags);
-                //console.log(id = plot_data['items'][i]['id']);
-                if (id != undefined && lat != undefined && long != undefined) {
-                    var lat_lng = new google.maps.LatLng(lat['value'], long['value'])
-                    // console.log(plot_data['items'][i]['id'], plot_data['items'][i]['latitude']['value'], plot_data['items'][i]['longitude']['value'])
-                    // var contentString = '<h4>' + id + " | " + lat['value'] + "," + long['value'] + '</h4><a class="waves-effect waves-light btn">Follow</a>'
-                    var contentString = '<a href=' + ret_data['url'] + '?id=' + id + ' target="_blank"><h5>' + id + '<i class="large material-icons"><h5>launch</h5></i></h5></a><div id="' + id + '_1"><strong>OWNER</strong>: ' +
-                        plot_data['items'][i]['owner']['name'] + ' <br> <strong>WEBSITE</strong>: <a href="' + plot_data['items'][i]['owner']['website'] + '" target="_blank">' + plot_data['items'][i]['owner']['website'] + '</a><br><br>' +
-                        '<button class="waves-effect waves-ligh btn" style="text.align:center;font-weight: bold; id="' + id + '_follow" onclick="load_form(\'' + id + '_2\')"">Follow  <i class="material-icons right">arrow_forward</i></button></div>' +
-                        '<div id="' + id + '_2" style="display:none;"' + req_details + '</div>'
-                    var infowindow = new google.maps.InfoWindow({
-                        content: contentString
-                    });
 
-                    var marker = new google.maps.Marker({
-                        position: lat_lng,
-                        map: map,
-                        title: id,
-                        //    icon:marker_image,
-                        icon: {
-                            url: getMarkerImage(tags),
-                            scaledSize: new google.maps.Size(35, 35)
-                        },
-                        zIndex: 1
-                    });
-
-                    google.maps.event.addListener(marker, 'click', (function(marker, content, infowindow) {
-                        return function() {
-                            infowindow.setContent(content);
-                            infowindow.open(map, marker);
-                        };
-                    })(marker, contentString, infowindow));
-                    //$('#'+id+'_2').hide();
-
-                }
-            }
-          //console.log(tags_dict);
-            var legend = document.getElementById('legend');
+    var legend = document.getElementById('legend');
             var flag = false;
             for (var key in legends) {
                 var name = key;
@@ -930,19 +900,16 @@
                 legend.appendChild(div);
             }
 
-            map.controls[google.maps.ControlPosition.RIGHT_BOTTOM].push(legend);
+    map.controls[google.maps.ControlPosition.RIGHT_BOTTOM].push(legend);
 
 
-            // // Create the search box and link it to the UI element.
-            //   var input = document.getElementById('pac-input');
-            //   var searchBox = new google.maps.places.SearchBox(input);
-            //   map.controls[google.maps.ControlPosition.TOP_LEFT].push(input);
+    // // Create the search box and link it to the UI element.
+    //   var input = document.getElementById('pac-input');
+    //   var searchBox = new google.maps.places.SearchBox(input);
+    //   map.controls[google.maps.ControlPosition.TOP_LEFT].push(input);
 
-        }
-        }
-
-
-    </script>
+}
+  </script>
 </body>
 
 </html>

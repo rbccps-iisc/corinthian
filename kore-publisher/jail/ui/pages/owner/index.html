@@ -274,7 +274,10 @@
         <div class="col">
           <div class="card shadow">
             <div class="card-header border-0">
-              <h3 class="mb-0">Entities registered</h3>
+              <h3 class="mb-0">Entities registered </h3>
+              
+              <span id="alert_message"></span> 
+
             </div>
             <div class="table-responsive">
               <table class="table align-items-center table-flush">
@@ -306,7 +309,7 @@
                       <!-- Button trigger modal -->
                       <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#reset_passwd_modal{{x.index}}
                       ">
-                        Reset Password 
+                        Reset Password  | <i class="fas fa-key"></i>
                       </button>
 
                       <!-- Modal -->
@@ -314,7 +317,7 @@
                         <div class="modal-dialog modal-dialog-centered" role="document">
                           <div class="modal-content">
                             <div class="modal-header">
-                              <h5 class="modal-title" id="exampleModalLabel+{{x.ent}}">Reset Password</h5>
+                              <h5 class="modal-title" id="exampleModalLabel{{x.ent}}">Reset Password</h5>
                               <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                                 <span aria-hidden="true">&times;</span>
                               </button>
@@ -323,8 +326,8 @@
                               Are you sure you want to reset the password for <strong>{{x.ent}}</strong>?
                             </div>
                             <div class="modal-footer">
-                              <button type="button" class="btn btn-secondary" data-dismiss="modal">No</button>
-                              <button type="button" class="btn btn-primary" ng-click="entity_reset_password('{{x.ent}}')">Yes</button>
+                              <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
+                              <button type="button" class="btn btn-primary" ng-click="entity_reset_password('{{x.ent}}')"><i class="fas fa-thumbs-up"></i></button>
                             </div>
                           </div>
                         </div>
@@ -333,7 +336,7 @@
                       <td>
                       <!-- Button trigger modal -->
                       <button type="button" class="btn btn-default" data-toggle="modal" data-target="#block_modal{{x.index}}">
-                        Block
+                        Block | <i class="fas fa-ban"></i>
                       </button>
 
                       <!-- Modal -->
@@ -341,7 +344,7 @@
                         <div class="modal-dialog modal-dialog-centered" role="document">
                           <div class="modal-content">
                             <div class="modal-header">
-                              <h5 class="modal-title" id="block_modal_label++{{x.ent}}">Block Entity</h5>
+                              <h5 class="modal-title" id="block_modal_label{{x.ent}}">Block Entity</h5>
                               <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                                 <span aria-hidden="true">&times;</span>
                               </button>
@@ -350,8 +353,8 @@
                               Are you sure you want to block <strong>{{x.ent}}</strong>?
                             </div>
                             <div class="modal-footer">
-                              <button type="button" class="btn btn-secondary" data-dismiss="modal">No</button>
-                              <button type="button" class="btn btn-default"  ng-click="entity_block(this.x, '{{x.index}}')">Yes</button>
+                              <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
+                              <button type="button" class="btn btn-default"  ng-click="entity_block(this.x, '{{x.index}}')"><i class="fas fa-thumbs-up"></i></button>
                             </div>
                           </div>
                         </div>
@@ -360,7 +363,7 @@
                     <td>
                       <!-- Button trigger modal -->
                       <button type="button" class="btn btn-outline-default" data-toggle="modal" data-target="#unblock_modal{{x.index}}">
-                        UnBlock
+                        UnBlock | <i class="far fa-circle"></i>
                       </button>
 
                       <!-- Modal -->
@@ -368,7 +371,7 @@
                         <div class="modal-dialog modal-dialog-centered" role="document">
                           <div class="modal-content">
                             <div class="modal-header">
-                              <h5 class="modal-title" id="unblock_modal_label++{{x.ent}}">Block Entity</h5>
+                              <h5 class="modal-title" id="unblock_modal_label{{x.ent}}">Block Entity</h5>
                               <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                                 <span aria-hidden="true">&times;</span>
                               </button>
@@ -377,8 +380,8 @@
                               Are you sure you want to unblock <strong>{{x.ent}}</strong>?
                             </div>
                             <div class="modal-footer">
-                              <button type="button" class="btn btn-secondary" data-dismiss="modal">No</button>
-                              <button type="button" class="btn btn-outline-default"  ng-click="entity_unblock(this.x, '{{x.index}}')">Yes</button>
+                              <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
+                              <button type="button" class="btn btn-outline-default"  ng-click="entity_unblock(this.x, '{{x.index}}')"><i class="fas fa-thumbs-up"></i></button>
                             </div>
                           </div>
                         </div>
@@ -387,7 +390,7 @@
                       <td>
                       <!-- Button trigger modal -->
                       <button type="button" class="btn btn-danger" data-toggle="modal" data-target="#delete_modal{{x.index}}">
-                        Delete
+                        Delete | <i class="far fa-trash-alt"></i>
                       </button>
 
                       <!-- Modal -->
@@ -395,7 +398,7 @@
                         <div class="modal-dialog modal-dialog-centered" role="document">
                           <div class="modal-content">
                             <div class="modal-header">
-                              <h5 class="modal-title" id="delete_modal_label+{{x.ent}}">Delete Entity</h5>
+                              <h5 class="modal-title" id="delete_modal_label{{x.ent}}">Delete Entity</h5>
                               <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                                 <span aria-hidden="true">&times;</span>
                               </button>
@@ -404,8 +407,8 @@
                               Are you sure you want to delete <strong>{{x.ent}}</strong>?
                             </div>
                             <div class="modal-footer">
-                              <button type="button" class="btn btn-secondary" data-dismiss="modal">No</button>
-                              <button type="button" class="btn btn-danger" ng-click="entity_delete(this.x, '{{x.index}}')">Yes</button>
+                              <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
+                              <button type="button" class="btn btn-danger" ng-click="entity_delete(this.x, '{{x.index}}')"><i class="fas fa-thumbs-up"></i></button>
                             </div>
                           </div>
                         </div>
