@@ -286,8 +286,8 @@ done:
 		sleep (1);
 	}
 
-	return NULL;
 */
+	return NULL;
 }
 
 int
@@ -1420,12 +1420,46 @@ reset_apikey (struct http_request *req)
 		"inputs missing in headers"
 	);
 
-	// only the owner or the admin can reset apikey
-	if (! looks_like_a_valid_owner(id))
+/////////////////////////////////////////////////
+
+	if (! is_string_safe(entity))
+		FORBIDDEN("invalid entity");
+
+	// either "id" should be owner of the "entity", or an "admin" 
+	if (strcmp(id,"admin") == 0)
 	{
-		if (strcmp(id,"admin") != 0)
-			FORBIDDEN("unauthorized");
+		/* if (! is_request_from_localhost(req))
+			FORBIDDEN("admin can only use from localhost"); */
 	}
+	else
+	{
+		if (! is_owner(id,entity))
+			FORBIDDEN("you are not the owner of the entity");
+	}
+
+	if (! login_success(id,apikey,NULL))
+		FORBIDDEN("invalid id or apikey");
+
+/////////////////////////////////////////////////
+
+	gen_salt_password_and_apikey (entity, salt, password_hash, entity_apikey);
+
+	CREATE_STRING (query,
+		"UPDATE users SET password='%s', salt='%s' WHERE id='%s'",
+			password_hash,
+			salt,
+			entity
+	);
+
+	// generate response
+	kore_buf_reset(response);
+	kore_buf_appendf (response,
+		"{\"id\":\"%s\",\"apikey\":\"%s\"}\n",
+			entity,
+			entity_apikey
+	);
+
+	RUN_QUERY (query,"failed to reset the apikey");
 
 	OK();
 
@@ -1473,11 +1507,16 @@ set_autonomous(struct http_request *req)
 	if (! is_string_safe(entity))
 		FORBIDDEN("invalid entity");
 
-	// only the owner or the admin can set autonomous 
-	if (! is_owner(id,entity))
+	// either "id" should be owner of the "entity", or an "admin" 
+	if (strcmp(id,"admin") == 0)
 	{
-		if (strcmp(id,"admin") != 0)
-			FORBIDDEN("unauthorized");
+		/* if (! is_request_from_localhost(req))
+			FORBIDDEN("admin can only use from localhost"); */
+	}
+	else
+	{
+		if (! is_owner(id,entity))
+			FORBIDDEN("you are not the owner of the entity");
 	}
 
 	if (! login_success(id,apikey,NULL))
@@ -3702,11 +3741,11 @@ void *
 create_exchanges_and_queues (void *v)
 {
 	int i;
-	int my_tries;
 
 	const char *id = (const char *)v;
 
 	// local variables
+	// int my_tries;
 	char my_queue	[129];
 	char my_exchange[129];
 
