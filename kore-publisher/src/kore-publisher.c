@@ -1425,6 +1425,9 @@ reset_apikey (struct http_request *req)
 	if (! is_string_safe(entity))
 		FORBIDDEN("invalid entity");
 
+	if (! looks_like_a_valid_entity(entity))
+		FORBIDDEN("entity is not valid");
+
 	// either "id" should be owner of the "entity", or an "admin" 
 	if (strcmp(id,"admin") == 0)
 	{
@@ -1475,6 +1478,8 @@ set_autonomous(struct http_request *req)
 	const char *entity;
 	const char *str_is_autonomous;
 
+	req->status = 403;
+
 	BAD_REQUEST_if
 	(
 		KORE_RESULT_OK != http_request_header(req, "id", &id)
@@ -1506,6 +1511,9 @@ set_autonomous(struct http_request *req)
 
 	if (! is_string_safe(entity))
 		FORBIDDEN("invalid entity");
+
+	if (! looks_like_a_valid_entity(entity))
+		FORBIDDEN("entity is not valid");
 
 	// either "id" should be owner of the "entity", or an "admin" 
 	if (strcmp(id,"admin") == 0)
