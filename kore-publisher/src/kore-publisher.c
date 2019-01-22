@@ -1423,6 +1423,9 @@ reset_apikey (struct http_request *req)
 
 /////////////////////////////////////////////////
 
+	if (! looks_like_a_valid_owner(id))
+		FORBIDDEN("id is not valid");
+
 	if (! is_string_safe(entity))
 		FORBIDDEN("invalid entity");
 
@@ -1509,6 +1512,9 @@ set_autonomous(struct http_request *req)
 	}
 
 /////////////////////////////////////////////////
+
+	if (! looks_like_a_valid_owner(id))
+		FORBIDDEN("id is not valid");
 
 	if (! is_string_safe(entity))
 		FORBIDDEN("invalid entity");
