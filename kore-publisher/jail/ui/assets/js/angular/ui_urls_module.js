@@ -6,7 +6,7 @@ const api = {
 		"deregister-owner": "/admin/deregister-owner",
 		"block": "/admin/block",
 		"unblock": "/admin/unblock",
-		"login": "/admin/owner"
+		"login": "/admin/owners"
 	},
 	"owner": {
 		"follow": "/owner/follow",
