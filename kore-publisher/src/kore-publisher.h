@@ -99,21 +99,21 @@ int db_cleanup		(struct http_request *);
 
 ///////////////////////////////////////////////////////////
 
-int init (int);
+int init 		(int);
+void init_admin_conn 	(void);
 
-void init_admin_conn (void);
+bool login_success 		(const char *, const char *, bool *);
+bool async_login_success 	(const char *, const char *, bool *);
 
 void gen_salt_password_and_apikey (const char *, char *, char *, char *);
+bool check_acl 			  (const char *, const char *, const char *);
 
-bool login_success (const char *, const char *, bool *);
-bool check_acl(const char *id, const char *exchange, const char *permission);
+bool looks_like_a_valid_owner		(const char *str);
+bool looks_like_a_valid_entity 		(const char *str);
+bool looks_like_a_valid_resource	(const char *str);
 
-bool looks_like_a_valid_owner	(const char *str);
-bool looks_like_a_valid_entity 	(const char *str);
-bool looks_like_a_valid_resource(const char *str);
-
-bool is_alpha_numeric 	(const char *str);
-bool is_owner		(const char *, const char *);
+bool is_alpha_numeric 			(const char *str);
+bool is_owner				(const char *, const char *);
 
 // threads
 void *async_publish_function		(void *);
@@ -123,7 +123,6 @@ void *delete_exchanges_and_queues 	(void *);
 bool is_string_safe 	(const char *str);
 void string_to_lower 	(const char *str);
 void json_sanitize 	(const char *str);
-
 
 bool is_request_from_localhost (struct http_request *);
 
