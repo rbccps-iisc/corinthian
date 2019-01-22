@@ -104,7 +104,7 @@ pthread_t 	async_thread	[MAX_ASYNC_THREADS];
 bool admin_conn_open = false;
 
 void
-init_admin_conn ()
+init_admin_conn (void)
 {
 	if (admin_conn_open)
 	{
@@ -2183,6 +2183,70 @@ done:
 		}
 	}
 
+	END();
+}
+
+int
+get_owners(struct http_request *req)
+{
+	int i;
+
+	const char *id;
+	const char *apikey;
+
+	req->status = 403;
+
+	BAD_REQUEST_if
+	(
+		KORE_RESULT_OK != http_request_header(req, "id", &id)
+				||
+		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+			,
+		"inputs missing in headers"
+	);
+
+
+/////////////////////////////////////////////////
+
+	if (strcmp(id,"admin") != 0)
+		FORBIDDEN("unauthorized");
+
+	/* if (! is_request_from_localhost(req))
+		FORBIDDEN("admin can only use from localhost"); */
+
+	if (! login_success(id,apikey,NULL))
+		FORBIDDEN("invalid id or apikey");
+
+/////////////////////////////////////////////////
+
+	CREATE_STRING (query, "SELECT id FROM users WHERE id NOT LIKE '%%/%%'");
+	RUN_QUERY(query,"failed to query user table");
+
+	int num_rows = kore_pgsql_ntuples(&sql);
+
+	kore_buf_reset(response);
+	kore_buf_append(response,"[",1);
+
+	for (i = 0; i < num_rows; ++i)
+	{
+		kore_buf_appendf (
+			response,
+				"\"%s\",",
+				response,kore_pgsql_getvalue(&sql,i,0)
+		);
+	}
+
+	if (num_rows > 0)
+	{
+		// remove the last COMMA 
+		--(response->offset);
+	}
+
+	kore_buf_append(response,"]",1);
+
+	OK();
+
+done:
 	END();
 }
 

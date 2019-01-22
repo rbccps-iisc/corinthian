@@ -71,6 +71,9 @@ int register_entity	(struct http_request *);
 int deregister_entity	(struct http_request *);
 int set_autonomous	(struct http_request *);
 
+int reset_apikey	(struct http_request *);
+
+int get_owners		(struct http_request *);
 int register_owner 	(struct http_request *);
 int deregister_owner 	(struct http_request *);
 
@@ -98,7 +101,7 @@ int db_cleanup		(struct http_request *);
 
 int init (int);
 
-void init_admin_conn ();
+void init_admin_conn (void);
 
 void gen_salt_password_and_apikey (const char *, char *, char *, char *);
 
