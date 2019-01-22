@@ -2251,7 +2251,7 @@ get_owners(struct http_request *req)
 		kore_buf_appendf (
 			response,
 				"\"%s\",",
-				response,kore_pgsql_getvalue(&sql,i,0)
+				kore_pgsql_getvalue(&sql,i,0)
 		);
 	}
 
