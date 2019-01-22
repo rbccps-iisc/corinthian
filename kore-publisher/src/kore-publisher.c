@@ -1449,7 +1449,7 @@ reset_apikey (struct http_request *req)
 	gen_salt_password_and_apikey (entity, salt, password_hash, entity_apikey);
 
 	CREATE_STRING (query,
-		"UPDATE users SET password='%s', salt='%s' WHERE id='%s'",
+		"UPDATE users SET password_hash='%s', salt='%s' WHERE id='%s'",
 			password_hash,
 			salt,
 			entity
