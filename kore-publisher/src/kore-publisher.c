@@ -104,7 +104,7 @@ pthread_t 	async_thread	[MAX_ASYNC_THREADS];
 bool admin_conn_open = false;
 
 void
-init_admin_conn ()
+init_admin_conn (void)
 {
 	if (admin_conn_open)
 	{
@@ -166,8 +166,10 @@ init_admin_conn ()
 void*
 async_publish_function (void *v)
 {
-/*
 	// XXX: this api is not tested and must not be used
+
+	return NULL;
+#if 0
 
 	Q *q = (Q *)v;
 
@@ -285,9 +287,7 @@ done:
 
 		sleep (1);
 	}
-
-*/
-	return NULL;
+#endif
 }
 
 int
@@ -417,7 +417,7 @@ is_alpha_numeric (const char *str)
 {
 	size_t len = 0;
 
-	char *p = str;
+	const char *p = str;
 
 	while (*p)
 	{
@@ -435,7 +435,7 @@ is_alpha_numeric (const char *str)
 		++p;
 		++len;
 
-		if (len  > MAX_LEN_OWNER_ID)
+		if (len > MAX_LEN_OWNER_ID)
 			return false;
 	}
 
@@ -473,7 +473,7 @@ looks_like_a_valid_entity (const char *str)
 
 	uint8_t front_slash_count = 0;
 
-	char *p = str;
+	const char *p = str;
 
 	while (*p)
 	{
@@ -514,7 +514,7 @@ looks_like_a_valid_resource (const char *str)
 	uint8_t dot_count 		= 0;
 	uint8_t front_slash_count 	= 0;
 
-	char *p = str;
+	const char *p = str;
 
 	while (*p)
 	{
@@ -551,7 +551,7 @@ looks_like_a_valid_resource (const char *str)
 	if ( (front_slash_count != 1) || (dot_count > 1) ) {
 		return false;
 	}
-  	   
+
 	return true;
 }
 
@@ -727,7 +727,7 @@ done:
 bool
 async_login_success (const char *id, const char *apikey, bool *is_autonomous)
 {
-/*
+#if 0
 	char *salt;
 	char *password_hash;
 	char *str_is_autonomous;
@@ -833,7 +833,8 @@ done:
 	kore_pgsql_cleanup(&async_sql);
 
 	return login_result;
-*/
+#endif
+
 	return false;
 }
 
@@ -989,7 +990,7 @@ publish (struct http_request *req)
 			*cached_conn,
 			1,
 			amqp_cstring_bytes(exchange),
-        		amqp_cstring_bytes(topic_to_publish),
+			amqp_cstring_bytes(topic_to_publish),
 			0,
 			0,
 			&props,
@@ -1020,8 +1021,7 @@ done:
 int
 publish_async (struct http_request *req)
 {
-
-/*
+#if 0
 	const char *id;
 	const char *apikey;
 	const char *to;
@@ -1137,7 +1137,8 @@ done:
 		}
 	}
 
-*/
+#endif
+
 	OK();
 done:
 	END();
@@ -1280,8 +1281,8 @@ subscribe (struct http_request *req)
 		
 		} while	(
 			(res.reply_type == AMQP_RESPONSE_NORMAL) 	&&
-           		(res.reply.id 	== AMQP_BASIC_GET_EMPTY_METHOD) &&
-           		((time(NULL) - start_time) < 1)
+			(res.reply.id 	== AMQP_BASIC_GET_EMPTY_METHOD) &&
+			((time(NULL) - start_time) < 1)
 		);
 
 
@@ -1295,7 +1296,7 @@ subscribe (struct http_request *req)
 			break;
 
 		amqp_basic_get_ok_t *header = (amqp_basic_get_ok_t *) res.reply.decoded;
-         
+
 		amqp_read_message(*cached_conn, 1, &message, 0);
 
 		/* construct the response */
@@ -1422,6 +1423,9 @@ reset_apikey (struct http_request *req)
 
 /////////////////////////////////////////////////
 
+	if (! looks_like_a_valid_owner(id))
+		FORBIDDEN("id is not valid");
+
 	if (! is_string_safe(entity))
 		FORBIDDEN("invalid entity");
 
@@ -1448,7 +1452,7 @@ reset_apikey (struct http_request *req)
 	gen_salt_password_and_apikey (entity, salt, password_hash, entity_apikey);
 
 	CREATE_STRING (query,
-		"UPDATE users SET password='%s', salt='%s' WHERE id='%s'",
+		"UPDATE users SET password_hash='%s', salt='%s' WHERE id='%s'",
 			password_hash,
 			salt,
 			entity
@@ -1508,6 +1512,9 @@ set_autonomous(struct http_request *req)
 	}
 
 /////////////////////////////////////////////////
+
+	if (! looks_like_a_valid_owner(id))
+		FORBIDDEN("id is not valid");
 
 	if (! is_string_safe(entity))
 		FORBIDDEN("invalid entity");
@@ -1652,12 +1659,24 @@ register_entity (struct http_request *req)
 
 		kore_pgsql_cleanup(&sql);
 		kore_pgsql_init(&sql);
+
 		if (! kore_pgsql_setup(&sql,"db",KORE_PGSQL_SYNC))
 		{
 			kore_pgsql_logerror(&sql);
 			ERROR("DB error while setup");
 		}
-		if (! kore_pgsql_query_params (&sql,query->data,0,1,body,req->http_body_length,0))
+
+		if ( 
+			! kore_pgsql_query_params (
+				&sql,
+				(char *)query->data,
+				0,
+				1,
+				body,
+				req->http_body_length,
+				0
+			)
+		)
 		{
 			kore_pgsql_logerror(&sql);
 			ERROR("failed to create the entity with schema");
@@ -2187,6 +2206,70 @@ done:
 }
 
 int
+get_owners(struct http_request *req)
+{
+	int i;
+
+	const char *id;
+	const char *apikey;
+
+	req->status = 403;
+
+	BAD_REQUEST_if
+	(
+		KORE_RESULT_OK != http_request_header(req, "id", &id)
+				||
+		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+			,
+		"inputs missing in headers"
+	);
+
+
+/////////////////////////////////////////////////
+
+	if (strcmp(id,"admin") != 0)
+		FORBIDDEN("unauthorized");
+
+	/* if (! is_request_from_localhost(req))
+		FORBIDDEN("admin can only use from localhost"); */
+
+	if (! login_success(id,apikey,NULL))
+		FORBIDDEN("invalid id or apikey");
+
+/////////////////////////////////////////////////
+
+	CREATE_STRING (query, "SELECT id FROM users WHERE id NOT LIKE '%%/%%'");
+	RUN_QUERY(query,"failed to query user table");
+
+	int num_rows = kore_pgsql_ntuples(&sql);
+
+	kore_buf_reset(response);
+	kore_buf_append(response,"[",1);
+
+	for (i = 0; i < num_rows; ++i)
+	{
+		kore_buf_appendf (
+			response,
+				"\"%s\",",
+				response,kore_pgsql_getvalue(&sql,i,0)
+		);
+	}
+
+	if (num_rows > 0)
+	{
+		// remove the last COMMA 
+		--(response->offset);
+	}
+
+	kore_buf_append(response,"]",1);
+
+	OK();
+
+done:
+	END();
+}
+
+int
 queue_bind (struct http_request *req)
 {
 	const char *id;
@@ -2195,7 +2278,7 @@ queue_bind (struct http_request *req)
 	const char *to;
 	const char *from;
 
-        const char *topic;
+	const char *topic;
 	const char *message_type;
 	const char *is_priority;
 
@@ -2364,7 +2447,7 @@ queue_unbind (struct http_request *req)
 	const char *to;
 	const char *from;
 
-        const char *topic;
+	const char *topic;
 	const char *message_type;
 	const char *is_priority;
 
@@ -2778,7 +2861,7 @@ follow (struct http_request *req)
 			snprintf (exchange, 129, "%s.notification",to);
 		else
 		{
-			char *_owner = strtok(to,"/");
+			char *_owner = strtok((char *)to,"/");
 			snprintf (exchange, 129, "%s.notification",_owner);
 		}
 
@@ -2796,7 +2879,7 @@ follow (struct http_request *req)
 				admin_conn,
 				1,
 				amqp_cstring_bytes(exchange),
-        			amqp_cstring_bytes(subject),
+				amqp_cstring_bytes(subject),
 				0,
 				0,
 				&props,
@@ -3184,7 +3267,7 @@ share (struct http_request *req)
 	CREATE_STRING (query,
 		"INSERT INTO acl (acl_id,from_id,exchange,follow_id,permission,topic,valid_till) "
 		"VALUES(DEFAULT,'%s','%s','%s','%s','%s',now() + interval '%s hours')",
-	        	from_id,
+			from_id,
 			my_exchange,
 			follow_id,
 			permission,
@@ -3258,7 +3341,7 @@ share (struct http_request *req)
 	char *subject = "Approved follow request";
 
 	char message[1025];
-	snprintf(message,  1025, "'%s' has approved follow request for '%s' access on '%s'",id,permission,bind_exchange);
+	snprintf(message, 1025, "'%s' has approved follow request for '%s' access on '%s'",id,permission,bind_exchange);
 
 	props.user_id 		= amqp_cstring_bytes("admin");
 	props.content_type 	= amqp_cstring_bytes("text/plain");
@@ -3269,7 +3352,7 @@ share (struct http_request *req)
 			admin_conn,
 			1,
 			amqp_cstring_bytes(exchange),
-        		amqp_cstring_bytes(subject),
+			amqp_cstring_bytes(subject),
 			0,
 			0,
 			&props,
@@ -4092,7 +4175,7 @@ is_string_safe (const char *string)
 	size_t len = 0;
 
 	// string should not be NULL. let it crash if it is 
-	const char *p = (char *)string;
+	const char *p = string;
 
 	// assumption is that 'string' is in single quotes
 
@@ -4176,135 +4259,4 @@ string_to_lower (const char *str)
 
 		++p;
 	}
-}
-
-int
-ui_admin (struct http_request *req)
-{
-	const char *id 		= NULL;
-	const char *apikey	= NULL;
-
-	req->status = 403;
-
-	http_populate_post(req);
-
-	// TODO: check captcha 
-
-	if (
-		(! http_argument_get_string(req,"id",&id))
-			||
-		(! http_argument_get_string(req,"apikey",&apikey))
-	)
-	{
-		REDIRECT("/ui?");
-	}
-
-/////////////////////////////////////////////////
-
-	if (strcmp(id,"admin") != 0)
-		REDIRECT("/ui?");
-
-	if (! login_success("admin",apikey,NULL))
-		REDIRECT("/ui?");
-
-/////////////////////////////////////////////////
-	
-	kore_buf_reset(response);
-	kore_buf_append(response,asset_ADMIN_ui_1_html,asset_len_ADMIN_ui_1_html);
-	kore_buf_appendf(response,"<script language=javascript>var id='%s',apikey='%s';</script>",id,apikey);
-	kore_buf_append(response,asset_ADMIN_ui_2_html,asset_len_ADMIN_ui_2_html);
-	
-	OK();
-
-done:
-	END_HTML();
-}
-
-int
-ui_owner (struct http_request *req)
-{
-	const char *id 		= NULL;
-	const char *apikey	= NULL;
-
-	req->status = 403;
-
-	http_populate_post(req);
-
-	// TODO: check captcha 
-
-	if (
-		(! http_argument_get_string(req,"id",&id))
-			||
-		(! http_argument_get_string(req,"apikey",&apikey))
-	)
-	{
-		REDIRECT("/ui?");
-	}
-
-/////////////////////////////////////////////////
-
-	if (! looks_like_a_valid_owner(id))
-		REDIRECT("/ui?");
-
-	if (! login_success(id,apikey,NULL))
-		REDIRECT("/ui?");
-
-/////////////////////////////////////////////////
-
-	kore_buf_reset(response);
-	kore_buf_append(response,asset_OWNER_ui_1_html,asset_len_OWNER_ui_1_html);
-	kore_buf_appendf(response,"<script language=javascript>var id='%s',apikey='%s';</script>",id,apikey);
-	kore_buf_append(response,asset_OWNER_ui_2_html,asset_len_OWNER_ui_2_html);
-	
-	OK();
-
-done:
-	END_HTML();
-}
-
-int
-ui_entity (struct http_request *req)
-{
-	const char *id 		= NULL;
-	const char *apikey	= NULL;
-
-	req->status = 403;
-
-	http_populate_post(req);
-
-	// TODO: check captcha 
-
-	if (
-		(! http_argument_get_string(req,"id",&id))
-			||
-		(! http_argument_get_string(req,"apikey",&apikey))
-	)
-	{
-		REDIRECT("/ui?");
-	}
-
-/////////////////////////////////////////////////
-
-	if (! looks_like_a_valid_entity(id))
-		REDIRECT("/ui?");
-
-	bool is_autonomous = false;
-
-	if (! login_success(id,apikey, &is_autonomous))
-		REDIRECT("/ui?");
-
-	if (! is_autonomous)
-		REDIRECT("/ui?");
-
-/////////////////////////////////////////////////
-
-	kore_buf_reset(response);
-	kore_buf_append(response,asset_ENTITY_ui_1_html,asset_len_ENTITY_ui_1_html);
-	kore_buf_appendf(response,"<script language=javascript>var id='%s',apikey='%s';</script>",id,apikey);
-	kore_buf_append(response,asset_ENTITY_ui_2_html,asset_len_ENTITY_ui_2_html);
-	
-	OK();
-
-done:
-	END_HTML();
 }
