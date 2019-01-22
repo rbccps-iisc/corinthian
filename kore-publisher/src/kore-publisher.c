@@ -3678,6 +3678,9 @@ block (struct http_request *req)
 	if (! is_string_safe(entity))
 		FORBIDDEN("invalid entity");
 
+	if (strcmp(id,entity) == 0)
+		FORBIDDEN("cannot block yourself");
+
 	if (! login_success(id,apikey,NULL))
 		FORBIDDEN("invalid id or apikey");
 
