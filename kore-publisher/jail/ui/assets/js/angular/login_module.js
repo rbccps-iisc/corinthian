@@ -26,13 +26,14 @@ login.controller('loginCtrl', function($scope, $http, origin, api){
 				  // Save user credentials to sessionStorage
 				  sessionStorage.setItem("id", _ID);
 				  sessionStorage.setItem("apikey", _APIKEY);
+				  sessionStorage.setItem("role", _ROLE);
 				  var _data = [];
 				  var ent_dic;
 				  for(var i in response.data){
-				  	ent_dic = {'ent':Object.keys(response.data[i])[0], 'is_autonomous':Object.values(response.data[i])[0], 'index': i};
+				  	ent_dic = {'ent':Object.keys(response.data[i])[0], 'is_autonomous':Object.values(response.data[i])[0], 'index': Object.keys(response.data[i])[0].replace("/","_")};
 				  	_data.push(ent_dic);
 				  }
-				  
+				  console.log(response);
 				  localStorage.setItem("data", JSON.stringify(_data));
 				  window.location = location.origin + "/ui/pages/"+_ROLE;
 				} else {

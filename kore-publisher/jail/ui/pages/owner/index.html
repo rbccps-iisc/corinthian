@@ -303,7 +303,7 @@
                   </tr>
                 </thead>
                 <tbody id="entity_list">
-                     <tr ng-repeat="x in data | orderBy:'-'" id="{{x.index}}">
+                     <tr ng-repeat="x in data | orderBy:'-' track by $index" id="{{x.index}}">
                     <th scope="row">
                       <div class="media align-items-center">
                         <a href="#" class="avatar rounded-circle mr-3">
@@ -417,7 +417,7 @@
                             </div>
                             <div class="modal-footer">
                               <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
-                              <button type="button" class="btn btn-danger" ng-click="entity_delete(this.x, '{{x.index}}')"><i class="fas fa-thumbs-up"></i></button>
+                              <button type="button" class="btn btn-danger" ng-click="entity_delete(x.ent, x.index)"><i class="fas fa-thumbs-up"></i></button>
                             </div>
                           </div>
                         </div>

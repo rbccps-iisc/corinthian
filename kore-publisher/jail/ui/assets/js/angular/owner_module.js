@@ -1,49 +1,60 @@
 const owner = angular.module("owner", ['session_checker', 'footer', 'logout', 'ui_urls', 'owner_sidebar']);
 
 var d;
+var SCOPE;
 
-owner.controller('ownerCtrl', function($scope, $http){
+owner.controller('ownerCtrl', function($scope, $compile, $http){
     $scope.brand = "IUDX";
     $scope.brand_full_form = "Indian Urban Data Exchange";
     $scope.navbar_links = [
-    	{"text":"Link-1","href":"#", "legend":"planet"},
-    	{"text":"Link-2","href":"#", "legend":"compass-04"},
-    	{"text":"Link-3","href":"#", "legend":"diamond"}
+      {"text":"Link-1","href":"#", "legend":"planet"},
+      {"text":"Link-2","href":"#", "legend":"compass-04"},
+      {"text":"Link-3","href":"#", "legend":"diamond"}
     ];
    
     $scope.data = JSON.parse(localStorage.getItem('data'));    
     $scope.id = sessionStorage.getItem('id');
     $scope.apikey = sessionStorage.getItem('apikey');
     d=$scope.data
+
+    SCOPE = $scope;
+    $scope.compile_and_prepend = function (elem_from, elem_to) {
+        var content = $compile(angular.element(elem_from))($scope);
+        angular.element(elem_to).prepend(content);
+    }
     
     // ADD/Register Entity
     $scope.addEntity=function(){
-    	$http({
-			    method: 'POST',
-			    url: api['owner']['register-entity'],
-			    headers: {
-			        'id': $scope.id,
-			        'apikey': $scope.apikey,
-			        'entity': $scope.entity_name,
-			        'is-autonomous':$scope.is_autonomous
-			    },
-			    data: {} 
-			}).then(function (response)
+      //console.log($scope.is_autonomous==undefined)
+      var is_autonomous=($scope.is_autonomous==undefined)?false:true;
+      $http({
+          method: 'POST',
+          url: api['owner']['register-entity'],
+          headers: {
+              'id': $scope.id,
+              'apikey': $scope.apikey,
+              'entity': $scope.entity_name,
+              'is-autonomous':is_autonomous
+          },
+          data: {} 
+      }).then(function (response)
             {
 
-            			function checker(flag){
-            				if(flag){
-            					return 'checked'
-            				}else{
-            					return ''
-            				}
-            			}
-                		
-	                	var data=JSON.parse(localStorage.getItem('data'));
-	                	var _obj = {'ent':$scope.id+"/"+$scope.entity_name, 'is_autonomous':$scope.is_autonomous, 'index': data.length}
-	                	data.push(_obj);
-	                	localStorage.setItem('data', JSON.stringify(data));
-	                	$( "#entity_list" ).prepend( `<tr ng-repeat="x in data | orderBy:'-'" id="`+_obj['ent']+`">
+                  function checker(flag){
+                    if(flag){
+                      return 'checked'
+                    }else{
+                      return ''
+                    }
+                  }
+                    
+                    var data=JSON.parse(localStorage.getItem('data'));
+                    var _obj = {'ent':$scope.id+"/"+$scope.entity_name, 'is_autonomous':is_autonomous, 'index': $scope.id+"_"+$scope.entity_name}
+                    data.push(_obj);
+                    console.log('data',data)
+                    localStorage.setItem('data', JSON.stringify(data));
+                    // console.log(JSON.parse(localStorage.getItem('data')))
+                    var entity_row=`<tr id="`+_obj['index']+`">
                     <th scope="row">
                       <div class="media align-items-center">
                         <a href="#" class="avatar rounded-circle mr-3">
@@ -56,13 +67,13 @@ owner.controller('ownerCtrl', function($scope, $http){
                     </th>
                     <td>
                       <!-- Button trigger modal -->
-                      <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#reset_passwd_modal`+data.length+`
+                      <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#reset_passwd_modal`+_obj['index']+`
                       ">
                         Reset Password  | <i class="fas fa-key"></i>
                       </button>
 
                       <!-- Modal -->
-                      <div class="modal fade" id="reset_passwd_modal`+_obj['ent']+`" tabindex="-1" role="dialog" aria-labelledby="reset_passwd_modal_label" aria-hidden="true">
+                      <div class="modal fade" id="reset_passwd_modal`+_obj['index']+`" tabindex="-1" role="dialog" aria-labelledby="reset_passwd_modal_label" aria-hidden="true">
                         <div class="modal-dialog modal-dialog-centered" role="document">
                           <div class="modal-content">
                             <div class="modal-header">
@@ -84,12 +95,12 @@ owner.controller('ownerCtrl', function($scope, $http){
                     </td>
                       <td>
                       <!-- Button trigger modal -->
-                      <button type="button" class="btn btn-default" data-toggle="modal" data-target="#block_modal`+data.length+`">
+                      <button type="button" class="btn btn-default" data-toggle="modal" data-target="#block_modal`+_obj['index']+`">
                         Block | <i class="fas fa-ban"></i>
                       </button>
 
                       <!-- Modal -->
-                      <div class="modal fade" id="block_modal`+data.length+`" tabindex="-1" role="dialog" aria-labelledby="block_modal_label" aria-hidden="true">
+                      <div class="modal fade" id="block_modal`+_obj['index']+`" tabindex="-1" role="dialog" aria-labelledby="block_modal_label" aria-hidden="true">
                         <div class="modal-dialog modal-dialog-centered" role="document">
                           <div class="modal-content">
                             <div class="modal-header">
@@ -103,7 +114,7 @@ owner.controller('ownerCtrl', function($scope, $http){
                             </div>
                             <div class="modal-footer">
                               <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
-                              <button type="button" class="btn btn-default"  ng-click="entity_block(this.x, '`+data.length+`')"><i class="fas fa-thumbs-up"></i></button>
+                              <button type="button" class="btn btn-default"  ng-click="entity_block(this.x, '`+_obj['index']+`')"><i class="fas fa-thumbs-up"></i></button>
                             </div>
                           </div>
                         </div>
@@ -111,12 +122,12 @@ owner.controller('ownerCtrl', function($scope, $http){
                     </td>
                     <td>
                       <!-- Button trigger modal -->
-                      <button type="button" class="btn btn-outline-default" data-toggle="modal" data-target="#unblock_modal`+data.length+`">
+                      <button type="button" class="btn btn-outline-default" data-toggle="modal" data-target="#unblock_modal`+_obj['index']+`">
                         UnBlock | <i class="far fa-circle"></i>
                       </button>
 
                       <!-- Modal -->
-                      <div class="modal fade" id="unblock_modal`+data.length+`" tabindex="-1" role="dialog" aria-labelledby="unblock_modal_label" aria-hidden="true">
+                      <div class="modal fade" id="unblock_modal`+_obj['index']+`" tabindex="-1" role="dialog" aria-labelledby="unblock_modal_label" aria-hidden="true">
                         <div class="modal-dialog modal-dialog-centered" role="document">
                           <div class="modal-content">
                             <div class="modal-header">
@@ -130,7 +141,7 @@ owner.controller('ownerCtrl', function($scope, $http){
                             </div>
                             <div class="modal-footer">
                               <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
-                              <button type="button" class="btn btn-outline-default"  ng-click="entity_unblock(this.x, '`+data.length+`')"><i class="fas fa-thumbs-up"></i></button>
+                              <button type="button" class="btn btn-outline-default"  ng-click="entity_unblock(this.x, '`+_obj['index']+`')"><i class="fas fa-thumbs-up"></i></button>
                             </div>
                           </div>
                         </div>
@@ -138,12 +149,12 @@ owner.controller('ownerCtrl', function($scope, $http){
                     </td>
                       <td>
                       <!-- Button trigger modal -->
-                      <button type="button" class="btn btn-danger" data-toggle="modal" data-target="#delete_modal`+data.length+`">
+                      <button type="button" class="btn btn-danger" data-toggle="modal" data-target="#delete_modal`+_obj['index']+`">
                         Delete | <i class="far fa-trash-alt"></i>
                       </button>
 
                       <!-- Modal -->
-                      <div class="modal fade" id="delete_modal`+data.length+`" tabindex="-1" role="dialog" aria-labelledby="delete_modal_label" aria-hidden="true">
+                      <div class="modal fade" id="delete_modal`+_obj['index']+`" tabindex="-1" role="dialog" aria-labelledby="delete_modal_label" aria-hidden="true">
                         <div class="modal-dialog modal-dialog-centered" role="document">
                           <div class="modal-content">
                             <div class="modal-header">
@@ -157,7 +168,7 @@ owner.controller('ownerCtrl', function($scope, $http){
                             </div>
                             <div class="modal-footer">
                               <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
-                              <button type="button" class="btn btn-danger" ng-click="entity_delete(`+_obj+`, '`+data.length+`')"><i class="fas fa-thumbs-up"></i></button>
+                              <button type="button" class="btn btn-danger" ng-click="entity_delete('`+_obj['ent']+`', '`+_obj['index']+`')"><i class="fas fa-thumbs-up"></i></button>
                             </div>
                           </div>
                         </div>
@@ -172,181 +183,201 @@ owner.controller('ownerCtrl', function($scope, $http){
                       </label>
                     </td>
                     
-                  </tr>` );
-	                	$("#alert_message").html(`<br><div class="alert alert-success alert-dismissible fade show in" role="alert">
-												    <span class="alert-inner--icon"><i class="ni ni-like-2"></i></span>
-												    <span class="alert-inner--text"><strong>Success! </strong>` + _obj['ent'] + ` registered.</span>
-												    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-												        <span aria-hidden="true">&times;</span>
-												    </button>
-												</div>`);
-	                	window.setTimeout(function(){
-	                		$( "#alert_message").fadeIn();
-	                		$( "#alert_message").fadeOut(750);
-	                	}, 1);
-	                
+                  </tr>`;
+                  var compiled_entity_row=$compile(entity_row)($scope);
+                    $("#entity_list").each(function() {
+                        if ($(this).html()){
+                            $(this).prepend(compiled_entity_row);console.log("If");
+                        }else{
+                            $(this).append(compiled_entity_row);console.log("ELSE");
+                        }
+                    });
+                    
+                    $("#alert_message").html(`<br><div class="alert alert-success alert-dismissible fade show in" role="alert">
+                            <span class="alert-inner--icon"><i class="ni ni-like-2"></i></span>
+                            <span class="alert-inner--text"><strong>Success! </strong>` + _obj['ent'] + ` registered.</span>
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>`);
+                    window.setTimeout(function(){
+                      $( "#alert_message").fadeIn();
+                      $( "#alert_message").fadeOut(750);
+                    }, 1);
+                  
 
             }, function(error){
-            	 $( "#alert_message").html(`<br><div class="alert alert-danger alert-dismissible fade show" role="alert">
-												    <span class="alert-inner--icon"><i class="fas fa-exclamation-triangle"></i></span>
-												    <span class="alert-inner--text"><strong>Error! </strong>` + error['data']['error'] + `</span>
-												    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-												        <span aria-hidden="true">&times;</span>
-												    </button>
-												</div>`);
-            	 window.setTimeout(function(){
-	                		$( "#alert_message").fadeIn();
-	                		$( "#alert_message").fadeOut(750);
-	                	}, 1);
+               $( "#alert_message").html(`<br><div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <span class="alert-inner--icon"><i class="fas fa-exclamation-triangle"></i></span>
+                            <span class="alert-inner--text"><strong>Error! </strong>` + error['data']['error'] + `</span>
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>`);
+               window.setTimeout(function(){
+                      $( "#alert_message").fadeIn();
+                      $( "#alert_message").fadeOut(750);
+                    }, 1);
             });
 
-			
+      
     }
 
     // Delete/Deregister Entity
     $scope.entity_delete=function(entity, index){
-    	$http({
-			    method: 'POST',
-			    url: api['owner']['deregister-entity'],
-			    headers: {
-			        'id': $scope.id,
-			        'apikey': $scope.apikey,
-			        'entity': entity['ent'],
-			    },
-			    data: {} 
-			}).then(function (response)
-            {
-                var temp_d = {'ent':entity['ent'], 'is-autonomous': entity['is_autonomous']}
+      console.log(entity, index)
+      $http({
+          method: 'POST',
+          url: api['owner']['deregister-entity'],
+          headers: {
+              'id': $scope.id,
+              'apikey': $scope.apikey,
+              'entity': entity,
+          },
+          data: {} 
+      }).then(function (response)
+            { 
+                var d=JSON.parse(localStorage.getItem('data'));
+                console.log("OWN-MOD",0,d, entity)
                 for (var i = 0; i < d.length ; i++) {
-                	if (d[i]['ent']==entity['ent']){
-	                	d.splice(i, 1);
-	                	localStorage.setItem('data', JSON.stringify(d));
-	                	$( "#"+ entity['index']).fadeOut(1, function() { $(this).remove(); });
-	                	$("#alert_message").html(`<br><div class="alert alert-success alert-dismissible fade show in" role="alert">
-												    <span class="alert-inner--icon"><i class="ni ni-like-2"></i></span>
-												    <span class="alert-inner--text"><strong>Success! </strong>` + entity['ent'] + ` deleted.</span>
-												    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-												        <span aria-hidden="true">&times;</span>
-												    </button>
-												</div>`);
-	                	// $( "#alert_message").fadeOut();
-	                	
-	                	window.setTimeout(function(){
-	                		$( "#delete_modal"+ entity['index']).modal('hide');
-	                		$('.modal-backdrop').remove();
-	                	}, 1);
-	                	window.setTimeout(function(){
-	                		$( "#alert_message").fadeIn();
-	                		$( "#alert_message").fadeOut(750);
-	                	}, 1);
-	                	break;
-                	}
+                  if (d[i]['ent']==entity){
+                    console.log("OWN-MOD",1)
+                    // console.log(d[i]);
+                    d.splice(i, 1);
+                    localStorage.setItem('data', JSON.stringify(d));
+                    console.log("OWN-MOD",2)
+                    $( "#"+ index).fadeOut(1, function() { $(this).remove(); });
+                    console.log("OWN-MOD",3)
+                    $("#alert_message").html(`<br><div class="alert alert-success alert-dismissible fade show in" role="alert">
+                            <span class="alert-inner--icon"><i class="ni ni-like-2"></i></span>
+                            <span class="alert-inner--text"><strong>Success! </strong>` + entity + ` deleted.</span>
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>`);
+                    console.log("OWN-MOD",4)
+                    // $( "#alert_message").fadeOut();
+                    
+                    window.setTimeout(function(){
+                      $( "#delete_modal"+ index).modal('hide');
+                      $('.modal-backdrop').remove();
+                    }, 1);
+                    console.log("OWN-MOD",5)
+                    window.setTimeout(function(){
+                      $( "#alert_message").fadeIn();
+                      $( "#alert_message").fadeOut(750);
+                    }, 1);
+                    console.log("OWN-MOD",6)
+                    break;
+                  }
                 }
                 
             }, function(error){
-                 // console.log(error['data']['error']); 
+                 console.log(error['data']['error']); 
                  $( "#alert_message").html(`<br><div class="alert alert-danger alert-dismissible fade show" role="alert">
-												    <span class="alert-inner--icon"><i class="fas fa-exclamation-triangle"></i></span>
-												    <span class="alert-inner--text"><strong>Error! </strong>` + error['data']['error'] + `</span>
-												    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-												        <span aria-hidden="true">&times;</span>
-												    </button>
-												</div>`);
+                            <span class="alert-inner--icon"><i class="fas fa-exclamation-triangle"></i></span>
+                            <span class="alert-inner--text"><strong>Error! </strong>` + error['data']['error'] + `</span>
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>`);
+                 console.log("OWN-MOD",66)
                  window.setTimeout(function(){
-	                		$( "#alert_message").fadeIn(250);
-	                		$( "#alert_message").fadeOut(750);
-	                	}, 1);
+                      $( "#alert_message").fadeIn(250);
+                      $( "#alert_message").fadeOut(750);
+                    }, 1);
+                 console.log("OWN-MOD",99)
         });
-	}
+  }
 
     // Block Entity
     $scope.entity_block=function(entity, index){
-    	$http({
-			    method: 'POST',
-			    url: api['owner']['block'],
-			    headers: {
-			        'id': $scope.id,
-			        'apikey': $scope.apikey,
-			        'entity': entity['ent'],
-			    },
-			    data: {} 
-			}).then(function (response)
+      $http({
+          method: 'POST',
+          url: api['owner']['block'],
+          headers: {
+              'id': $scope.id,
+              'apikey': $scope.apikey,
+              'entity': entity,
+          },
+          data: {} 
+      }).then(function (response)
             {
-            	$( "#alert_message").html(`<br><div class="alert alert-success alert-dismissible fade show" role="alert">
-												    <span class="alert-inner--icon"><i class="ni ni-like-2"></i></span>
-												    <span class="alert-inner--text"><strong>Success! </strong>` + entity['ent'] + ` blocked.</span>
-												    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-												        <span aria-hidden="true">&times;</span>
-												    </button>
-												</div>`);
-	        	window.setTimeout(function(){
-	        		$( "#block_modal"+ entity['index']).modal('hide');
-	        		$('.modal-backdrop').remove();
-	        	}, 100);    
-	        	window.setTimeout(function(){
-	                		$( "#alert_message").fadeIn(250);
-	                		$( "#alert_message").fadeOut(750);
-	                	}, 1);
-    	    	       
+              $( "#alert_message").html(`<br><div class="alert alert-success alert-dismissible fade show" role="alert">
+                            <span class="alert-inner--icon"><i class="ni ni-like-2"></i></span>
+                            <span class="alert-inner--text"><strong>Success! </strong>` + entity + ` blocked.</span>
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>`);
+            window.setTimeout(function(){
+              $( "#block_modal"+ index).modal('hide');
+              $('.modal-backdrop').remove();
+            }, 100);    
+            window.setTimeout(function(){
+                      $( "#alert_message").fadeIn(250);
+                      $( "#alert_message").fadeOut(750);
+                    }, 1);
+                   
             }, function(error){
                  // console.log(error['data']['error']); 
                  $( "#alert_message").html(`<br><div class="alert alert-danger alert-dismissible fade show" role="alert">
-												    <span class="alert-inner--icon"><i class="fas fa-exclamation-triangle"></i></span>
-												    <span class="alert-inner--text"><strong>Error! </strong>` + error['data']['error'] + `</span>
-												    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-												        <span aria-hidden="true">&times;</span>
-												    </button>
-												</div>`);
+                            <span class="alert-inner--icon"><i class="fas fa-exclamation-triangle"></i></span>
+                            <span class="alert-inner--text"><strong>Error! </strong>` + error['data']['error'] + `</span>
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>`);
                  window.setTimeout(function(){
-	                		$( "#alert_message").fadeIn(250);
-	                		$( "#alert_message").fadeOut(750);
-	                	}, 1);
+                      $( "#alert_message").fadeIn(250);
+                      $( "#alert_message").fadeOut(750);
+                    }, 1);
         });
-	}
+  }
 
     // UnBlock Entity
     $scope.entity_unblock=function(entity, index){
-    	$http({
-			    method: 'POST',
-			    url: api['owner']['unblock'],
-			    headers: {
-			        'id': $scope.id,
-			        'apikey': $scope.apikey,
-			        'entity': entity['ent'],
-			    },
-			    data: {} 
-			}).then(function (response)
+      $http({
+          method: 'POST',
+          url: api['owner']['unblock'],
+          headers: {
+              'id': $scope.id,
+              'apikey': $scope.apikey,
+              'entity': entity,
+          },
+          data: {} 
+      }).then(function (response)
             {
-            	$( "#alert_message").html(`<br><div class="alert alert-success alert-dismissible fade show" role="alert">
-												    <span class="alert-inner--icon"><i class="ni ni-like-2"></i></span>
-												    <span class="alert-inner--text"><strong>Success! </strong>` + entity['ent'] + ` unblocked.</span>
-												    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-												        <span aria-hidden="true">&times;</span>
-												    </button>
-												</div>`);
-	        	window.setTimeout(function(){
-	        		$( "#unblock_modal"+ entity['index']).modal('hide');
-	        		$('.modal-backdrop').remove();
-	        	}, 100);   
-	        	window.setTimeout(function(){
-	                		$( "#alert_message").fadeIn(250);
-	                		$( "#alert_message").fadeOut(750);
-	                	}, 1);
-            	        
+              $( "#alert_message").html(`<br><div class="alert alert-success alert-dismissible fade show" role="alert">
+                            <span class="alert-inner--icon"><i class="ni ni-like-2"></i></span>
+                            <span class="alert-inner--text"><strong>Success! </strong>` + entity + ` unblocked.</span>
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>`);
+            window.setTimeout(function(){
+              $( "#unblock_modal"+ index).modal('hide');
+              $('.modal-backdrop').remove();
+            }, 100);   
+            window.setTimeout(function(){
+                      $( "#alert_message").fadeIn(250);
+                      $( "#alert_message").fadeOut(750);
+                    }, 1);
+                      
             }, function(error){
                  // console.log(error['data']['error']); 
                  $( "#alert_message").html(`<br><div class="alert alert-danger alert-dismissible fade show" role="alert">
-												    <span class="alert-inner--icon"><i class="fas fa-exclamation-triangle"></i></span>
-												    <span class="alert-inner--text"><strong>Error! </strong>` + error['data']['error'] + `</span>
-												    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-												        <span aria-hidden="true">&times;</span>
-												    </button>
-												</div>`);
+                            <span class="alert-inner--icon"><i class="fas fa-exclamation-triangle"></i></span>
+                            <span class="alert-inner--text"><strong>Error! </strong>` + error['data']['error'] + `</span>
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>`);
                  window.setTimeout(function(){
-	                		$( "#alert_message").fadeIn(250);
-	                		$( "#alert_message").fadeOut(750);
-	                	}, 1);
+                      $( "#alert_message").fadeIn(250);
+                      $( "#alert_message").fadeOut(750);
+                    }, 1);
         });
-	}
+  }
 
 });
