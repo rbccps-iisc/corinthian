@@ -271,7 +271,7 @@
       </button>
       <!-- <span id="alert_message"></span>  -->
     </div>
-    <div class="col-sm-4">
+    <div class="col-sm-6">
       <span id="alert_message"></span>
     </div>
   </div>
@@ -430,7 +430,7 @@
                      
                     <td>
                       <label class="custom-toggle">
-                        <input type="checkbox" ng-checked={{x.is_autonomous}}>
+                        <input type="checkbox" id="cb_{{x.index}}" ng-checked={{x.is_autonomous}} ng-click="change_autonomous_state(x.ent,x.is_autonomous,x.index, this.x)">
                         <span class="custom-toggle-slider rounded-circle"></span>
                       </label>
                     </td>

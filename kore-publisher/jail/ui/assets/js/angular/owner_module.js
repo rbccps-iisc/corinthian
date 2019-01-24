@@ -177,7 +177,7 @@ owner.controller('ownerCtrl', function($scope, $compile, $http){
                     <td>
                       <label class="custom-toggle">
                         
-                        <input type="checkbox" ` + checker($scope.is_autonomous) + `>
+                        <input type="checkbox" id="cb_"`+ _obj[index] +` ng-checked=` + _obj['is_autonomous'] + `ng-click="change_autonomous_state('`+_obj['ent']+`',`+_obj['is_autonomous']+`,'`+_obj['index']+`')">
                         <span class="custom-toggle-slider rounded-circle"></span>
                       </label>
                     </td>
@@ -244,7 +244,7 @@ owner.controller('ownerCtrl', function($scope, $compile, $http){
                     localStorage.setItem('data', JSON.stringify(d));
                     $( "#delete_modal_body"+index).html(`<br><div class="alert alert-success alert-dismissible fade show in" role="alert">
                             <span class="alert-inner--icon"><i class="ni ni-like-2"></i></span>
-                            <span class="alert-inner--text"><strong>Success! </strong>` + entity + ` deleted.</span>
+                            <span class="alert-inner--text"><strong>Success! </strong> <strong>` + entity + `</strong> deleted.</span>
                             <button type="button" class="close" data-dismiss="alert" aria-label="Close">
                                 <span aria-hidden="true">&times;</span>
                             </button>
@@ -256,6 +256,77 @@ owner.controller('ownerCtrl', function($scope, $compile, $http){
                       $( "#delete_modal"+ index).modal('hide');
                       $('.modal-backdrop').remove();
                       $( "#"+ index).fadeOut(1, function() { $(this).remove(); });
+                    }, 2000);
+                    break;
+                  }
+                }
+                
+            }, function(error){
+                 console.log(error['data']['error']); 
+                 $( "#delete_modal_body"+index).html(`<br><div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <span class="alert-inner--icon"><i class="fas fa-exclamation-triangle"></i></span>
+                            <span class="alert-inner--text"><strong>Error! </strong>` + error['data']['error'] + `</span>
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>`);
+        });
+  }
+
+ 
+ // Block Entity
+    $scope.change_autonomous_state=function(entity, _is_autonomous, index, ent){
+      // console.log(entity, is_autonomous, typeof(is_autonomous), index)
+      console.log('pre',_is_autonomous, ent)
+      
+      _is_autonomous= (_is_autonomous)?false:true;
+      
+      // console.log(entity, is_autonomous, typeof(is_autonomous), index)
+      console.log('post',_is_autonomous)
+      $http({
+          method: 'POST',
+          url: api['owner']['set-autonomous'],
+          headers: {
+              'id': $scope.id,
+              'apikey': $scope.apikey,
+              'entity': entity,
+              'is-autonomous': _is_autonomous,
+          },
+          data: {} 
+      }).then(function (response)
+            {
+              var d=JSON.parse(localStorage.getItem('data'));
+                for (var i = 0; i < d.length ; i++) {
+                  if (d[i]['ent']==entity){
+                    console.log(d[i]);
+                    d[i]['is_autonomous']=_is_autonomous;
+                    console.log(d[i]);
+                    localStorage.setItem('data', JSON.stringify(d));
+                    // $('#cb_'+index).prop('checked', _is_autonomous); // Checks it
+                    $scope.is_autonomous = _is_autonomous;
+                    if(_is_autonomous){
+                      $( "#delete_modal_body"+index).html(`<br><div class="alert alert-success alert-dismissible fade show in" role="alert">
+                            <span class="alert-inner--icon"><i class="ni ni-like-2"></i></span>
+                            <span class="alert-inner--text"><strong>Success! </strong> <strong>` + entity + `</strong> is now an autonomous entity.</span>
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>`);
+                    }else{
+                      $( "#delete_modal_body"+index).html(`<br><div class="alert alert-success alert-dismissible fade show in" role="alert">
+                            <span class="alert-inner--icon"><i class="ni ni-like-2"></i></span>
+                            <span class="alert-inner--text"><strong>Success! </strong> <strong>` + entity + `</strong> has been set to non-autonomous entity.</span>
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>`);
+                    }
+                    // $( "#alert_message").fadeOut();
+                    $( "#delete_modal_footer"+ index).html("");
+                    
+                    window.setTimeout(function(){
+                      $( "#delete_modal"+ index).modal('hide');
+                      $('.modal-backdrop').remove();
                     }, 2000);
                     break;
                   }

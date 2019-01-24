@@ -22,6 +22,7 @@ const api = {
 		"follow-requests": "/owner/follow-requests",
 		"register-entity": "/owner/register-entity",
 		"deregister-entity": "/owner/deregister-entity",
+		"set-autonomous": "/owner/set-autonomous",
 		"login": "/owner/entities"
 	},
 	"auto-entity": {
