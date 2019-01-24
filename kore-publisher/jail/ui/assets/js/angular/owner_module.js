@@ -51,7 +51,6 @@ owner.controller('ownerCtrl', function($scope, $compile, $http){
                     var data=JSON.parse(localStorage.getItem('data'));
                     var _obj = {'ent':$scope.id+"/"+$scope.entity_name, 'is_autonomous':is_autonomous, 'index': $scope.id+"_"+$scope.entity_name}
                     data.push(_obj);
-                    console.log('data',data)
                     localStorage.setItem('data', JSON.stringify(data));
                     // console.log(JSON.parse(localStorage.getItem('data')))
                     var entity_row=`<tr id="`+_obj['index']+`">
@@ -83,7 +82,7 @@ owner.controller('ownerCtrl', function($scope, $compile, $http){
                               </button>
                             </div>
                             <div class="modal-body">
-                              Are you sure you want to reset the password for <strong>`+_obj['ent']+`</strong>?
+                              <center>Are you sure you want to reset the password for <br><strong>`+_obj['ent']+`</strong>?</center>
                             </div>
                             <div class="modal-footer">
                               <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
@@ -110,7 +109,7 @@ owner.controller('ownerCtrl', function($scope, $compile, $http){
                               </button>
                             </div>
                             <div class="modal-body">
-                              Are you sure you want to block <strong>`+_obj['ent']+`</strong>?
+                              <center>Are you sure you want to block <br><strong>`+_obj['ent']+`</strong>?</center>
                             </div>
                             <div class="modal-footer">
                               <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
@@ -137,7 +136,7 @@ owner.controller('ownerCtrl', function($scope, $compile, $http){
                               </button>
                             </div>
                             <div class="modal-body">
-                              Are you sure you want to unblock <strong>`+_obj['ent']+`</strong>?
+                              <center>Are you sure you want to unblock <br><strong>`+_obj['ent']+`</strong>?</center>
                             </div>
                             <div class="modal-footer">
                               <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
@@ -163,10 +162,10 @@ owner.controller('ownerCtrl', function($scope, $compile, $http){
                                 <span aria-hidden="true">&times;</span>
                               </button>
                             </div>
-                            <div class="modal-body">
-                              Are you sure you want to delete <strong>`+_obj['ent']+`</strong>?
+                            <div id="delete_modal_body`+_obj['index']+`" class="modal-body">
+                              <center>Are you sure you want to delete <br><strong>`+_obj['ent']+`</strong>?</center>
                             </div>
-                            <div class="modal-footer">
+                            <div id="delete_modal_footer`+_obj['index']+`" class="modal-footer">
                               <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
                               <button type="button" class="btn btn-danger" ng-click="entity_delete('`+_obj['ent']+`', '`+_obj['index']+`')"><i class="fas fa-thumbs-up"></i></button>
                             </div>
@@ -187,9 +186,9 @@ owner.controller('ownerCtrl', function($scope, $compile, $http){
                   var compiled_entity_row=$compile(entity_row)($scope);
                     $("#entity_list").each(function() {
                         if ($(this).html()){
-                            $(this).prepend(compiled_entity_row);console.log("If");
+                            $(this).prepend(compiled_entity_row);
                         }else{
-                            $(this).append(compiled_entity_row);console.log("ELSE");
+                            $(this).append(compiled_entity_row);
                         }
                     });
                     
@@ -202,8 +201,8 @@ owner.controller('ownerCtrl', function($scope, $compile, $http){
                         </div>`);
                     window.setTimeout(function(){
                       $( "#alert_message").fadeIn();
-                      $( "#alert_message").fadeOut(750);
-                    }, 1);
+                      $( "#alert_message").fadeOut(450);
+                    }, 900);
                   
 
             }, function(error){
@@ -216,8 +215,8 @@ owner.controller('ownerCtrl', function($scope, $compile, $http){
                         </div>`);
                window.setTimeout(function(){
                       $( "#alert_message").fadeIn();
-                      $( "#alert_message").fadeOut(750);
-                    }, 1);
+                      $( "#alert_message").fadeOut(450);
+                    }, 900);
             });
 
       
@@ -225,7 +224,7 @@ owner.controller('ownerCtrl', function($scope, $compile, $http){
 
     // Delete/Deregister Entity
     $scope.entity_delete=function(entity, index){
-      console.log(entity, index)
+      // console.log(entity, index)
       $http({
           method: 'POST',
           url: api['owner']['deregister-entity'],
@@ -238,55 +237,39 @@ owner.controller('ownerCtrl', function($scope, $compile, $http){
       }).then(function (response)
             { 
                 var d=JSON.parse(localStorage.getItem('data'));
-                console.log("OWN-MOD",0,d, entity)
                 for (var i = 0; i < d.length ; i++) {
                   if (d[i]['ent']==entity){
-                    console.log("OWN-MOD",1)
                     // console.log(d[i]);
                     d.splice(i, 1);
                     localStorage.setItem('data', JSON.stringify(d));
-                    console.log("OWN-MOD",2)
-                    $( "#"+ index).fadeOut(1, function() { $(this).remove(); });
-                    console.log("OWN-MOD",3)
-                    $("#alert_message").html(`<br><div class="alert alert-success alert-dismissible fade show in" role="alert">
+                    $( "#delete_modal_body"+index).html(`<br><div class="alert alert-success alert-dismissible fade show in" role="alert">
                             <span class="alert-inner--icon"><i class="ni ni-like-2"></i></span>
                             <span class="alert-inner--text"><strong>Success! </strong>` + entity + ` deleted.</span>
                             <button type="button" class="close" data-dismiss="alert" aria-label="Close">
                                 <span aria-hidden="true">&times;</span>
                             </button>
                         </div>`);
-                    console.log("OWN-MOD",4)
                     // $( "#alert_message").fadeOut();
+                    $( "#delete_modal_footer"+ index).html("");
                     
                     window.setTimeout(function(){
                       $( "#delete_modal"+ index).modal('hide');
                       $('.modal-backdrop').remove();
-                    }, 1);
-                    console.log("OWN-MOD",5)
-                    window.setTimeout(function(){
-                      $( "#alert_message").fadeIn();
-                      $( "#alert_message").fadeOut(750);
-                    }, 1);
-                    console.log("OWN-MOD",6)
+                      $( "#"+ index).fadeOut(1, function() { $(this).remove(); });
+                    }, 2000);
                     break;
                   }
                 }
                 
             }, function(error){
                  console.log(error['data']['error']); 
-                 $( "#alert_message").html(`<br><div class="alert alert-danger alert-dismissible fade show" role="alert">
+                 $( "#delete_modal_body"+index).html(`<br><div class="alert alert-danger alert-dismissible fade show" role="alert">
                             <span class="alert-inner--icon"><i class="fas fa-exclamation-triangle"></i></span>
                             <span class="alert-inner--text"><strong>Error! </strong>` + error['data']['error'] + `</span>
                             <button type="button" class="close" data-dismiss="alert" aria-label="Close">
                                 <span aria-hidden="true">&times;</span>
                             </button>
                         </div>`);
-                 console.log("OWN-MOD",66)
-                 window.setTimeout(function(){
-                      $( "#alert_message").fadeIn(250);
-                      $( "#alert_message").fadeOut(750);
-                    }, 1);
-                 console.log("OWN-MOD",99)
         });
   }
 
@@ -303,7 +286,7 @@ owner.controller('ownerCtrl', function($scope, $compile, $http){
           data: {} 
       }).then(function (response)
             {
-              $( "#alert_message").html(`<br><div class="alert alert-success alert-dismissible fade show" role="alert">
+              $( "#delete_model_body_"+entity.replace('/','_')).html(`<br><div class="alert alert-success alert-dismissible fade show" role="alert">
                             <span class="alert-inner--icon"><i class="ni ni-like-2"></i></span>
                             <span class="alert-inner--text"><strong>Success! </strong>` + entity + ` blocked.</span>
                             <button type="button" class="close" data-dismiss="alert" aria-label="Close">

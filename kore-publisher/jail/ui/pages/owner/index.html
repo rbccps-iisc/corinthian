@@ -248,27 +248,31 @@
           <!-- Card stats -->
           <form name="addEntityForm" role="form">
   <div class="row">
-    <div class="col-md-6">
+    <div class="col-sm-3">
       <div class="form-group has-success">
         <input type="text" placeholder="Entity-Name" class="form-control is-valid" ng-model='entity_name' required/>
       </div>
     </div>
-    <div class="col-md-3">
+    <div class="col-sm-2">
     <label class="custom-toggle">
-      <div class="custom-control custom-control-alternative custom-checkbox mb-3" style="padding: 10px">
+      <div class="custom-control custom-control-alternative custom-checkbox mb-3" >
       <input class="custom-control-input" id="customCheck5" type="checkbox" ng-model='is_autonomous'>
       <label class="custom-control-label" for="customCheck5" style="color:white;">is_autonomous</label>
     </div>
     </label>
       
     </div>
-    <div class="col-md-3">
-      <button class="btn btn-icon btn-3 btn-success" type="submit"  ng-click="addEntityForm.$valid && addEntity()">
+    <div class="col-sm-4">
+      <button class="btn btn-icon btn-3 btn-success" type="submit"  ng-click="addEntityForm.$valid && addEntity()" >
       <span class="btn-inner--icon"><i class="ni ni-fat-add"></i></span>
   
       <span class="btn-inner--text">Add Entity</span>
     
       </button>
+      <!-- <span id="alert_message"></span>  -->
+    </div>
+    <div class="col-sm-4">
+      <span id="alert_message"></span>
     </div>
   </div>
 </form>
@@ -285,7 +289,7 @@
             <div class="card-header border-0">
               <h3 class="mb-0">Entities registered </h3>
 
-              <span id="alert_message"></span> 
+              <!-- <span id="alert_message"></span>  -->
 
             </div>
             <div class="table-responsive">
@@ -303,7 +307,7 @@
                   </tr>
                 </thead>
                 <tbody id="entity_list">
-                     <tr ng-repeat="x in data | orderBy:'-' track by $index" id="{{x.index}}">
+                     <tr ng-repeat="x in data | orderBy:'-'" id="{{x.index}}">
                     <th scope="row">
                       <div class="media align-items-center">
                         <a href="#" class="avatar rounded-circle mr-3">
@@ -332,7 +336,7 @@
                               </button>
                             </div>
                             <div class="modal-body">
-                              Are you sure you want to reset the password for <strong>{{x.ent}}</strong>?
+                              <center>Are you sure you want to reset the password for <br><strong>{{x.ent}}</strong>?</center>
                             </div>
                             <div class="modal-footer">
                               <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
@@ -359,7 +363,7 @@
                               </button>
                             </div>
                             <div class="modal-body">
-                              Are you sure you want to block <strong>{{x.ent}}</strong>?
+                              <center>Are you sure you want to block <br><strong>{{x.ent}}</strong>?</center>
                             </div>
                             <div class="modal-footer">
                               <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
@@ -386,7 +390,7 @@
                               </button>
                             </div>
                             <div class="modal-body">
-                              Are you sure you want to unblock <strong>{{x.ent}}</strong>?
+                              <center>Are you sure you want to unblock <br><strong>{{x.ent}}</strong>?</center>
                             </div>
                             <div class="modal-footer">
                               <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
@@ -412,10 +416,10 @@
                                 <span aria-hidden="true">&times;</span>
                               </button>
                             </div>
-                            <div class="modal-body">
-                              Are you sure you want to delete <strong>{{x.ent}}</strong>?
+                            <div id="delete_modal_body{{x.index}}" class="modal-body">
+                              <center>Are you sure you want to delete <br><strong>{{x.ent}}</strong>?</center>
                             </div>
-                            <div class="modal-footer">
+                            <div id="delete_modal_footer{{x.index}}" class="modal-footer">
                               <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
                               <button type="button" class="btn btn-danger" ng-click="entity_delete(x.ent, x.index)"><i class="fas fa-thumbs-up"></i></button>
                             </div>
@@ -520,6 +524,7 @@
         return false;
       }
     });
+
   </script>
 </body>
 
