@@ -18,7 +18,7 @@ An IUDX compliant IoT middleware for smart cities
 Documentation: https://iudx.readthedocs.io
 
 Quickstart
-==========
+========== 
 
 #. Clone the repository::
 
