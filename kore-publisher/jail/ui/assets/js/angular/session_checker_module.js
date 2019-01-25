@@ -26,20 +26,33 @@ session_checker.controller('session_checkerCtrl', ['$scope', function($scope) {
 		}
 
 		var role = sessionStorage.getItem('role');
-		if(role=='admin'){
-    		if(window.location.href !== location.origin + "/ui/pages/admin/"){
-    				window.location = location.origin + "/ui/pages/admin";
-    		}
-		}else if(role=='owner'){
-			if (window.location.href !== location.origin + "/ui/pages/owner/"){
-				window.location = location.origin + "/ui/pages/owner";
-			}
-		}else if(role=='auto-entity'){
-			if (window.location.href !== location.origin + "/ui/pages/auto-entity/"){
-				window.location = location.origin + "/ui/pages/auto-entity";
-			}
-		}/*else{
-			window.location = location.origin + "/ui/pages/error/404";
-		}	*/				
+
+		//Admin		
+		if (window.location.href === location.origin + "/ui/pages/admin/" && role != 'admin'){
+				window.location = location.origin + "/ui/pages/error/403";		
+		}
+
+		if (window.location.href === location.origin + "/ui/pages/admin/catalog" && role != 'admin'){
+				window.location = location.origin + "/ui/pages/error/403";		
+		}
+
+		//Owner		
+		if (window.location.href === location.origin + "/ui/pages/owner/" && role != 'owner'){
+				window.location = location.origin + "/ui/pages/error/403";		
+		}
+
+		if (window.location.href === location.origin + "/ui/pages/owner/catalog" && role != 'owner'){
+				window.location = location.origin + "/ui/pages/error/403";		
+		}
+
+		//Auto-Entity		
+		if (window.location.href === location.origin + "/ui/pages/auto-entity/" && role != 'auto-entity'){
+				window.location = location.origin + "/ui/pages/error/403";		
+		}
+
+		if (window.location.href === location.origin + "/ui/pages/auto-entity/catalog" && role != 'auto-entity'){
+				window.location = location.origin + "/ui/pages/error/403";		
+		}
+
 }
 }]);
