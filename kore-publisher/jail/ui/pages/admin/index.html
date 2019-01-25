@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
   <meta name="description" content="IUDX | Indian Urban Data Exchange">
   <meta name="organization" content="RBCCPS, IISc Bangalore">
-  <meta name="keywords" content="IUDX, CATALOGUE, CATALOGUE, RBCCPS, IISc BANGALORE">
+  <meta name="keywords" content="IUDX, CATALOGUE, RBCCPS, IISc BANGALORE">
   <meta name="author" content="Jishnu Jaykumar P (http://jishnujayakumar.github.io)">
   <title>
     IUDX | Indian Urban Data Exchange
@@ -20,7 +20,7 @@
   <!-- Argon CSS -->
   <link type="text/css" href="../../assets/css/argon.min.css?v=1.0.0" rel="stylesheet">
 </head>
-<body class="bg-default" ng-controller="logoutCtrl">
+<body class="bg-default" ng-controller="logoutCtrl"  oncontextmenu="return false">
   
   
   <!-- Sidenav -->
@@ -51,7 +51,7 @@
           <a class="nav-link" href="#" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
             <div class="media align-items-center">
               <span class="avatar avatar-sm rounded-circle">
-                <img alt="Image placeholder" src="../../assets/img//logo/admin.png">
+                <img alt="Image placeholder" src="../../assets/img/logo/owner.png">
               </span>
             </div>
           </a>
@@ -113,15 +113,15 @@
           </div>
         </form>
         <!-- Navigation -->
-        <ul class="navbar-nav">
+        <ul class="navbar-nav"  ng-controller="admin_sidebarCtrl">
           <!--li class="nav-item">
-            <a class="nav-link" href="/admin">
+            <a class="nav-link" href="/owner">
               <i class="ni ni-tv-2 text-primary"></i> Dashboard
             </a>
           </li-->
-          <li class="nav-item">
-            <a class="nav-link" href="/add-owner">
-              <i class="ni ni-fat-add text-green"></i> ADD Owner
+           <li class="nav-item" ng-repeat="option in sidebar">
+            <a class="nav-link" href="{{option.href}}">
+              <i class="ni ni-{{option.legend}} text-{{option.color}}"></i> {{option.text}}
             </a>
           </li>
           <!--li class="nav-item">
@@ -181,7 +181,7 @@
     </div>
   </nav>
   <!-- Main content -->
-  <div class="main-content">
+  <div class="main-content" ng-controller="adminCtrl">
     <!-- Top navbar -->
     <nav class="navbar navbar-top navbar-expand-md navbar-dark" id="navbar-main">
       <div class="container-fluid">
@@ -204,10 +204,10 @@
             <a class="nav-link pr-0" href="#" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
               <div class="media align-items-center">
                 <span class="avatar avatar-sm rounded-circle">
-                  <img alt="Admin logo" src="../../assets/img/logo/admin.png">
+                  <img alt="Admin logo" src="../../assets/img/logo/owner.png">
                 </span>
                 <div class="media-body ml-2 d-none d-lg-block">
-                  <span class="mb-0 text-sm  font-weight-bold">Admin</span>
+                  <span class="mb-0 text-sm  font-weight-bold">{{id}}</span>
                 </div>
               </div>
             </a>
@@ -245,21 +245,25 @@
     <div class="header bg-gradient-primary pb-8 pt-5 pt-md-8">
       <div class="container-fluid">
         <div class="header-body">
-          <!-- Card stats -->
-          <form>
+           <!-- Card stats -->
+          <form name="addOwnerForm" role="form">
   <div class="row">
-    <div class="col-md-6">
+    <div class="col-sm-3">
       <div class="form-group has-success">
-        <input type="text" placeholder="Owner-Name" class="form-control is-valid" />
+        <input type="text" placeholder="Owner-Name" class="form-control is-valid" ng-model='owner_name' required/>
       </div>
     </div>
-    <div class="col-md-6">
-      <button class="btn btn-icon btn-3 btn-success" type="button">
+    <div class="col-sm-4">
+      <button class="btn btn-icon btn-3 btn-success" type="submit"  ng-click="addOwnerForm.$valid && addOwner()" >
       <span class="btn-inner--icon"><i class="ni ni-fat-add"></i></span>
   
-      <span class="btn-inner--text">Add Owner</span>
+      <span class="btn-inner--text">Add owner</span>
     
       </button>
+      <!-- <span id="alert_message"></span>  -->
+    </div>
+    <div class="col-sm-6">
+      <span id="alert_message"></span>
     </div>
   </div>
 </form>
@@ -283,206 +287,14 @@
                     <th scope="col">Owner</th>
                     <th scope="col">Reset Password</th>
                     <th scope="col">Block</th>
+                    <th scope="col">UnBlock</th>
                     <th scope="col">Delete</th>
                     <!--th scope="col"></th-->
                     <!--th scope="col"></th-->
                   </tr>
                 </thead>
-                <tbody>
-                  <tr>
-                    <th scope="row">
-                      <div class="media align-items-center">
-                        <a href="#" class="avatar rounded-circle mr-3">
-                          <img alt="Image placeholder" src="../../assets/img/logo/owner.png">
-                        </a>
-                        <div class="media-body">
-                          <span class="mb-0 text-sm">ELCITA</span>
-                        </div>
-                      </div>
-                    </th>
-                    <td>
-                      <!-- Button trigger modal -->
-                      <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#reset_passwd_modal">
-                        Reset Password
-                      </button>
-
-                      <!-- Modal -->
-                      <div class="modal fade" id="reset_passwd_modal" tabindex="-1" role="dialog" aria-labelledby="reset_passwd_modal_label" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered" role="document">
-                          <div class="modal-content">
-                            <div class="modal-header">
-                              <h5 class="modal-title" id="exampleModalLabel">Reset Password</h5>
-                              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                <span aria-hidden="true">&times;</span>
-                              </button>
-                            </div>
-                            <div class="modal-body">
-                              Are you sure you want to reset the password for {owner}?
-                            </div>
-                            <div class="modal-footer">
-                              <button type="button" class="btn btn-secondary" data-dismiss="modal">No</button>
-                              <button type="button" class="btn btn-primary">Yes</button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                      <td>
-                      <!-- Button trigger modal -->
-                      <button type="button" class="btn btn-default" data-toggle="modal" data-target="#block_modal">
-                        Block
-                      </button>
-
-                      <!-- Modal -->
-                      <div class="modal fade" id="block_modal" tabindex="-1" role="dialog" aria-labelledby="block_modal_label" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered" role="document">
-                          <div class="modal-content">
-                            <div class="modal-header">
-                              <h5 class="modal-title" id="block_modal_label">Block Owner</h5>
-                              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                <span aria-hidden="true">&times;</span>
-                              </button>
-                            </div>
-                            <div class="modal-body">
-                              Are you sure you want to block {owner}?
-                            </div>
-                            <div class="modal-footer">
-                              <button type="button" class="btn btn-secondary" data-dismiss="modal">No</button>
-                              <button type="button" class="btn btn-default">Yes</button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                      <td>
-                      <!-- Button trigger modal -->
-                      <button type="button" class="btn btn-danger" data-toggle="modal" data-target="#delete_modal">
-                        Delete
-                      </button>
-
-                      <!-- Modal -->
-                      <div class="modal fade" id="delete_modal" tabindex="-1" role="dialog" aria-labelledby="delete_modal_label" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered" role="document">
-                          <div class="modal-content">
-                            <div class="modal-header">
-                              <h5 class="modal-title" id="delete_modal_label">Delete Owner</h5>
-                              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                <span aria-hidden="true">&times;</span>
-                              </button>
-                            </div>
-                            <div class="modal-body">
-                              Are you sure you want to delete {owner}?
-                            </div>
-                            <div class="modal-footer">
-                              <button type="button" class="btn btn-secondary" data-dismiss="modal">No</button>
-                              <button type="button" class="btn btn-danger">Yes</button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                     
- 
-                    
-                  </tr>
-
-                  <tr>
-                    <th scope="row">
-                      <div class="media align-items-center">
-                        <a href="#" class="avatar rounded-circle mr-3">
-                          <img alt="Image placeholder" src="../../assets/img/logo/owner-1.png">
-                        </a>
-                        <div class="media-body">
-                          <span class="mb-0 text-sm">RBCCPS</span>
-                        </div>
-                      </div>
-                    </th>
-                    <td>
-                      <!-- Button trigger modal -->
-                      <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#reset_passwd_modal">
-                        Reset Password
-                      </button>
-
-                      <!-- Modal -->
-                      <div class="modal fade" id="reset_passwd_modal" tabindex="-1" role="dialog" aria-labelledby="reset_passwd_modal_label" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered" role="document">
-                          <div class="modal-content">
-                            <div class="modal-header">
-                              <h5 class="modal-title" id="exampleModalLabel">Reset Password</h5>
-                              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                <span aria-hidden="true">&times;</span>
-                              </button>
-                            </div>
-                            <div class="modal-body">
-                              Are you sure you want to reset the password for {owner}?
-                            </div>
-                            <div class="modal-footer">
-                              <button type="button" class="btn btn-secondary" data-dismiss="modal">No</button>
-                              <button type="button" class="btn btn-primary">Yes</button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                      <td>
-                      <!-- Button trigger modal -->
-                      <button type="button" class="btn btn-default" data-toggle="modal" data-target="#block_modal">
-                        Block
-                      </button>
-
-                      <!-- Modal -->
-                      <div class="modal fade" id="block_modal" tabindex="-1" role="dialog" aria-labelledby="block_modal_label" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered" role="document">
-                          <div class="modal-content">
-                            <div class="modal-header">
-                              <h5 class="modal-title" id="block_modal_label">Block Owner</h5>
-                              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                <span aria-hidden="true">&times;</span>
-                              </button>
-                            </div>
-                            <div class="modal-body">
-                              Are you sure you want to block {owner}?
-                            </div>
-                            <div class="modal-footer">
-                              <button type="button" class="btn btn-secondary" data-dismiss="modal">No</button>
-                              <button type="button" class="btn btn-default">Yes</button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                      <td>
-                      <!-- Button trigger modal -->
-                      <button type="button" class="btn btn-danger" data-toggle="modal" data-target="#delete_modal">
-                        Delete
-                      </button>
-
-                      <!-- Modal -->
-                      <div class="modal fade" id="delete_modal" tabindex="-1" role="dialog" aria-labelledby="delete_modal_label" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered" role="document">
-                          <div class="modal-content">
-                            <div class="modal-header">
-                              <h5 class="modal-title" id="delete_modal_label">Delete Owner</h5>
-                              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                <span aria-hidden="true">&times;</span>
-                              </button>
-                            </div>
-                            <div class="modal-body">
-                              Are you sure you want to delete {owner}?
-                            </div>
-                            <div class="modal-footer">
-                              <button type="button" class="btn btn-secondary" data-dismiss="modal">No</button>
-                              <button type="button" class="btn btn-danger">Yes</button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                     
- 
-                    
-                  </tr>
-                 
+                <tbody id="owner_list">
+               
                 </tbody>
               </table>
             </div>
@@ -514,7 +326,7 @@
           </div>
         </div>
       </div>
-
+      <br>
 <!-- Footer -->
       <footer class="footer">
         <div class="row align-items-center justify-content-xl-between">
@@ -543,7 +355,7 @@
       </footer>
     </div>
   </div>
-  <!-- Argon Scripts -->
+    <!-- Argon Scripts -->
   <!-- Core -->
   <script src="../../assets/vendor/jquery/dist/jquery.min.js"></script>
   <script src="../../assets/vendor/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
@@ -557,7 +369,228 @@
   <script src="../../assets/js/angular/admin_module.js"></script>
   <script src="../../assets/js/angular/footer_module.js"></script>
   <script src="../../assets/js/angular/logout_module.js"></script>
+  <script src="../../assets/js/angular/ui_urls_module.js"></script>
+  <script src="../../assets/js/angular/admin_sidebar_module.js"></script>
   <script src="../../assets/js/angular/session_checker_module.js"></script>
+  <script type="text/javascript">
+    // Disable ctrl+s to prevent downloading source code 
+    $(document).bind('keydown', function(e) {
+      if(e.ctrlKey && (e.which == 83)) {
+        e.preventDefault();
+        // alert('Ctrl+S');
+        return false;
+      }
+    });
+
+    function checker(flag){
+        if(flag){
+          return 'checked'
+        }else{
+          return ''
+        }
+    }
+    
+    function get_table_row(owner){
+       var html_to_be_appended = `<tr id="`+owner['own']+`">
+                    <th scope="row">
+                      <div class="media align-items-center">
+                        <a href="#" class="avatar rounded-circle mr-3">
+                          <img alt="Image placeholder" src="../../assets/img/logo/owner-1.png">
+                        </a>
+                        <div class="media-body">
+                          <span class="mb-0 text-sm">`+owner['own']+`</span>
+                        </div>
+                      </div>
+                    </th>
+                    <td>
+                      <!-- Button trigger modal -->
+                      <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#reset_passwd_modal`+owner['own']+`
+                      ">
+                        Reset Password  | <i class="fas fa-key"></i>
+                      </button>
+
+                      <!-- Modal -->
+                      <div class="modal fade" id="reset_passwd_modal`+owner['own']+`" tabindex="-1" role="dialog" aria-labelledby="reset_passwd_modal_label" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered" role="document">
+                          <div class="modal-content">
+                            <div class="modal-header">
+                              <h5 class="modal-title" id="exampleModalLabel`+owner['own']+`">Reset Password</h5>
+                              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                              </button>
+                            </div>
+                            <div id="reset_password_modal_body`+owner['own']+`" class="modal-body">
+                              <center>Are you sure you want to reset the password for <br><strong>`+owner['own']+`</strong>?</center>
+                            </div>
+                            <div id="reset_password_modal_footer`+owner['own']+`" class="modal-footer">
+                              <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
+                              <button type="button" class="btn btn-primary" onclick="owner_reset_password('`+owner['own']+`', '`+owner['own']+`')"><i class="fas fa-thumbs-up"></i></button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                      <td>
+                      <!-- Button trigger modal -->
+                      <button type="button" class="btn btn-default" data-toggle="modal" data-target="#block_modal`+owner['own']+`">
+                        Block | <i class="fas fa-ban"></i>
+                      </button>
+
+                      <!-- Modal -->
+                      <div class="modal fade" id="block_modal`+owner['own']+`" tabindex="-1" role="dialog" aria-labelledby="block_modal_label" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered" role="document">
+                          <div class="modal-content">
+                            <div class="modal-header">
+                              <h5 class="modal-title" id="block_modal_label`+owner['own']+`">Block Owner</h5>
+                              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                              </button>
+                            </div>
+                            <div id="block_modal_body`+owner['own']+`" class="modal-body">
+                              <center>Are you sure you want to block <br><strong>`+owner['own']+`</strong>?</center>
+                            </div>
+                            <div id="block_modal_footer`+owner['own']+`" class="modal-footer">
+                              <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
+                              <button type="button" class="btn btn-default"  onclick="owner_block('`+owner['own']+`', '`+owner['own']+`')"><i class="fas fa-thumbs-up"></i></button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <!-- Button trigger modal -->
+                      <button type="button" class="btn btn-outline-default" data-toggle="modal" data-target="#unblock_modal`+owner['own']+`">
+                        UnBlock | <i class="far fa-circle"></i>
+                      </button>
+
+                      <!-- Modal -->
+                      <div class="modal fade" id="unblock_modal`+owner['own']+`" tabindex="-1" role="dialog" aria-labelledby="unblock_modal_label" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered" role="document">
+                          <div class="modal-content">
+                            <div class="modal-header">
+                              <h5 class="modal-title" id="unblock_modal_label`+owner['own']+`">UnBlock Owner</h5>
+                              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                              </button>
+                            </div>
+                            <div  id="unblock_modal_body`+owner['own']+`" class="modal-body">
+                              <center>Are you sure you want to unblock <br><strong>`+owner['own']+`</strong>?</center>
+                            </div>
+                            <div  id="unblock_modal_footer`+owner['own']+`" class="modal-footer">
+                              <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
+                              <button type="button" class="btn btn-outline-default"  onclick="owner_unblock('`+owner['own']+`', '`+owner['own']+`')"><i class="fas fa-thumbs-up"></i></button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                      <td>
+                      <!-- Button trigger modal -->
+                      <button type="button" class="btn btn-danger" data-toggle="modal" data-target="#delete_modal`+owner['own']+`">
+                        Delete | <i class="far fa-trash-alt"></i>
+                      </button>
+
+                      <!-- Modal -->
+                      <div class="modal fade" id="delete_modal`+owner['own']+`" tabindex="-1" role="dialog" aria-labelledby="delete_modal_label" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered" role="document">
+                          <div class="modal-content">
+                            <div class="modal-header">
+                              <h5 class="modal-title" id="delete_modal_label`+owner['own']+`">Delete Owner</h5>
+                              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                              </button>
+                            </div>
+                            <div id="delete_modal_body`+owner['own']+`" class="modal-body">
+                              <center>Are you sure you want to delete <br><strong>`+owner['own']+`</strong>?</center>
+                            </div>
+                            <div id="delete_modal_footer`+owner['own']+`" class="modal-footer">
+                              <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
+                              <button type="button" class="btn btn-danger" onclick="owner_delete('`+owner['own']+`', '`+owner['own']+`')"><i class="fas fa-thumbs-up"></i></button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                     
+                    
+                    
+                  </tr>`
+                          return html_to_be_appended;
+    }
+
+
+    function display_owners(){
+      var owner_data = JSON.parse(localStorage.getItem('data'));
+      var owner_list = $('#owner_list');
+      for (var i = (owner_data.length-1); i >=0 ; i--) {
+        owner_list.append(get_table_row(owner_data[i])); 
+        console.log(owner_data[i])
+      }
+    }
+
+    $( document ).ready(function() {
+      display_owners();
+    });
+
+    function owner_delete(owner_id){
+      $.ajax({
+           url: api['admin']['deregister-owner'],
+           data: {},
+           type: "POST",
+           contentType: 'application/json; charset=utf-8',
+           dataType: 'jsonp',
+           headers:{
+            'id': sessionStorage.getItem('id'),
+            'apikey': sessionStorage.getItem('apikey'),
+            'owner': owner_id,
+           },
+           dataType: 'json',
+           complete: function(jqXHR) {
+             if(jqXHR['status'] == 200) {
+                var d=JSON.parse(localStorage.getItem('data'));
+                for (var i = 0; i < d.length ; i++) {
+                  if (d[i]['own']==owner_id){
+                    // console.log(d[i]);
+                    d.splice(i, 1);
+                    localStorage.setItem('data', JSON.stringify(d));
+                    $( "#delete_modal_body"+owner_id).html(`<br><div class="alert alert-success alert-dismissible fade show in" role="alert">
+                            <span class="alert-inner--icon"><i class="ni ni-like-2"></i></span>
+                            <span class="alert-inner--text"><strong>Success! </strong> <strong>` + owner_id + `</strong> deleted.</span>
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>`);
+                    // $( "#alert_message").fadeOut();
+                    $( "#delete_modal_footer"+ owner_id).html("");
+                    
+                    window.setTimeout(function(){
+                      $( "#delete_modal"+ owner_id).modal('hide');
+                      $('.modal-backdrop').remove();
+                      $( "#"+ owner_id).fadeOut(1, function() { $(this).remove(); });
+                    }, 2000);
+                    break;
+                  }
+                }
+             }else{
+                $( "#delete_modal_body"+owner_id).html(`<br><div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <span class="alert-inner--icon"><i class="fas fa-exclamation-triangle"></i></span>
+                            <span class="alert-inner--text"><strong>Error! </strong>` + jqXHR['responseJSON']['error'] + `</span>
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>`);
+                  window.setTimeout(function(){
+                      $( "#delete_modal"+ owner_id).modal('hide');
+                      $('.modal-backdrop').remove();
+                    }, 2000);
+             }   
+          }  
+
+        });
+    }
+
+  </script>
+ 
 </body>
 
 </html>

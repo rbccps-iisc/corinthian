@@ -18,6 +18,8 @@ login.controller('loginCtrl', function($scope, $http, origin, api){
 			        'id': _ID,
 			        'apikey': _APIKEY,
 			    },
+			    contentType: 'application/json; charset=utf-8',
+           		dataType: 'jsonp',
 			    // data: {} 
 			}).then(function (response)
             {
@@ -29,11 +31,21 @@ login.controller('loginCtrl', function($scope, $http, origin, api){
 				  sessionStorage.setItem("role", _ROLE);
 				  var _data = [];
 				  var ent_dic;
-				  for(var i in response.data){
-				  	ent_dic = {'ent':Object.keys(response.data[i])[0], 'is_autonomous':Object.values(response.data[i])[0], 'index': Object.keys(response.data[i])[0].replace("/","_")};
-				  	_data.push(ent_dic);
+				  console.log(response.data)
+				  if(_ROLE=='admin'){
+				  	for (var i = response.data.length - 1; i >= 0; i--) {
+				  		ent_dic = {'own': response.data[i]};
+				  		_data.push(ent_dic);
+				  	}
+				  }else if(_ROLE=='owner'){
+				  	for(var i in response.data){
+					  	ent_dic = {'ent':Object.keys(response.data[i])[0], 'is_autonomous':Object.values(response.data[i])[0], 'index': Object.keys(response.data[i])[0].replace("/","_")};
+					  	_data.push(ent_dic);
+					 }
+				  }else if(_ROLE=='auto-entity'){
+				  	
 				  }
-				  console.log(response);
+				  
 				  localStorage.setItem("data", JSON.stringify(_data));
 				  window.location = location.origin + "/ui/pages/"+_ROLE;
 				} else {
@@ -52,7 +64,6 @@ login.controller('loginCtrl', function($scope, $http, origin, api){
     	let id = $scope.id;
     	let apikey = $scope.apikey;
     	let data ={}
-
     	if(id=='admin'){
 			//Trigger admin login
 			$scope._login(api['admin']['login'], id, apikey, 'admin');
