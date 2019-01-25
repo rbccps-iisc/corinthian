@@ -907,8 +907,11 @@ publish (struct http_request *req)
 
 	if (http_request_header(req, "message", &message) != KORE_RESULT_OK)
 	{
+		if (req->http_body == NULL)
+			BAD_REQUEST("no message found in request");
+			
 		if ((message = (char *)req->http_body->data) == NULL)
-			BAD_REQUEST("no body found in request");
+			BAD_REQUEST("no message found in request");
 	}
 
 	// get content-type and set in props
@@ -1088,8 +1091,11 @@ publish_async (struct http_request *req)
 
 	if (http_request_header(req, "message", &message) != KORE_RESULT_OK)
 	{
+		if (req->http_body == NULL)
+			BAD_REQUEST("no message found in request");
+
 		if ((message = (char *)req->http_body->data) == NULL)
-			BAD_REQUEST("no body found in request");
+			BAD_REQUEST("no message found in request");
 	}
 
 	if (http_request_header(req, "content-type", &content_type) != KORE_RESULT_OK)
@@ -1592,8 +1598,8 @@ register_entity (struct http_request *req)
 	if (! is_alpha_numeric(entity))
 		BAD_REQUEST("entity is not valid");
 
-	char *body = (char *)req->http_body->data;
-
+	char *body = req->http_body ? (char *)req->http_body->data : NULL;
+	
 	bool is_autonomous = false;
 	if (http_request_header(req, "is-autonomous", &char_is_autonomous) == KORE_RESULT_OK)
 	{
@@ -2251,7 +2257,7 @@ get_owners(struct http_request *req)
 		kore_buf_appendf (
 			response,
 				"\"%s\",",
-				response,kore_pgsql_getvalue(&sql,i,0)
+				kore_pgsql_getvalue(&sql,i,0)
 		);
 	}
 
@@ -3677,6 +3683,9 @@ block (struct http_request *req)
 
 	if (! is_string_safe(entity))
 		FORBIDDEN("invalid entity");
+
+	if (strcmp(id,entity) == 0)
+		FORBIDDEN("cannot block yourself");
 
 	if (! login_success(id,apikey,NULL))
 		FORBIDDEN("invalid id or apikey");
