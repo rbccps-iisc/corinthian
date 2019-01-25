@@ -76,7 +76,7 @@
               <span>Support</span>
             </a-->
             <div class="dropdown-divider"></div>
-            <a href="#!" class="dropdown-item" ng-click="_logout()">
+            <a href="#!" class="dropdown-item" onclick="_logout()">
               <i class="ni ni-user-run"></i>
               <span>Logout</span>
             </a>
@@ -113,13 +113,13 @@
           </div>
         </form>
         <!-- Navigation -->
-        <ul class="navbar-nav" ng-controller="owner_sidebarCtrl">
+        <ul class="navbar-nav"  ng-controller="owner_sidebarCtrl">
           <!--li class="nav-item">
             <a class="nav-link" href="/owner">
               <i class="ni ni-tv-2 text-primary"></i> Dashboard
             </a>
           </li-->
-          <li class="nav-item" ng-repeat="option in sidebar">
+           <li class="nav-item" ng-repeat="option in sidebar">
             <a class="nav-link" href="{{option.href}}">
               <i class="ni ni-{{option.legend}} text-{{option.color}}"></i> {{option.text}}
             </a>
@@ -245,7 +245,7 @@
     <div class="header bg-gradient-primary pb-8 pt-5 pt-md-8">
       <div class="container-fluid">
         <div class="header-body">
-          <!-- Card stats -->
+           <!-- Card stats -->
           <form name="addEntityForm" role="form">
   <div class="row">
     <div class="col-sm-3">
@@ -287,10 +287,7 @@
         <div class="col">
           <div class="card shadow">
             <div class="card-header border-0">
-              <h3 class="mb-0">Entities registered </h3>
-
-              <!-- <span id="alert_message"></span>  -->
-
+              <h3 class="mb-0">Entities registered</h3>
             </div>
             <div class="table-responsive">
               <table class="table align-items-center table-flush">
@@ -307,136 +304,6 @@
                   </tr>
                 </thead>
                 <tbody id="entity_list">
-                     <tr ng-repeat="x in data | orderBy:'-'" id="{{x.index}}">
-                    <th scope="row">
-                      <div class="media align-items-center">
-                        <a href="#" class="avatar rounded-circle mr-3">
-                          <img alt="Image placeholder" src="../../assets/img/logo/owner-1.png">
-                        </a>
-                        <div class="media-body">
-                          <span class="mb-0 text-sm">{{x.ent}}</span>
-                        </div>
-                      </div>
-                    </th>
-                    <td>
-                      <!-- Button trigger modal -->
-                      <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#reset_passwd_modal{{x.index}}
-                      ">
-                        Reset Password  | <i class="fas fa-key"></i>
-                      </button>
-
-                      <!-- Modal -->
-                      <div class="modal fade" id="reset_passwd_modal{{x.index}}" tabindex="-1" role="dialog" aria-labelledby="reset_passwd_modal_label" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered" role="document">
-                          <div class="modal-content">
-                            <div class="modal-header">
-                              <h5 class="modal-title" id="exampleModalLabel{{x.ent}}">Reset Password</h5>
-                              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                <span aria-hidden="true">&times;</span>
-                              </button>
-                            </div>
-                            <div class="modal-body">
-                              <center>Are you sure you want to reset the password for <br><strong>{{x.ent}}</strong>?</center>
-                            </div>
-                            <div class="modal-footer">
-                              <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
-                              <button type="button" class="btn btn-primary" ng-click="entity_reset_password('{{x.ent}}')"><i class="fas fa-thumbs-up"></i></button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                      <td>
-                      <!-- Button trigger modal -->
-                      <button type="button" class="btn btn-default" data-toggle="modal" data-target="#block_modal{{x.index}}">
-                        Block | <i class="fas fa-ban"></i>
-                      </button>
-
-                      <!-- Modal -->
-                      <div class="modal fade" id="block_modal{{x.index}}" tabindex="-1" role="dialog" aria-labelledby="block_modal_label" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered" role="document">
-                          <div class="modal-content">
-                            <div class="modal-header">
-                              <h5 class="modal-title" id="block_modal_label{{x.ent}}">Block Entity</h5>
-                              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                <span aria-hidden="true">&times;</span>
-                              </button>
-                            </div>
-                            <div class="modal-body">
-                              <center>Are you sure you want to block <br><strong>{{x.ent}}</strong>?</center>
-                            </div>
-                            <div class="modal-footer">
-                              <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
-                              <button type="button" class="btn btn-default"  ng-click="entity_block(this.x, '{{x.index}}')"><i class="fas fa-thumbs-up"></i></button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <!-- Button trigger modal -->
-                      <button type="button" class="btn btn-outline-default" data-toggle="modal" data-target="#unblock_modal{{x.index}}">
-                        UnBlock | <i class="far fa-circle"></i>
-                      </button>
-
-                      <!-- Modal -->
-                      <div class="modal fade" id="unblock_modal{{x.index}}" tabindex="-1" role="dialog" aria-labelledby="unblock_modal_label" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered" role="document">
-                          <div class="modal-content">
-                            <div class="modal-header">
-                              <h5 class="modal-title" id="unblock_modal_label{{x.ent}}">Block Entity</h5>
-                              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                <span aria-hidden="true">&times;</span>
-                              </button>
-                            </div>
-                            <div class="modal-body">
-                              <center>Are you sure you want to unblock <br><strong>{{x.ent}}</strong>?</center>
-                            </div>
-                            <div class="modal-footer">
-                              <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
-                              <button type="button" class="btn btn-outline-default"  ng-click="entity_unblock(this.x, '{{x.index}}')"><i class="fas fa-thumbs-up"></i></button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                      <td>
-                      <!-- Button trigger modal -->
-                      <button type="button" class="btn btn-danger" data-toggle="modal" data-target="#delete_modal{{x.index}}">
-                        Delete | <i class="far fa-trash-alt"></i>
-                      </button>
-
-                      <!-- Modal -->
-                      <div class="modal fade" id="delete_modal{{x.index}}" tabindex="-1" role="dialog" aria-labelledby="delete_modal_label" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered" role="document">
-                          <div class="modal-content">
-                            <div class="modal-header">
-                              <h5 class="modal-title" id="delete_modal_label{{x.ent}}">Delete Entity</h5>
-                              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                <span aria-hidden="true">&times;</span>
-                              </button>
-                            </div>
-                            <div id="delete_modal_body{{x.index}}" class="modal-body">
-                              <center>Are you sure you want to delete <br><strong>{{x.ent}}</strong>?</center>
-                            </div>
-                            <div id="delete_modal_footer{{x.index}}" class="modal-footer">
-                              <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
-                              <button type="button" class="btn btn-danger" ng-click="entity_delete(x.ent, x.index)"><i class="fas fa-thumbs-up"></i></button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                     
-                    <td>
-                      <label class="custom-toggle">
-                        <input type="checkbox" id="cb_{{x.index}}" ng-checked={{x.is_autonomous}} ng-click="change_autonomous_state(x.ent,x.is_autonomous,x.index, this.x)">
-                        <span class="custom-toggle-slider rounded-circle"></span>
-                      </label>
-                    </td>
-                    
-                  </tr>
-                 
                
                 </tbody>
               </table>
@@ -498,7 +365,7 @@
       </footer>
     </div>
   </div>
-  <!-- Argon Scripts -->
+    <!-- Argon Scripts -->
   <!-- Core -->
   <script src="../../assets/vendor/jquery/dist/jquery.min.js"></script>
   <script src="../../assets/vendor/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
@@ -525,7 +392,401 @@
       }
     });
 
+    function checker(flag){
+        if(flag){
+          return 'checked'
+        }else{
+          return ''
+        }
+    }
+    
+    function get_table_row(entity){
+       var html_to_be_appended = `<tr id="`+entity['index']+`">
+                    <th scope="row">
+                      <div class="media align-items-center">
+                        <a href="#" class="avatar rounded-circle mr-3">
+                          <img alt="Image placeholder" src="../../assets/img/logo/owner-1.png">
+                        </a>
+                        <div class="media-body">
+                          <span class="mb-0 text-sm">`+entity['ent']+`</span>
+                        </div>
+                      </div>
+                    </th>
+                    <td>
+                      <!-- Button trigger modal -->
+                      <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#reset_passwd_modal`+entity['index']+`
+                      ">
+                        Reset Password  | <i class="fas fa-key"></i>
+                      </button>
+
+                      <!-- Modal -->
+                      <div class="modal fade" id="reset_passwd_modal`+entity['index']+`" tabindex="-1" role="dialog" aria-labelledby="reset_passwd_modal_label" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered" role="document">
+                          <div class="modal-content">
+                            <div class="modal-header">
+                              <h5 class="modal-title" id="exampleModalLabel`+entity['ent']+`">Reset Password</h5>
+                              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                              </button>
+                            </div>
+                            <div id="reset_password_modal_body`+entity['index']+`" class="modal-body">
+                              <center>Are you sure you want to reset the password for <br><strong>`+entity['ent']+`</strong>?</center>
+                            </div>
+                            <div id="reset_password_modal_footer`+entity['index']+`" class="modal-footer">
+                              <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
+                              <button type="button" class="btn btn-primary" onclick="entity_reset_password('`+entity['ent']+`', '`+entity['index']+`')"><i class="fas fa-thumbs-up"></i></button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                      <td>
+                      <!-- Button trigger modal -->
+                      <button type="button" class="btn btn-default" data-toggle="modal" data-target="#block_modal`+entity['index']+`">
+                        Block | <i class="fas fa-ban"></i>
+                      </button>
+
+                      <!-- Modal -->
+                      <div class="modal fade" id="block_modal`+entity['index']+`" tabindex="-1" role="dialog" aria-labelledby="block_modal_label" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered" role="document">
+                          <div class="modal-content">
+                            <div class="modal-header">
+                              <h5 class="modal-title" id="block_modal_label`+entity['ent']+`">Block Entity</h5>
+                              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                              </button>
+                            </div>
+                            <div id="block_modal_body`+entity['index']+`" class="modal-body">
+                              <center>Are you sure you want to block <br><strong>`+entity['ent']+`</strong>?</center>
+                            </div>
+                            <div id="block_modal_footer`+entity['index']+`" class="modal-footer">
+                              <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
+                              <button type="button" class="btn btn-default"  onclick="entity_block('`+entity['ent']+`', '`+entity['index']+`')"><i class="fas fa-thumbs-up"></i></button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <!-- Button trigger modal -->
+                      <button type="button" class="btn btn-outline-default" data-toggle="modal" data-target="#unblock_modal`+entity['index']+`">
+                        UnBlock | <i class="far fa-circle"></i>
+                      </button>
+
+                      <!-- Modal -->
+                      <div class="modal fade" id="unblock_modal`+entity['index']+`" tabindex="-1" role="dialog" aria-labelledby="unblock_modal_label" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered" role="document">
+                          <div class="modal-content">
+                            <div class="modal-header">
+                              <h5 class="modal-title" id="unblock_modal_label`+entity['ent']+`">UnBlock Entity</h5>
+                              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                              </button>
+                            </div>
+                            <div  id="unblock_modal_body`+entity['index']+`" class="modal-body">
+                              <center>Are you sure you want to unblock <br><strong>`+entity['ent']+`</strong>?</center>
+                            </div>
+                            <div  id="unblock_modal_footer`+entity['index']+`" class="modal-footer">
+                              <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
+                              <button type="button" class="btn btn-outline-default"  onclick="entity_unblock('`+entity['ent']+`', '`+entity['index']+`')"><i class="fas fa-thumbs-up"></i></button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                      <td>
+                      <!-- Button trigger modal -->
+                      <button type="button" class="btn btn-danger" data-toggle="modal" data-target="#delete_modal`+entity['index']+`">
+                        Delete | <i class="far fa-trash-alt"></i>
+                      </button>
+
+                      <!-- Modal -->
+                      <div class="modal fade" id="delete_modal`+entity['index']+`" tabindex="-1" role="dialog" aria-labelledby="delete_modal_label" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered" role="document">
+                          <div class="modal-content">
+                            <div class="modal-header">
+                              <h5 class="modal-title" id="delete_modal_label`+entity['ent']+`">Delete Entity</h5>
+                              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                              </button>
+                            </div>
+                            <div id="delete_modal_body`+entity['index']+`" class="modal-body">
+                              <center>Are you sure you want to delete <br><strong>`+entity['ent']+`</strong>?</center>
+                            </div>
+                            <div id="delete_modal_footer`+entity['index']+`" class="modal-footer">
+                              <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
+                              <button type="button" class="btn btn-danger" onclick="entity_delete('`+entity['ent']+`', '`+entity['index']+`')"><i class="fas fa-thumbs-up"></i></button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                     
+                    <td>
+                              <label class="custom-toggle">
+                                <input type="checkbox" onchange="change_autonomous_state('`+entity['ent']+`','`+entity['index']+`',this)" `+ checker(entity['is_autonomous']) +`>
+                                <span class="custom-toggle-slider rounded-circle"></span>
+                              </label>
+                            </td>
+                    
+                  </tr>`
+                          return html_to_be_appended;
+    }
+
+
+    function display_entities(){
+      var entity_data = JSON.parse(localStorage.getItem('data'));
+      var entity_list = $('#entity_list');
+      for (var i = (entity_data.length-1); i >=0 ; i--) {
+        entity_list.append(get_table_row(entity_data[i])); 
+      }
+    }
+
+    $( document ).ready(function() {
+      display_entities();
+    });
+
+    function entity_block(entity_id, entity_index){
+      $.ajax({
+           url: api['owner']['block'],
+           data: {},
+           type: "POST",
+           contentType: 'application/json; charset=utf-8',
+           dataType: 'jsonp',
+           headers:{
+            'id': sessionStorage.getItem('id'),
+            'apikey': sessionStorage.getItem('apikey'),
+            'entity': entity_id,
+           },
+           dataType: 'json',
+           complete: function(jqXHR) {
+             if(jqXHR['status'] == 200) {
+                var d=JSON.parse(localStorage.getItem('data'));
+                for (var i = 0; i < d.length ; i++) {
+                  if (d[i]['ent']==entity_id){
+                    // console.log(d[i]);
+                    localStorage.setItem('data', JSON.stringify(d));
+                    $( "#block_modal_body"+entity_index).html(`<br><div class="alert alert-success alert-dismissible fade show in" role="alert">
+                            <span class="alert-inner--icon"><i class="ni ni-like-2"></i></span>
+                            <span class="alert-inner--text"><strong>Success! </strong> <strong>` + entity_id + `</strong> blocked.</span>
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>`);
+                    // $( "#alert_message").fadeOut();
+                    $( "#block_modal_footer"+ entity_index).html("");
+                    
+                    window.setTimeout(function(){
+                      $( "#block_modal"+ entity_index).modal('hide');
+                      $('.modal-backdrop').remove();
+                    }, 2000);
+                    break;
+                  }
+                }
+             }else{
+                $( "#block_modal_body"+entity_index).html(`<br><div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <span class="alert-inner--icon"><i class="fas fa-exclamation-triangle"></i></span>
+                            <span class="alert-inner--text"><strong>Error! </strong>` + jqXHR['responseJSON']['error'] + `</span>
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>`);
+                  window.setTimeout(function(){
+                      $( "#block_modal"+ entity_index).modal('hide');
+                      $('.modal-backdrop').remove();
+                      $( "#"+ entity_index).fadeOut(1, function() { $(this).remove(); });
+                    }, 2000);
+             }   
+          }  
+
+        });
+    }
+
+    function entity_unblock(entity_id, entity_index){
+      $.ajax({
+           url: api['owner']['unblock'],
+           data: {},
+           type: "POST",
+           contentType: 'application/json; charset=utf-8',
+           dataType: 'jsonp',
+           headers:{
+            'id': sessionStorage.getItem('id'),
+            'apikey': sessionStorage.getItem('apikey'),
+            'entity': entity_id,
+           },
+           dataType: 'json',
+           complete: function(jqXHR) {
+             if(jqXHR['status'] == 200) {
+                var d=JSON.parse(localStorage.getItem('data'));
+                for (var i = 0; i < d.length ; i++) {
+                  if (d[i]['ent']==entity_id){
+                    // console.log(d[i]);
+                    $( "#unblock_modal_body"+entity_index).html(`<br><div class="alert alert-success alert-dismissible fade show in" role="alert">
+                            <span class="alert-inner--icon"><i class="ni ni-like-2"></i></span>
+                            <span class="alert-inner--text"><strong>Success! </strong> <strong>` + entity_id + `</strong> unblocked.</span>
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>`);
+                    // $( "#alert_message").fadeOut();
+                    $( "#unblock_modal_footer"+ entity_index).html("");
+                    
+                    window.setTimeout(function(){
+                      $( "#unblock_modal"+ entity_index).modal('hide');
+                      $('.modal-backdrop').remove();
+                    }, 2000);
+                    break;
+                  }
+                }
+             }else{
+                $( "#unblock_modal_body"+entity_index).html(`<br><div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <span class="alert-inner--icon"><i class="fas fa-exclamation-triangle"></i></span>
+                            <span class="alert-inner--text"><strong>Error! </strong>` + jqXHR['responseJSON']['error'] + `</span>
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>`);
+                  window.setTimeout(function(){
+                      $( "#unblock_modal"+ entity_index).modal('hide');
+                      $('.modal-backdrop').remove();
+                      $( "#"+ entity_index).fadeOut(1, function() { $(this).remove(); });
+                    }, 2000);
+             }   
+          }  
+
+        });
+    }
+
+    function entity_delete(entity_id, entity_index){
+      $.ajax({
+           url: api['owner']['deregister-entity'],
+           data: {},
+           type: "POST",
+           contentType: 'application/json; charset=utf-8',
+           dataType: 'jsonp',
+           headers:{
+            'id': sessionStorage.getItem('id'),
+            'apikey': sessionStorage.getItem('apikey'),
+            'entity': entity_id,
+           },
+           dataType: 'json',
+           complete: function(jqXHR) {
+             if(jqXHR['status'] == 200) {
+                var d=JSON.parse(localStorage.getItem('data'));
+                for (var i = 0; i < d.length ; i++) {
+                  if (d[i]['ent']==entity_id){
+                    // console.log(d[i]);
+                    d.splice(i, 1);
+                    localStorage.setItem('data', JSON.stringify(d));
+                    $( "#delete_modal_body"+entity_index).html(`<br><div class="alert alert-success alert-dismissible fade show in" role="alert">
+                            <span class="alert-inner--icon"><i class="ni ni-like-2"></i></span>
+                            <span class="alert-inner--text"><strong>Success! </strong> <strong>` + entity_id + `</strong> deleted.</span>
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>`);
+                    // $( "#alert_message").fadeOut();
+                    $( "#delete_modal_footer"+ entity_index).html("");
+                    
+                    window.setTimeout(function(){
+                      $( "#delete_modal"+ entity_index).modal('hide');
+                      $('.modal-backdrop').remove();
+                      $( "#"+ entity_index).fadeOut(1, function() { $(this).remove(); });
+                    }, 2000);
+                    break;
+                  }
+                }
+             }else{
+                $( "#delete_modal_body"+entity_index).html(`<br><div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <span class="alert-inner--icon"><i class="fas fa-exclamation-triangle"></i></span>
+                            <span class="alert-inner--text"><strong>Error! </strong>` + jqXHR['responseJSON']['error'] + `</span>
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>`);
+                  window.setTimeout(function(){
+                      $( "#delete_modal"+ entity_index).modal('hide');
+                      $('.modal-backdrop').remove();
+                      $( "#"+ entity_index).fadeOut(1, function() { $(this).remove(); });
+                    }, 2000);
+             }   
+          }  
+
+        });
+    }
+
+  // function change_autonomous_state(entity_id, index, cb) {
+  //   console.log("Clicked, new value = " + cb.checked, entity_id, index);
+  // }
+
+    function change_autonomous_state(entity_id, entity_index, checkbox){
+      $.ajax({
+           url: api['owner']['set-autonomous'],
+           data: {},
+           type: "POST",
+           contentType: 'application/json; charset=utf-8',
+           dataType: 'jsonp',
+           headers:{
+            'id': sessionStorage.getItem('id'),
+            'apikey': sessionStorage.getItem('apikey'),
+            'entity': entity_id,
+            'is-autonomous': checkbox.checked
+           },
+           dataType: 'json',
+           complete: function(jqXHR) {
+             if(jqXHR['status'] == 200) {
+                var d=JSON.parse(localStorage.getItem('data'));
+                for (var i = 0; i < d.length ; i++) {
+                  if (d[i]['ent']==entity_id){
+                    // console.log(d[i]);
+                    d[i]['is_autonomous']=checkbox.checked;
+                    localStorage.setItem('data', JSON.stringify(d));
+                    if(checkbox.checked){
+                      $( "#alert_message").html(`<br><div class="alert alert-success alert-dismissible fade show in" role="alert">
+                            <span class="alert-inner--icon"><i class="ni ni-like-2"></i></span>
+                            <span class="alert-inner--text"><strong>Success! </strong> <strong>` + entity_id + `</strong> is now an autonomous entity.</span>
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>`);
+                    }else{
+                      $( "#alert_message").html(`<br><div class="alert alert-success alert-dismissible fade show in" role="alert">
+                            <span class="alert-inner--icon"><i class="ni ni-like-2"></i></span>
+                            <span class="alert-inner--text"><strong>Success! </strong> <strong>` + entity_id + `</strong> is now a non-autonomous entity.</span>
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>`);
+                    }
+                    // $( "#alert_message").fadeOut();
+                    
+                     window.setTimeout(function(){
+                      $( "#alert_message").fadeIn();
+                      $( "#alert_message").fadeOut(450);
+                    }, 900);
+                    break;
+                  }
+                }
+             }else{
+                $( "#alert_message").html(`<br><div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <span class="alert-inner--icon"><i class="fas fa-exclamation-triangle"></i></span>
+                            <span class="alert-inner--text"><strong>Error! </strong>` + jqXHR['responseJSON']['error'] + `</span>
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>`);
+                  window.setTimeout(function(){
+                      $( "#alert_message").fadeIn();
+                      $( "#alert_message").fadeOut(450);
+                    }, 900);
+             }   
+          }  
+
+        });
+    }
+
   </script>
+ 
 </body>
 
 </html>

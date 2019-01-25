@@ -26,7 +26,8 @@ owner.controller('ownerCtrl', function($scope, $compile, $http){
     // ADD/Register Entity
     $scope.addEntity=function(){
       //console.log($scope.is_autonomous==undefined)
-      var is_autonomous=($scope.is_autonomous==undefined)?false:true;
+      // console.log($scope.is_autonomous)
+      var is_autonomous=($scope.is_autonomous==undefined || $scope.is_autonomous==false)?false:true;
       $http({
           method: 'POST',
           url: api['owner']['register-entity'],
@@ -81,12 +82,12 @@ owner.controller('ownerCtrl', function($scope, $compile, $http){
                                 <span aria-hidden="true">&times;</span>
                               </button>
                             </div>
-                            <div class="modal-body">
+                            <div id="reset_password_modal_body`+_obj['index']+`" class="modal-body">
                               <center>Are you sure you want to reset the password for <br><strong>`+_obj['ent']+`</strong>?</center>
                             </div>
-                            <div class="modal-footer">
+                            <div id="reset_password_modal_footer`+_obj['index']+`" class="modal-footer">
                               <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
-                              <button type="button" class="btn btn-primary" ng-click="entity_reset_password('`+_obj['ent']+`')"><i class="fas fa-thumbs-up"></i></button>
+                              <button type="button" class="btn btn-primary" onclick="entity_reset_password('`+_obj['ent']+`', '`+_obj['index']+`')"><i class="fas fa-thumbs-up"></i></button>
                             </div>
                           </div>
                         </div>
@@ -108,12 +109,12 @@ owner.controller('ownerCtrl', function($scope, $compile, $http){
                                 <span aria-hidden="true">&times;</span>
                               </button>
                             </div>
-                            <div class="modal-body">
+                            <div id="block_modal_body`+_obj['index']+`" class="modal-body">
                               <center>Are you sure you want to block <br><strong>`+_obj['ent']+`</strong>?</center>
                             </div>
-                            <div class="modal-footer">
+                            <div id="block_modal_footer`+_obj['index']+`" class="modal-footer">
                               <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
-                              <button type="button" class="btn btn-default"  ng-click="entity_block(this.x, '`+_obj['index']+`')"><i class="fas fa-thumbs-up"></i></button>
+                              <button type="button" class="btn btn-default"  onclick="entity_block('`+_obj['ent']+`', '`+_obj['index']+`')"><i class="fas fa-thumbs-up"></i></button>
                             </div>
                           </div>
                         </div>
@@ -130,17 +131,17 @@ owner.controller('ownerCtrl', function($scope, $compile, $http){
                         <div class="modal-dialog modal-dialog-centered" role="document">
                           <div class="modal-content">
                             <div class="modal-header">
-                              <h5 class="modal-title" id="unblock_modal_label`+_obj['ent']+`">Block Entity</h5>
+                              <h5 class="modal-title" id="unblock_modal_label`+_obj['ent']+`">UnBlock Entity</h5>
                               <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                                 <span aria-hidden="true">&times;</span>
                               </button>
                             </div>
-                            <div class="modal-body">
+                            <div id="unblock_modal_body`+_obj['index']+`" class="modal-body">
                               <center>Are you sure you want to unblock <br><strong>`+_obj['ent']+`</strong>?</center>
                             </div>
-                            <div class="modal-footer">
+                            <div id="unblock_modal_footer`+_obj['index']+`" class="modal-footer">
                               <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
-                              <button type="button" class="btn btn-outline-default"  ng-click="entity_unblock(this.x, '`+_obj['index']+`')"><i class="fas fa-thumbs-up"></i></button>
+                              <button type="button" class="btn btn-outline-default"  onclick="entity_unblock('`+_obj['ent']+`', '`+_obj['index']+`')"><i class="fas fa-thumbs-up"></i></button>
                             </div>
                           </div>
                         </div>
@@ -167,7 +168,7 @@ owner.controller('ownerCtrl', function($scope, $compile, $http){
                             </div>
                             <div id="delete_modal_footer`+_obj['index']+`" class="modal-footer">
                               <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
-                              <button type="button" class="btn btn-danger" ng-click="entity_delete('`+_obj['ent']+`', '`+_obj['index']+`')"><i class="fas fa-thumbs-up"></i></button>
+                              <button type="button" class="btn btn-danger" onclick="entity_delete('`+_obj['ent']+`', '`+_obj['index']+`')"><i class="fas fa-thumbs-up"></i></button>
                             </div>
                           </div>
                         </div>
@@ -175,14 +176,14 @@ owner.controller('ownerCtrl', function($scope, $compile, $http){
                     </td>
                      
                     <td>
-                      <label class="custom-toggle">
-                        
-                        <input type="checkbox" id="cb_"`+ _obj[index] +` ng-checked=` + _obj['is_autonomous'] + `ng-click="change_autonomous_state('`+_obj['ent']+`',`+_obj['is_autonomous']+`,'`+_obj['index']+`')">
-                        <span class="custom-toggle-slider rounded-circle"></span>
-                      </label>
-                    </td>
+                              <label class="custom-toggle">
+                                <input type="checkbox" onchange="change_autonomous_state('`+_obj['ent']+`','`+_obj['index']+`',this)" `+ checker(_obj['is_autonomous']) +`>
+                                <span class="custom-toggle-slider rounded-circle"></span>
+                              </label>
+                            </td>
                     
                   </tr>`;
+
                   var compiled_entity_row=$compile(entity_row)($scope);
                     $("#entity_list").each(function() {
                         if ($(this).html()){
@@ -191,7 +192,8 @@ owner.controller('ownerCtrl', function($scope, $compile, $http){
                             $(this).append(compiled_entity_row);
                         }
                     });
-                    
+
+                    // $("cb_"+ _obj['index']).prop('checked', _obj['is_autonomous'])
                     $("#alert_message").html(`<br><div class="alert alert-success alert-dismissible fade show in" role="alert">
                             <span class="alert-inner--icon"><i class="ni ni-like-2"></i></span>
                             <span class="alert-inner--text"><strong>Success! </strong>` + _obj['ent'] + ` registered.</span>

@@ -20,7 +20,7 @@
   <!-- Argon CSS -->
   <link type="text/css" href="../../assets/css/argon.min.css?v=1.0.0" rel="stylesheet">
 </head>
-<body class="bg-default" ng-controller="logoutCtrl">
+<body class="bg-default" ng-controller="logoutCtrl"  oncontextmenu="return false">
   
   
   <!-- Sidenav -->
@@ -113,15 +113,15 @@
           </div>
         </form>
         <!-- Navigation -->
-        <ul class="navbar-nav">
+        <ul class="navbar-nav" ng-controller="owner_sidebarCtrl">
           <!--li class="nav-item">
             <a class="nav-link" href="/owner">
               <i class="ni ni-tv-2 text-primary"></i> Dashboard
             </a>
           </li-->
-          <li class="nav-item">
-            <a class="nav-link" href="/add-owner">
-              <i class="ni ni-fat-add text-green"></i> ADD Entity
+          <li class="nav-item" ng-repeat="option in sidebar">
+            <a class="nav-link" href="{{option.href}}">
+              <i class="ni ni-{{option.legend}} text-{{option.color}}"></i> {{option.text}}
             </a>
           </li>
           <!--li class="nav-item">
@@ -246,20 +246,33 @@
       <div class="container-fluid">
         <div class="header-body">
           <!-- Card stats -->
-          <form>
+          <form name="addEntityForm" role="form">
   <div class="row">
-    <div class="col-md-6">
+    <div class="col-sm-3">
       <div class="form-group has-success">
-        <input type="text" placeholder="Entity-Name" class="form-control is-valid" />
+        <input type="text" placeholder="Entity-Name" class="form-control is-valid" ng-model='entity_name' required/>
       </div>
     </div>
-    <div class="col-md-6">
-      <button class="btn btn-icon btn-3 btn-success" type="button">
+    <div class="col-sm-2">
+    <label class="custom-toggle">
+      <div class="custom-control custom-control-alternative custom-checkbox mb-3" >
+      <input class="custom-control-input" id="customCheck5" type="checkbox" ng-model='is_autonomous'>
+      <label class="custom-control-label" for="customCheck5" style="color:white;">is_autonomous</label>
+    </div>
+    </label>
+      
+    </div>
+    <div class="col-sm-4">
+      <button class="btn btn-icon btn-3 btn-success" type="submit"  ng-click="addEntityForm.$valid && addEntity()" >
       <span class="btn-inner--icon"><i class="ni ni-fat-add"></i></span>
   
       <span class="btn-inner--text">Add Entity</span>
     
       </button>
+      <!-- <span id="alert_message"></span>  -->
+    </div>
+    <div class="col-sm-6">
+      <span id="alert_message"></span>
     </div>
   </div>
 </form>
@@ -274,7 +287,10 @@
         <div class="col">
           <div class="card shadow">
             <div class="card-header border-0">
-              <h3 class="mb-0">Entities registered</h3>
+              <h3 class="mb-0">Entities registered </h3>
+
+              <!-- <span id="alert_message"></span>  -->
+
             </div>
             <div class="table-responsive">
               <table class="table align-items-center table-flush">
@@ -283,6 +299,7 @@
                     <th scope="col">Entity</th>
                     <th scope="col">Reset Password</th>
                     <th scope="col">Block</th>
+                    <th scope="col">UnBlock</th>
                     <th scope="col">Delete</th>
                     <th scope="col">Autonomous Entity</th>
                     <!--th scope="col"></th-->
@@ -290,6 +307,136 @@
                   </tr>
                 </thead>
                 <tbody id="entity_list">
+                     <tr ng-repeat="x in data | orderBy:'-'" id="{{x.index}}">
+                    <th scope="row">
+                      <div class="media align-items-center">
+                        <a href="#" class="avatar rounded-circle mr-3">
+                          <img alt="Image placeholder" src="../../assets/img/logo/owner-1.png">
+                        </a>
+                        <div class="media-body">
+                          <span class="mb-0 text-sm">{{x.ent}}</span>
+                        </div>
+                      </div>
+                    </th>
+                    <td>
+                      <!-- Button trigger modal -->
+                      <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#reset_passwd_modal{{x.index}}
+                      ">
+                        Reset Password  | <i class="fas fa-key"></i>
+                      </button>
+
+                      <!-- Modal -->
+                      <div class="modal fade" id="reset_passwd_modal{{x.index}}" tabindex="-1" role="dialog" aria-labelledby="reset_passwd_modal_label" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered" role="document">
+                          <div class="modal-content">
+                            <div class="modal-header">
+                              <h5 class="modal-title" id="exampleModalLabel{{x.ent}}">Reset Password</h5>
+                              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                              </button>
+                            </div>
+                            <div class="modal-body">
+                              <center>Are you sure you want to reset the password for <br><strong>{{x.ent}}</strong>?</center>
+                            </div>
+                            <div class="modal-footer">
+                              <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
+                              <button type="button" class="btn btn-primary" ng-click="entity_reset_password('{{x.ent}}')"><i class="fas fa-thumbs-up"></i></button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                      <td>
+                      <!-- Button trigger modal -->
+                      <button type="button" class="btn btn-default" data-toggle="modal" data-target="#block_modal{{x.index}}">
+                        Block | <i class="fas fa-ban"></i>
+                      </button>
+
+                      <!-- Modal -->
+                      <div class="modal fade" id="block_modal{{x.index}}" tabindex="-1" role="dialog" aria-labelledby="block_modal_label" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered" role="document">
+                          <div class="modal-content">
+                            <div class="modal-header">
+                              <h5 class="modal-title" id="block_modal_label{{x.ent}}">Block Entity</h5>
+                              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                              </button>
+                            </div>
+                            <div class="modal-body">
+                              <center>Are you sure you want to block <br><strong>{{x.ent}}</strong>?</center>
+                            </div>
+                            <div class="modal-footer">
+                              <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
+                              <button type="button" class="btn btn-default"  ng-click="entity_block(this.x, '{{x.index}}')"><i class="fas fa-thumbs-up"></i></button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <!-- Button trigger modal -->
+                      <button type="button" class="btn btn-outline-default" data-toggle="modal" data-target="#unblock_modal{{x.index}}">
+                        UnBlock | <i class="far fa-circle"></i>
+                      </button>
+
+                      <!-- Modal -->
+                      <div class="modal fade" id="unblock_modal{{x.index}}" tabindex="-1" role="dialog" aria-labelledby="unblock_modal_label" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered" role="document">
+                          <div class="modal-content">
+                            <div class="modal-header">
+                              <h5 class="modal-title" id="unblock_modal_label{{x.ent}}">Block Entity</h5>
+                              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                              </button>
+                            </div>
+                            <div class="modal-body">
+                              <center>Are you sure you want to unblock <br><strong>{{x.ent}}</strong>?</center>
+                            </div>
+                            <div class="modal-footer">
+                              <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
+                              <button type="button" class="btn btn-outline-default"  ng-click="entity_unblock(this.x, '{{x.index}}')"><i class="fas fa-thumbs-up"></i></button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                      <td>
+                      <!-- Button trigger modal -->
+                      <button type="button" class="btn btn-danger" data-toggle="modal" data-target="#delete_modal{{x.index}}">
+                        Delete | <i class="far fa-trash-alt"></i>
+                      </button>
+
+                      <!-- Modal -->
+                      <div class="modal fade" id="delete_modal{{x.index}}" tabindex="-1" role="dialog" aria-labelledby="delete_modal_label" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered" role="document">
+                          <div class="modal-content">
+                            <div class="modal-header">
+                              <h5 class="modal-title" id="delete_modal_label{{x.ent}}">Delete Entity</h5>
+                              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                              </button>
+                            </div>
+                            <div id="delete_modal_body{{x.index}}" class="modal-body">
+                              <center>Are you sure you want to delete <br><strong>{{x.ent}}</strong>?</center>
+                            </div>
+                            <div id="delete_modal_footer{{x.index}}" class="modal-footer">
+                              <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
+                              <button type="button" class="btn btn-danger" ng-click="entity_delete(x.ent, x.index)"><i class="fas fa-thumbs-up"></i></button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                     
+                    <td>
+                      <label class="custom-toggle">
+                        <input type="checkbox" id="cb_{{x.index}}" ng-checked={{x.is_autonomous}} ng-click="change_autonomous_state(x.ent,x.is_autonomous,x.index, this.x)">
+                        <span class="custom-toggle-slider rounded-circle"></span>
+                      </label>
+                    </td>
+                    
+                  </tr>
+                 
                
                 </tbody>
               </table>
@@ -366,168 +513,19 @@
   <script src="../../assets/js/angular/footer_module.js"></script>
   <script src="../../assets/js/angular/logout_module.js"></script>
   <script src="../../assets/js/angular/ui_urls_module.js"></script>
+  <script src="../../assets/js/angular/owner_sidebar_module.js"></script>
   <script src="../../assets/js/angular/session_checker_module.js"></script>
   <script type="text/javascript">
-    
-    function get_table_row(entity){
-       var html_to_be_appended = `<tr id="`+ entity['ent'] +`">
-                            <th scope="row">
-                              <div class="media align-items-center">
-                                <a href="#" class="avatar rounded-circle mr-3">
-                                  <img alt="Image placeholder" src="../../assets/img/logo/owner-1.png">
-                                </a>
-                                <div class="media-body">
-                                  <span class="mb-0 text-sm">`+ entity['ent'] +`</span>
-                                </div>
-                              </div>
-                            </th>
-                            <td>
-                              <!-- Button trigger modal -->
-                              <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#reset_passwd_modal`+ entity['ent'] +`
-                              ">
-                                Reset Password 
-                              </button>
-
-                              <!-- Modal -->
-                              <div class="modal fade" id="reset_passwd_modal`+ entity['ent'] +`" tabindex="-1" role="dialog" aria-labelledby="reset_passwd_modal_label" aria-hidden="true">
-                                <div class="modal-dialog modal-dialog-centered" role="document">
-                                  <div class="modal-content">
-                                    <div class="modal-header">
-                                      <h5 class="modal-title" id="exampleModalLabel`+ entity['ent'] +`">Reset Password</h5>
-                                      <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                        <span aria-hidden="true">&times;</span>
-                                      </button>
-                                    </div>
-                                    <div class="modal-body">
-                                      Are you sure you want to reset the password for `+ entity['ent'] +`?
-                                    </div>
-                                    <div class="modal-footer">
-                                      <button type="button" class="btn btn-secondary" data-dismiss="modal">No</button>
-                                      <button type="button" class="btn btn-primary" onclick="entity_reset_password('`+ entity['ent'] +`')">Yes</button>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            </td>
-                              <td>
-                              <!-- Button trigger modal -->
-                              <button type="button" class="btn btn-default" data-toggle="modal" data-target="#block_modal`+ entity['ent'] +`">
-                                Block
-                              </button>
-
-                              <!-- Modal -->
-                              <div class="modal fade" id="block_modal`+ entity['ent'] +`" tabindex="-1" role="dialog" aria-labelledby="block_modal_label" aria-hidden="true">
-                                <div class="modal-dialog modal-dialog-centered" role="document">
-                                  <div class="modal-content">
-                                    <div class="modal-header">
-                                      <h5 class="modal-title" id="block_modal_label`+ entity['ent'] +`">Block Entity</h5>
-                                      <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                        <span aria-hidden="true">&times;</span>
-                                      </button>
-                                    </div>
-                                    <div class="modal-body">
-                                      Are you sure you want to block?
-                                    </div>
-                                    <div class="modal-footer">
-                                      <button type="button" class="btn btn-secondary" data-dismiss="modal">No</button>
-                                      <button type="button" class="btn btn-default"  onclick="entity_block('`+ entity['ent'] +`')">Yes</button>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            </td>
-                              <td>
-                              <!-- Button trigger modal -->
-                              <button type="button" class="btn btn-danger" data-toggle="modal" data-target="#delete_modal`+ entity['index'] +`">
-                                Delete
-                              </button>
-
-                              <!-- Modal -->
-                              <div class="modal fade" id="delete_modal`+ entity['index'] +`" tabindex="`+ entity['index'] +`" role="dialog" aria-labelledby="delete_modal_label" aria-hidden="true">
-                                <div class="modal-dialog modal-dialog-centered" role="document">
-                                  <div class="modal-content">
-                                    <div class="modal-header">
-                                      <h5 class="modal-title" id="delete_modal_label`+ entity['ent'] +`">Delete Entity</h5>
-                                      <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                        <span aria-hidden="true">&times;</span>
-                                      </button>
-                                    </div>
-                                    <div class="modal-body">
-                                      Are you sure you want to delete `+ entity['ent'] +`?
-                                    </div>
-                                    <div class="modal-footer">
-                                      <button type="button" class="btn btn-secondary" data-dismiss="modal">No</button>
-                                      <button type="button" class="btn btn-danger" onclick="entity_delete('`+ entity['ent']+`', `+ entity['index']+`, `+ entity['is_autonomous']+`)">Yes</button>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            </td>
-                             
-                            <td>
-                              <label class="custom-toggle">
-                                <input type="checkbox" value=`+ entity['is_autonomous'] +`>
-                                <span class="custom-toggle-slider rounded-circle"></span>
-                              </label>
-                            </td>
-                            
-                          </tr>`
-                          return html_to_be_appended;
-    }
-
-
-    function display_entities(){
-      var entity_data = JSON.parse(localStorage.getItem('data'));
-      var entity_list = $('#entity_list');
-      for (var i = 0; i < entity_data.length; i++) {
-        entity_list.append(get_table_row(entity_data[i])); 
+    // Disable ctrl+s to prevent downloading source code 
+    $(document).bind('keydown', function(e) {
+      if(e.ctrlKey && (e.which == 83)) {
+        e.preventDefault();
+        // alert('Ctrl+S');
+        return false;
       }
-    }
-
-    $( document ).ready(function() {
-      display_entities();
     });
 
-    function entity_delete(entity_id, is_autonomous, entity_index){
-      $.ajax({
-           url: api['owner']['deregister-entity'],
-           data: {},
-           type: "POST",
-           dataType: "jsonp",
-           beforeSend: function(xhr){
-                          xhr.setRequestHeader('id', sessionStorage.getItem('id'));
-                          xhr.setRequestHeader('apikey', sessionStorage.getItem('apikey'));
-                          xhr.setRequestHeader('entity', entity_id);
-                        },
-           success: function( data){
-                      // alert("Success" + $.parseJSON(data));
-                      var temp_d = {'ent':entity_id, 'is-autonomous': is_autonomous};
-                      for (var i = 0; i < d.length ; i++) {
-                        console.log("S1", d[i],d[i]['ent']==entity_id);
-                        if (d[i]['ent']==entity_id){
-                          d.splice(i, 1);
-                          localStorage.setItem('data', JSON.stringify(d));
-                          console.log("SSSSSS");
-                          location.reload();
-                          break;
-                          // $('#'+entity_id).remove();
-                          // $('#delete_modal'+ entity['index']).modal('hide');
-                          // window.location = location.origin + "/ui/pages/owner";
-                          // $('#entity_list').remove();
-                          // display_entities();
-                        }
-                      }
-                    },
-
-            error: function( jqXhr, textStatus, errorThrown ){
-              // console.log( errorThrown + " | " + jqXhr + " | " + textStatus + " | ");
-              console.log("ERR", jqXhr, textStatus, errorThrown);
-            }
-        });
-    }
-
   </script>
- 
 </body>
 
 </html>
