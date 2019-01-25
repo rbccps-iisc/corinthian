@@ -542,11 +542,74 @@
       }
     }
 
+    function copyToClipboard(element_id) {
+      var $temp = $("<input>");
+      $("body").append($temp);
+      $temp.val($("#new_apikey_"+element_id).text()).select();
+      $("#copied_"+element_id).html("APIKEY copied!")
+      document.execCommand("copy");
+      $temp.remove();
+    }
+
     $( document ).ready(function() {
       display_entities();
     });
 
+    function entity_reset_password(entity_id, entity_index){
+      $.ajax({
+           url: api['owner']['reset-apikey'],
+           data: {},
+           type: "POST",
+           contentType: 'application/json; charset=utf-8',
+           dataType: 'jsonp',
+           headers:{
+            'id': sessionStorage.getItem('id'),
+            'apikey': sessionStorage.getItem('apikey'),
+            'entity': entity_id,
+           },
+           dataType: 'json',
+           complete: function(jqXHR) {
+             if(jqXHR['status'] == 200) {
+                    // console.log(d[i]);
+                    $( "#alert_message").html(`<br><center><div class="alert alert-success alert-dismissible fade show in" role="alert">
+                            <span class="alert-inner--icon"><i class="ni ni-like-2"></i></span>
+                            <span class="alert-inner--text"><strong>Success! </strong> Password for <strong>` + entity_id + `</strong> has been reset to <strong id="new_apikey_`+ entity_index +`">`+ jqXHR['responseJSON']['apikey'] +`</strong>.<br> <strong id="copied_`+ entity_index +`" onclick="copyToClipboard('`+entity_index+`')"><i style="font-size:30px;" class="far fa-copy"></i></strong></span>
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div></center>`);
+                    // $( "#alert_message").fadeOut();
+                    window.setTimeout(function(){
+                      $( "#reset_passwd_modal"+ entity_index).modal('hide');
+                      $( '.modal-backdrop').remove();
+                      $( "#alert_message").fadeIn();
+                      $( "#alert_message").fadeOut(3050);
+                    }, 900);
+             }else{
+                $( "#alert_message").html(`<br><div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <span class="alert-inner--icon"><i class="fas fa-exclamation-triangle"></i></span>
+                            <span class="alert-inner--text"><strong>Error! </strong>` + jqXHR['responseJSON']['error'] + `</span>
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>`);
+
+                window.setTimeout(function(){
+                      $( "#alert_message").fadeIn();
+                      $( "#alert_message").fadeOut(450);
+                    }, 900);
+            
+            }
+             
+          }  
+
+        });
+    }
+
+
     function entity_block(entity_id, entity_index){
+      var modal_body = $( "#block_modal_body"+entity_index).html();
+      var modal_footer = $( "#block_modal_footer"+entity_index).html();
       $.ajax({
            url: api['owner']['block'],
            data: {},
@@ -561,9 +624,6 @@
            dataType: 'json',
            complete: function(jqXHR) {
              if(jqXHR['status'] == 200) {
-                var d=JSON.parse(localStorage.getItem('data'));
-                for (var i = 0; i < d.length ; i++) {
-                  if (d[i]['ent']==entity_id){
                     // console.log(d[i]);
                     localStorage.setItem('data', JSON.stringify(d));
                     $( "#block_modal_body"+entity_index).html(`<br><div class="alert alert-success alert-dismissible fade show in" role="alert">
@@ -578,11 +638,10 @@
                     
                     window.setTimeout(function(){
                       $( "#block_modal"+ entity_index).modal('hide');
-                      $('.modal-backdrop').remove();
+                      $( '.modal-backdrop').remove();
+                      $( "#block_modal_body"+entity_index).html(modal_body);   
+                      $( "#block_modal_footer"+entity_index).html(modal_footer);   
                     }, 2000);
-                    break;
-                  }
-                }
              }else{
                 $( "#block_modal_body"+entity_index).html(`<br><div class="alert alert-danger alert-dismissible fade show" role="alert">
                             <span class="alert-inner--icon"><i class="fas fa-exclamation-triangle"></i></span>
@@ -591,18 +650,27 @@
                                 <span aria-hidden="true">&times;</span>
                             </button>
                         </div>`);
+
+                $( "#block_modal_footer"+ entity_index).html("");
+
                   window.setTimeout(function(){
                       $( "#block_modal"+ entity_index).modal('hide');
                       $('.modal-backdrop').remove();
-                      $( "#"+ entity_index).fadeOut(1, function() { $(this).remove(); });
+                      $( "#block_modal_body"+entity_index).html(modal_body);   
+                      $( "#block_modal_footer"+entity_index).html(modal_footer);                
                     }, 2000);
-             }   
+
+            
+            }
+             
           }  
 
         });
     }
 
     function entity_unblock(entity_id, entity_index){
+      var modal_body = $( "#unblock_modal_body"+entity_index).html();
+      var modal_footer = $( "#unblock_modal_footer"+entity_index).html();
       $.ajax({
            url: api['owner']['unblock'],
            data: {},
@@ -616,11 +684,7 @@
            },
            dataType: 'json',
            complete: function(jqXHR) {
-             if(jqXHR['status'] == 200) {
-                var d=JSON.parse(localStorage.getItem('data'));
-                for (var i = 0; i < d.length ; i++) {
-                  if (d[i]['ent']==entity_id){
-                    // console.log(d[i]);
+             if(jqXHR['status'] == 200) {                    
                     $( "#unblock_modal_body"+entity_index).html(`<br><div class="alert alert-success alert-dismissible fade show in" role="alert">
                             <span class="alert-inner--icon"><i class="ni ni-like-2"></i></span>
                             <span class="alert-inner--text"><strong>Success! </strong> <strong>` + entity_id + `</strong> unblocked.</span>
@@ -633,11 +697,10 @@
                     
                     window.setTimeout(function(){
                       $( "#unblock_modal"+ entity_index).modal('hide');
-                      $('.modal-backdrop').remove();
+                      $( '.modal-backdrop').remove();
+                      $( "#unblock_modal_body"+entity_index).html(modal_body);   
+                      $( "#unblock_modal_footer"+entity_index).html(modal_footer);   
                     }, 2000);
-                    break;
-                  }
-                }
              }else{
                 $( "#unblock_modal_body"+entity_index).html(`<br><div class="alert alert-danger alert-dismissible fade show" role="alert">
                             <span class="alert-inner--icon"><i class="fas fa-exclamation-triangle"></i></span>
@@ -646,16 +709,24 @@
                                 <span aria-hidden="true">&times;</span>
                             </button>
                         </div>`);
+
+                $( "#unblock_modal_footer"+ entity_index).html("");
+
                   window.setTimeout(function(){
                       $( "#unblock_modal"+ entity_index).modal('hide');
                       $('.modal-backdrop').remove();
-                      $( "#"+ entity_index).fadeOut(1, function() { $(this).remove(); });
+                      $( "#unblock_modal_body"+entity_index).html(modal_body);   
+                      $( "#unblock_modal_footer"+entity_index).html(modal_footer);                
                     }, 2000);
-             }   
+
+            
+            }
+             
           }  
 
         });
     }
+
 
     function entity_delete(entity_id, entity_index){
       $.ajax({
