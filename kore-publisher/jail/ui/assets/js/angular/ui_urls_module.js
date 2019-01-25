@@ -23,6 +23,7 @@ const api = {
 		"register-entity": "/owner/register-entity",
 		"deregister-entity": "/owner/deregister-entity",
 		"set-autonomous": "/owner/set-autonomous",
+		"reset-apikey": "/owner/reset-apikey",
 		"login": "/owner/entities"
 	},
 	"auto-entity": {
