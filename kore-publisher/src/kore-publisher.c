@@ -74,7 +74,8 @@ char 	hash_string		[2*SHA256_DIGEST_LENGTH + 1];
 ht connection_ht;
 ht async_connection_ht;
 
-bool is_success = false;
+bool is_success 			= false;
+bool allow_admin_apis_from_other_hosts 	= true;
 
 char *admin_apikey;
 char *postgres_pwd;
@@ -339,6 +340,13 @@ init (int state)
 	}
 	unsetenv("POSTGRES_PWD");
 
+	/* By default allow admin APIs from other hosts too
+	   set the DISALLOW_ADMIN_APIS environment variable to disable it ! */
+
+	if (getenv("DISALLOW_ADMIN_APIS"))
+	{
+		allow_admin_apis_from_other_hosts = false;
+	}
 
 	admin_connection_open = false;
 	init_admin_connection();
@@ -1439,8 +1447,8 @@ reset_apikey (struct http_request *req)
 	// either "id" should be owner of the "entity", or an "admin" 
 	if (strcmp(id,"admin") == 0)
 	{
-		/* if (! is_request_from_localhost(req))
-			FORBIDDEN("admin can only use from localhost"); */
+		if (! is_request_from_localhost(req))
+			FORBIDDEN("admin can only call APIs from localhost");
 	}
 	else
 	{
@@ -1529,8 +1537,8 @@ set_autonomous(struct http_request *req)
 	// either "id" should be owner of the "entity", or an "admin" 
 	if (strcmp(id,"admin") == 0)
 	{
-		/* if (! is_request_from_localhost(req))
-			FORBIDDEN("admin can only use from localhost"); */
+		if (! is_request_from_localhost(req))
+			FORBIDDEN("admin can only call APIs from localhost");
 	}
 	else
 	{
@@ -1990,8 +1998,8 @@ register_owner(struct http_request *req)
 
 	req->status = 403;
 
-	/* if (! is_request_from_localhost(req))
-		FORBIDDEN("admin APIs can only be called from localhost"); */
+	if (! is_request_from_localhost(req))
+		FORBIDDEN("this API can only be called from localhost");
 
 	BAD_REQUEST_if
 	(
@@ -2102,8 +2110,8 @@ deregister_owner(struct http_request *req)
 
 	req->status = 403;
 
-	/* if (! is_request_from_localhost(req))
-		FORBIDDEN("admin APIs can only be called from localhost"); */
+	if (! is_request_from_localhost(req))
+		FORBIDDEN("this API can only be called from localhost");
 
 	BAD_REQUEST_if
 	(
@@ -2219,6 +2227,9 @@ get_owners(struct http_request *req)
 
 	req->status = 403;
 
+	if (! is_request_from_localhost(req))
+		FORBIDDEN("this API can only be called from localhost");
+
 	BAD_REQUEST_if
 	(
 		KORE_RESULT_OK != http_request_header(req, "id", &id)
@@ -2228,14 +2239,10 @@ get_owners(struct http_request *req)
 		"inputs missing in headers"
 	);
 
-
 /////////////////////////////////////////////////
 
 	if (strcmp(id,"admin") != 0)
 		FORBIDDEN("unauthorized");
-
-	/* if (! is_request_from_localhost(req))
-		FORBIDDEN("admin can only use from localhost"); */
 
 	if (! login_success(id,apikey,NULL))
 		FORBIDDEN("invalid id or apikey");
@@ -3681,8 +3688,8 @@ block (struct http_request *req)
 
 	if (strcmp(id,"admin") == 0)
 	{
-		/* if (! is_request_from_localhost(req))
-			FORBIDDEN("admin can only use from localhost"); */
+		if (! is_request_from_localhost(req))
+			FORBIDDEN("admin can only call APIs from localhost");
 	}
 	else
 	{
@@ -3739,8 +3746,8 @@ unblock (struct http_request *req)
 
 	if (strcmp(id,"admin") == 0)
 	{
-		/* if (! is_request_from_localhost(req))
-			FORBIDDEN("admin can only use from localhost"); */
+		if (! is_request_from_localhost(req))
+			FORBIDDEN("admin can only call APIs from localhost");
 	}
 	else
 	{
@@ -4251,6 +4258,9 @@ json_sanitize (const char *string)
 bool
 is_request_from_localhost (struct http_request *req)
 {
+	if (allow_admin_apis_from_other_hosts)
+		return true;
+
 	switch (req->owner->family)
 	{
 		case AF_INET:

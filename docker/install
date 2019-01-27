@@ -32,6 +32,7 @@ fi
 echo "ADMIN_PWD="$admin_passwd > .env
 echo "POSTGRES_PWD="$postgres_passwd >> .env
 echo "POSTGRES_READONLY_PWD="$postgres_readonly_passwd >> .env
+echo "#DISALLOW_ADMIN_APIS=1" >> .env
 
 docker-compose down -v
 docker-compose up -d
