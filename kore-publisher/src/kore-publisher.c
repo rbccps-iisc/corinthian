@@ -2865,8 +2865,21 @@ follow (struct http_request *req)
 			snprintf (exchange, 129, "%s.notification",to);
 		else
 		{
-			char *_owner = strtok((char *)to,"/");
-			snprintf (exchange, 129, "%s.notification",_owner);
+			int index = 0;
+
+			while (
+				to[index]
+					&&
+				to[index] != '/'
+					&&
+				index < MAX_LEN_OWNER_ID 
+			)
+			{
+				exchange[index] = to[index];
+				++index;
+			}
+
+			strlcpy (exchange + index,".notification", 32);
 		}
 
 		char *subject = "Request for follow";
