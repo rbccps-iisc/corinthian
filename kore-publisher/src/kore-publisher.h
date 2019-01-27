@@ -99,8 +99,8 @@ int db_cleanup		(struct http_request *);
 
 ///////////////////////////////////////////////////////////
 
-int init 		(int);
-void init_admin_conn 	(void);
+int init 			(int);
+void init_admin_connection 	(void);
 
 bool login_success 		(const char *, const char *, bool *);
 bool async_login_success 	(const char *, const char *, bool *);
