@@ -74,8 +74,8 @@ char 	hash_string		[2*SHA256_DIGEST_LENGTH + 1];
 ht connection_ht;
 ht async_connection_ht;
 
-bool is_success 			= false;
-bool allow_admin_apis_from_other_hosts 	= true;
+bool is_success				= false;
+bool allow_admin_apis_from_other_hosts	= false;
 
 char *admin_apikey;
 char *postgres_pwd;
@@ -340,12 +340,13 @@ init (int state)
 	}
 	unsetenv("POSTGRES_PWD");
 
-	/* By default allow admin APIs from other hosts too
-	   set the DISALLOW_ADMIN_APIS environment variable to disable it ! */
+	/* By default we allow admin APIs to be called from other hosts.
+	   Admin must unset the ALLOW_ADMIN_APIS_FROM_OTHER_HOSTS 
+	   environment variable to disable it ! */
 
-	if (getenv("DISALLOW_ADMIN_APIS"))
+	if (getenv("ALLOW_ADMIN_APIS_FROM_OTHER_HOSTS"))
 	{
-		allow_admin_apis_from_other_hosts = false;
+		allow_admin_apis_from_other_hosts = true;
 	}
 
 	admin_connection_open = false;

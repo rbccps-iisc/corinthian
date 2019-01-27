@@ -53,8 +53,9 @@ Quickstart
 
 Disabling admin APIs
 ====================
-By default the admin related APIs are allowed from any host. To disable it:
-set the DISALLOW_ADMIN_APIS environment variable (in the docker/.env file). 
+By default the admin related APIs are allowed from any host.
+To disable it: unset the "ALLOW_ADMIN_APIS_FROM_OTHER_HOSTS" environment variable
+(in the docker/.env file). 
 
 Use-case diagrams
 =================
