@@ -11,14 +11,16 @@
 #define MIN_LEN_ENTITY_ID 	(7)
 #define MAX_LEN_ENTITY_ID 	(65)
 
+// for queues and exchanges
 #define MIN_LEN_RESOURCE_ID	(MIN_LEN_ENTITY_ID)
 #define MAX_LEN_RESOURCE_ID	(128)
 
 #define MAX_LEN_HASH_KEY 	(MAX_LEN_ENTITY_ID + MAX_LEN_APIKEY)
-
 #define MAX_LEN_HASH_INPUT	(MAX_LEN_APIKEY + MAX_LEN_SALT + MAX_LEN_ENTITY_ID)
 
 #define MAX_LEN_FOLLOW_ID	(10)
+
+#define MAX_LEN_TOPIC		(128)
 
 #define MAX_AMQP_RETRIES	(3)
 
@@ -162,133 +164,6 @@ init_admin_connection (void)
 	admin_connection_open = true;
 }
 
-void*
-async_publish_function (void *v)
-{
-	// XXX: this api is not tested and must not be used
-
-	return NULL;
-#if 0
-
-	Q *q = (Q *)v;
-
-	publish_async_data_t *data = NULL; 
-
-	node *n = NULL;
-	char key [MAX_LEN_HASH_KEY + 1];
-
-	const char *id;
-	const char *apikey;
-	const char *subject;
-	const char *message;
-	const char *content_type;
-
-	char *async_exchange;
-
-	amqp_connection_state_t	*async_cached_conn = NULL;
-	
-	amqp_rpc_reply_t 	async_login_reply;
-	amqp_rpc_reply_t 	async_rpc_reply;
-	amqp_basic_properties_t	async_props;
-
-	memset(&async_props, 0, sizeof props);
-	async_props._flags = AMQP_BASIC_CONTENT_TYPE_FLAG | AMQP_BASIC_USER_ID_FLAG;
-
-	ht_init (&async_connection_ht);
-
-	while (1)
-	{
-		while ((data = q_delete(q)))
-		{
-			id		= data->id;
-			apikey		= data->apikey;
-			subject		= data->subject;
-			message		= data->message;
-			content_type	= data->content_type;
-			async_exchange	= data->exchange;
-
-			snprintf (key, MAX_LEN_HASH_KEY + 1, "%s%s", id, apikey);
-
-			if ((n = ht_search(&async_connection_ht,key)) != NULL)
-			{
-				async_cached_conn = n->value;
-			}
-			else
-			{
-
-/////////////////////////////////////////////////
-
-				if (! looks_like_a_valid_entity(id))
-					goto done;	
-
-				if (! login_success(id,apikey,NULL))
-					goto done;	
-
-/////////////////////////////////////////////////
-
-				async_cached_conn = malloc(sizeof(amqp_connection_state_t));
-
-				if (async_cached_conn == NULL)
-					goto done;	
-
-				*async_cached_conn = amqp_new_connection();
-				amqp_socket_t *socket = amqp_tcp_socket_new(*async_cached_conn);
-
-				if (socket == NULL)
-					goto done;	
-
-				if (amqp_socket_open(socket, "broker" , 5672))
-					goto done;	
-	
-				async_login_reply = amqp_login(
-					*async_cached_conn, 
-					"/",
-					0,
-					131072,
-					HEART_BEAT,
-					AMQP_SASL_METHOD_PLAIN,
-					id,
-					apikey
-				);
-
-				if (async_login_reply.reply_type != AMQP_RESPONSE_NORMAL)
-					goto done;	
-
-				if(! amqp_channel_open(*async_cached_conn, 1))
-					goto done;	
-
-				async_rpc_reply = amqp_get_rpc_reply(*async_cached_conn);
-				if (async_rpc_reply.reply_type != AMQP_RESPONSE_NORMAL)
-					goto done;	
-
-				ht_insert (&async_connection_ht, key, async_cached_conn);
-			}
-
-			async_props.user_id 		= amqp_cstring_bytes(id);
-			async_props.content_type 	= amqp_cstring_bytes(content_type);
-
-			if ( AMQP_STATUS_OK != amqp_basic_publish (
-					*async_cached_conn,
-					1,
-					amqp_cstring_bytes(async_exchange),
-        				amqp_cstring_bytes(subject),
-					0,
-					0,
-					&async_props,
-					amqp_cstring_bytes(message)
-				)
-			)
-				goto done;
-
-done:
-			free (data);
-		}
-
-		sleep (1);
-	}
-#endif
-}
-
 int
 init (int state)
 {
@@ -340,9 +215,9 @@ init (int state)
 	}
 	unsetenv("POSTGRES_PWD");
 
-	/* By default we allow admin APIs to be called from other hosts.
+	/* By default we allow admin APIs to be called from any hosts.
 	   Admin must unset the ALLOW_ADMIN_APIS_FROM_OTHER_HOSTS 
-	   environment variable to disable it ! */
+	   environment variable to only allow it from localhost. */
 
 	if (getenv("ALLOW_ADMIN_APIS_FROM_OTHER_HOSTS"))
 	{
@@ -731,120 +606,6 @@ done:
 	return login_result;
 }
 
-bool
-async_login_success (const char *id, const char *apikey, bool *is_autonomous)
-{
-#if 0
-	char *salt;
-	char *password_hash;
-	char *str_is_autonomous;
-
-	bool login_result = false;
-
-	if (id == NULL || apikey == NULL || *id == '\0' || *apikey == '\0')
-		goto done;
-
-	if (id[0] < 'a' || id[0] > 'z')
-		goto done;	
-
-	if (! is_string_safe(id))
-		goto done;
-
-	CREATE_STRING (async_query,
-		"SELECT salt,password_hash,is_autonomous FROM users "
-			"WHERE id='%s' AND blocked='f'",
-				id
-	);
-
-	debug_printf("async login query = {%s}\n",async_query->data);
-
-	kore_pgsql_cleanup(&async_sql);
-	kore_pgsql_init(&async_sql);
-	if (! kore_pgsql_setup(&async_sql,"db",KORE_PGSQL_SYNC))
-	{
-		kore_pgsql_logerror(&async_sql);
-		goto done;
-	}
-	if (! kore_pgsql_query(&async_sql,(const char *)async_query->data))
-	{
-		kore_pgsql_logerror(&async_sql);
-		goto done;
-	}
-
-	if (kore_pgsql_ntuples(&async_sql) == 0)
-		goto done;
-
-	salt 	 		= kore_pgsql_getvalue(&async_sql,0,0);
-	password_hash		= kore_pgsql_getvalue(&async_sql,0,1);
-	str_is_autonomous 	= kore_pgsql_getvalue(&async_sql,0,2);
-
-	if (is_autonomous)
-		*is_autonomous = false; 
-
-	// there is no salt or password hash in db ?
-	if (salt[0] == '\0' || password_hash[0] == '\0')
-		goto done;
-
-	if (is_autonomous)
-		*is_autonomous = str_is_autonomous[0] == 't'; 
-
-	snprintf (string_to_be_hashed, 
-			MAX_LEN_HASH_INPUT + 1,
-				"%s%s%s",
-					apikey, salt, id);
-
-	SHA256 (
-		(const uint8_t*)string_to_be_hashed,
-		strnlen (string_to_be_hashed,MAX_LEN_HASH_INPUT),
-		binary_hash
-	);
-
-	debug_printf("login success STRING TO BE HASHED = {%s}\n",
-			string_to_be_hashed);
-	snprintf
-	(
-		hash_string,
-		1 + 2*SHA256_DIGEST_LENGTH,
-		"%02x%02x%02x%02x"
-		"%02x%02x%02x%02x"
-		"%02x%02x%02x%02x"
-		"%02x%02x%02x%02x"
-		"%02x%02x%02x%02x"
-		"%02x%02x%02x%02x"
-		"%02x%02x%02x%02x"
-		"%02x%02x%02x%02x",
-		binary_hash[ 0],binary_hash[ 1],binary_hash[ 2],binary_hash[ 3],
-		binary_hash[ 4],binary_hash[ 5],binary_hash[ 6],binary_hash[ 7],
-		binary_hash[ 8],binary_hash[ 9],binary_hash[10],binary_hash[11],
-		binary_hash[12],binary_hash[13],binary_hash[14],binary_hash[15],
-		binary_hash[16],binary_hash[17],binary_hash[18],binary_hash[19],
-		binary_hash[20],binary_hash[21],binary_hash[22],binary_hash[23],
-		binary_hash[24],binary_hash[25],binary_hash[26],binary_hash[27],
-		binary_hash[28],binary_hash[29],binary_hash[30],binary_hash[31]
-	);
-
-	hash_string[2*SHA256_DIGEST_LENGTH] = '\0';
-
-	debug_printf("Expecting it to be {%s} got {%s}\n",
-			password_hash,
-				hash_string
-	);
-
-	if (strncmp(hash_string,password_hash,64) == 0) {
-		login_result = true;
-		debug_printf("Login OK\n");
-	}
-
-done:
-	kore_buf_reset(async_query);
-	kore_pgsql_cleanup(&async_sql);
-
-	return login_result;
-#endif
-
-	return false;
-}
-
 int
 publish (struct http_request *req)
 {
@@ -857,7 +618,7 @@ publish (struct http_request *req)
 
 	const char *content_type;
 
-	char topic_to_publish[129];
+	char topic_to_publish[MAX_LEN_TOPIC + 1];
 
 	req->status = 403;
 
@@ -892,8 +653,8 @@ publish (struct http_request *req)
 			BAD_REQUEST("message-type is not valid");
 		}
 
-		snprintf(exchange,129,"%s.%s",id,message_type);
-		strlcpy(topic_to_publish,subject,129);
+		snprintf(exchange,MAX_LEN_RESOURCE_ID + 1,"%s.%s",id,message_type);
+		strlcpy(topic_to_publish,subject,MAX_LEN_TOPIC);
 
 		debug_printf("==> exchange = %s\n",exchange);
 		debug_printf("==> topic = %s\n",topic_to_publish);
@@ -905,8 +666,8 @@ publish (struct http_request *req)
 			BAD_REQUEST("message-type can only be command");		
 		}
 
-		snprintf(topic_to_publish,129,"%s.%s.%s",to,message_type,subject);
-		snprintf(exchange,129,"%s.publish",id);
+		snprintf(topic_to_publish,MAX_LEN_TOPIC + 1,"%s.%s.%s",to,message_type,subject);
+		snprintf(exchange,MAX_LEN_RESOURCE_ID + 1,"%s.publish",id);
 
 		debug_printf("==> exchange = %s\n",exchange);
 		debug_printf("==> topic = %s\n",topic_to_publish);
@@ -1025,135 +786,6 @@ done:
 		}
 	}
 
-	END();
-}
-
-int
-publish_async (struct http_request *req)
-{
-#if 0
-	const char *id;
-	const char *apikey;
-	const char *to;
-	const char *subject;
-	const char *message;
-	const char *message_type;
-
-	const char *content_type;
-
-	char topic_to_publish[129];
-
-	req->status = 403;
-
-	BAD_REQUEST_if
-	(
-		KORE_RESULT_OK != http_request_header(req, "id", &id)
-				||
-		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
-				||
-		KORE_RESULT_OK != http_request_header(req, "to", &to)
-				||
-		KORE_RESULT_OK != http_request_header(req, "subject", &subject)
-				||
-		KORE_RESULT_OK != http_request_header(req, "message-type", &message_type)
-			,
-		"inputs missing in headers"
-	);
-
-	if (! looks_like_a_valid_entity(to))
-		BAD_REQUEST("'to' is not a valid entity");
-
-	// ok to publish to himself
-	if (strcmp(id,to) == 0)
-	{
-		if (
-			(strcmp(message_type,"public") 		!= 0)	&&
-			(strcmp(message_type,"private") 	!= 0)	&&
-			(strcmp(message_type,"protected") 	!= 0)	&&
-			(strcmp(message_type,"diagnostics") 	!= 0)	
-		)
-		{
-			BAD_REQUEST("message-type is not valid");
-		}
-
-		snprintf(exchange,129,"%s.%s",id,message_type);
-		strlcpy(topic_to_publish,subject,129);
-
-		debug_printf("==> exchange = %s\n",exchange);
-		debug_printf("==> topic = %s\n",topic_to_publish);
-	}
-	else
-	{
-		if (strcmp(message_type,"command") != 0)
-		{
-			BAD_REQUEST("message-type can only be command");		
-		}
-
-		snprintf(topic_to_publish,129,"%s.%s.%s",to,message_type,subject);
-		snprintf(exchange,129,"%s.publish",id);
-
-		debug_printf("==> exchange = %s\n",exchange);
-		debug_printf("==> topic = %s\n",topic_to_publish);
-	}
-
-	if (http_request_header(req, "message", &message) != KORE_RESULT_OK)
-	{
-		if (req->http_body == NULL)
-			BAD_REQUEST("no message found in request");
-
-		if ((message = (char *)req->http_body->data) == NULL)
-			BAD_REQUEST("no message found in request");
-	}
-
-	if (http_request_header(req, "content-type", &content_type) != KORE_RESULT_OK)
-		content_type = "";
-
-	publish_async_data_t *data = malloc (sizeof(publish_async_data_t));
-
-	if (data == NULL)
-		ERROR("out of memory");
-
-	data->id 		=
-	data->apikey 		=
-	data->message		=
-	data->exchange		=
-	data->subject		=
-	data->content_type	= NULL;
-
-	if (!(data->id 			= strdup(id)))			ERROR("out of memmory");
-	if (!(data->apikey		= strdup(apikey)))		ERROR("out of memmory");
-	if (!(data->message		= strdup(message)))		ERROR("out of memmory");
-	if (!(data->exchange 		= strdup(exchange)))		ERROR("out of memmory");
-	if (!(data->subject		= strdup(topic_to_publish)))	ERROR("out of memmory");
-	if (!(data->content_type	= strdup(content_type)))	ERROR("out of memmory");
-
-	if (q_insert (&async_q[async_queue_index], data) < 0)
-		ERROR("inserting into queue failed");
-
-	async_queue_index = (async_queue_index + 1) % MAX_ASYNC_THREADS;
-
-	OK_202();
-
-done:
-	if (req->status == 500)
-	{
-		if (data)
-		{
-			if (data->id)		free (data->id);
-			if (data->apikey)	free (data->apikey);
-			if (data->message)	free (data->message);
-			if (data->exchange)	free (data->exchange);
-			if (data->subject)	free (data->subject);
-			if (data->content_type)	free (data->content_type);
-
-			free (data);
-		}
-	}
-
-#endif
-
-	OK();
-done:
 	END();
 }
 
@@ -2353,7 +1985,7 @@ queue_bind (struct http_request *req)
 		}
 	}
 
-	snprintf (exchange,129,"%s.%s", to,message_type); 
+	snprintf (exchange,MAX_LEN_RESOURCE_ID + 1,"%s.%s", to,message_type); 
 
 /////////////////////////////////////////////////
 
@@ -2540,8 +2172,8 @@ queue_unbind (struct http_request *req)
 
 /////////////////////////////////////////////////
 
-	snprintf	(exchange,129,"%s.%s", to,message_type); 
-	strlcpy		(queue,from,128);
+	snprintf	(exchange,MAX_LEN_RESOURCE_ID + 1,"%s.%s", to,message_type); 
+	strlcpy		(queue,from,MAX_LEN_RESOURCE_ID);
 
 	if (KORE_RESULT_OK == http_request_header(req, "is-priority", &is_priority))
 	{
@@ -2814,13 +2446,13 @@ follow (struct http_request *req)
 
 		if (strcmp(permission,"write") == 0 || strcmp(permission,"read-write") == 0)
 		{
-			char write_exchange 	[129];
-			char command_queue	[129];
-			char write_topic	[129];
+			char write_exchange 	[MAX_LEN_RESOURCE_ID + 1];
+			char command_queue	[MAX_LEN_RESOURCE_ID + 1];
+			char write_topic	[MAX_LEN_TOPIC + 1];
 
-			snprintf(write_exchange,129,"%s.publish",from);
-			snprintf(command_queue,129,"%s.command",to);
-			snprintf(write_topic,129,"%s.command.%s",to,topic);
+			snprintf(write_exchange,MAX_LEN_RESOURCE_ID + 1,"%s.publish",from);
+			snprintf(command_queue, MAX_LEN_RESOURCE_ID + 1,"%s.command",to);
+			snprintf(write_topic,MAX_LEN_TOPIC + 1,"%s.command.%s",to,topic);
 
 			for (tries = 1; tries <= MAX_AMQP_RETRIES; ++tries)
 			{
@@ -2870,7 +2502,7 @@ follow (struct http_request *req)
 	else
 	{
 		if (is_to_autonomous)
-			snprintf (exchange, 129, "%s.notification",to);
+			snprintf (exchange, MAX_LEN_RESOURCE_ID + 1, "%s.notification",to);
 		else
 		{
 			int index = 0;
@@ -3050,14 +2682,13 @@ unfollow (struct http_request *req)
 
 		follow_id	= kore_pgsql_getvalue(&sql,0,0);
 		
-		char write_exchange 	[129];
-		char command_queue	[129];
-		char write_topic	[129];
+		char write_exchange 	[MAX_LEN_RESOURCE_ID + 1];
+		char command_queue	[MAX_LEN_RESOURCE_ID + 1];
+		char write_topic	[MAX_LEN_TOPIC + 1];
 
-		snprintf(write_exchange,129,"%s.publish",from);
-		snprintf(command_queue,129,"%s.command",to);
-		snprintf(write_topic,129,"%s.command.%s",to,topic);
-
+		snprintf(write_exchange,MAX_LEN_RESOURCE_ID + 1,"%s.publish",from);
+		snprintf(command_queue, MAX_LEN_RESOURCE_ID + 1,"%s.command",to);
+		snprintf(write_topic,MAX_LEN_TOPIC + 1,"%s.command.%s",to,topic);
 
 		for (tries = 1; tries <= MAX_AMQP_RETRIES; ++tries)
 		{
@@ -3099,7 +2730,7 @@ unfollow (struct http_request *req)
 	}
 
 //// for read permissions /////
-	snprintf(exchange,129,"%s.%s",to,message_type);
+	snprintf(exchange,MAX_LEN_RESOURCE_ID + 1,"%s.%s",to,message_type);
 
 	CREATE_STRING ( query,
 		"SELECT acl_id,follow_id FROM acl "
@@ -3122,9 +2753,9 @@ unfollow (struct http_request *req)
 	if (kore_pgsql_ntuples(&sql) != 1)
 		FORBIDDEN("unauthorized");
 
-	char priority_queue[129];
+	char priority_queue[MAX_LEN_RESOURCE_ID + 1];
 
-	snprintf(priority_queue,129,"%s.priority", from);
+	snprintf(priority_queue,MAX_LEN_RESOURCE_ID + 1,"%s.priority", from);
 
 	acl_id		= kore_pgsql_getvalue(&sql,0,0);
 	follow_id	= kore_pgsql_getvalue(&sql,0,1);
@@ -3302,23 +2933,23 @@ share (struct http_request *req)
 
 	RUN_QUERY (query,"could not run insert query on acl");
 
-	char bind_exchange	[129];
-	char bind_queue		[129];
-	char bind_topic		[129];
+	char bind_exchange	[MAX_LEN_RESOURCE_ID + 1];
+	char bind_queue		[MAX_LEN_RESOURCE_ID + 1];
+	char bind_topic		[MAX_LEN_TOPIC + 1];
 
 	if (strcmp(permission,"read") == 0)
 	{
 		/*
-		snprintf(bind_exchange,	129,"%s",		my_exchange);
-		snprintf(bind_queue,	129,"%s",		from_id); 		// TODO: what about priority queue
-		snprintf(bind_topic,	129,"%s",		topic);
+		snprintf(bind_exchange,	MAX_LEN_RESOURCE_ID + 1,"%s",		my_exchange);
+		snprintf(bind_queue,	MAX_LEN_RESOURCE_ID + 1,"%s",		from_id); 		// TODO: what about priority queue
+		snprintf(bind_topic,	MAX_LEN_TOPIC + 1,      "%s",		topic);
 		*/
 	}
 	else if (strcmp(permission,"write") == 0)
 	{
-		snprintf(bind_exchange,	129,"%s.publish",	from_id);
-		snprintf(bind_queue,	129,"%s",		my_exchange);		// exchange in follow is "device.command"
-		snprintf(bind_topic,	129,"%s.%s",		my_exchange,topic); 	// binding routing is "dev.command.topic"
+		snprintf(bind_exchange,	MAX_LEN_RESOURCE_ID + 1,"%s.publish",	from_id);
+		snprintf(bind_queue,	MAX_LEN_RESOURCE_ID + 1,"%s",		my_exchange);		// exchange in follow is "device.command"
+		snprintf(bind_topic,	MAX_LEN_TOPIC + 1,      "%s.%s",	my_exchange,topic); 	// binding routing is "dev.command.topic"
 
 		for (tries = 1; tries <= MAX_AMQP_RETRIES; ++tries)
 		{
@@ -3356,11 +2987,24 @@ share (struct http_request *req)
 	}
 
 	if (is_from_autonomous)
-		snprintf (exchange, 129, "%s.notification",from_id);
+		snprintf (exchange, MAX_LEN_RESOURCE_ID + 1, "%s.notification",from_id);
 	else
 	{
-		char *_owner = strtok(from_id,"/");
-		snprintf (exchange, 129, "%s.notification",_owner);
+		int index = 0;
+
+		while (
+			from_id[index]
+					&&
+			from_id[index] != '/'
+					&&
+			index < MAX_LEN_OWNER_ID 
+		)
+		{
+			exchange[index] = from_id[index];
+			++index;
+		}
+
+		strlcpy (exchange + index,".notification", 32);
 	}
 
 	char *subject = "Approved follow request";
@@ -3865,8 +3509,8 @@ create_exchanges_and_queues (void *v)
 
 	// local variables
 	// int my_tries;
-	char my_queue	[129];
-	char my_exchange[129];
+	char my_queue	[MAX_LEN_RESOURCE_ID + 1];
+	char my_exchange[MAX_LEN_RESOURCE_ID + 1];
 
 	amqp_rpc_reply_t my_r;
 
@@ -3875,7 +3519,7 @@ create_exchanges_and_queues (void *v)
 	if (looks_like_a_valid_owner(id))
 	{
 		// create notification exchange 
-		snprintf(my_exchange,129,"%s.notification",id);
+		snprintf(my_exchange,MAX_LEN_RESOURCE_ID + 1,"%s.notification",id);
 
 		debug_printf("[owner] creating exchange {%s}\n",my_exchange);
 
@@ -3902,7 +3546,7 @@ create_exchanges_and_queues (void *v)
 		debug_printf("[owner] done creating exchange {%s}\n",my_exchange);
 
 		// create notification queue
-		snprintf(my_queue,129,"%s.notification",id);
+		snprintf(my_queue,MAX_LEN_RESOURCE_ID + 1,"%s.notification",id);
 		debug_printf("[owner] creating queue {%s}\n",my_queue);
 
 		amqp_queue_declare (
@@ -3967,7 +3611,7 @@ create_exchanges_and_queues (void *v)
 	{
 		for (i = 0; _e[i]; ++i)
 		{
-			snprintf(my_exchange,129,"%s%s",id,_e[i]);
+			snprintf(my_exchange,MAX_LEN_RESOURCE_ID + 1,"%s%s",id,_e[i]);
 
 			debug_printf("[entity] creating exchange {%s}\n",my_exchange);
 
@@ -4012,7 +3656,7 @@ create_exchanges_and_queues (void *v)
 
 		for (i = 0; _q[i]; ++i)
 		{
-			snprintf(my_queue,129,"%s%s",id,_q[i]);
+			snprintf(my_queue,MAX_LEN_RESOURCE_ID + 1,"%s%s",id,_q[i]);
 
 			debug_printf("[entity] creating queue {%s}\n",my_queue);
 
@@ -4039,7 +3683,7 @@ create_exchanges_and_queues (void *v)
 			// bind .private and .notification 
 			if (strcmp(_q[i],".private") == 0 || strcmp(_q[i],".notification") == 0)
 			{
-				snprintf(my_exchange,129,"%s%s",id,_q[i]);
+				snprintf(my_exchange,MAX_LEN_RESOURCE_ID + 1,"%s%s",id,_q[i]);
 				debug_printf("[entity] binding {%s} -> {%s}\n",my_queue,my_exchange);
 
 				amqp_queue_bind (
@@ -4079,8 +3723,8 @@ delete_exchanges_and_queues (void *v)
 	const char *id = (const char *)v;
 
 	// local variables
-	char my_queue	[129];
-	char my_exchange[129];
+	char my_queue	[MAX_LEN_RESOURCE_ID + 1];
+	char my_exchange[MAX_LEN_RESOURCE_ID + 1];
 
 	amqp_rpc_reply_t my_r;
 
@@ -4089,7 +3733,7 @@ delete_exchanges_and_queues (void *v)
 	if (looks_like_a_valid_owner(id))
 	{
 		// delete notification exchange 
-		snprintf(my_exchange,129,"%s.notification",id);
+		snprintf(my_exchange,MAX_LEN_RESOURCE_ID + 1,"%s.notification",id);
 
 		debug_printf("[owner] deleting exchange {%s}\n",my_exchange);
 
@@ -4112,7 +3756,7 @@ delete_exchanges_and_queues (void *v)
 		debug_printf("[owner] done deleting exchange {%s}\n",my_exchange);
 
 		// delete notification queue
-		snprintf(my_queue,129,"%s.notification",id);
+		snprintf(my_queue,MAX_LEN_RESOURCE_ID + 1,"%s.notification",id);
 		debug_printf("[owner] deleting queue {%s}\n",my_queue);
 
 		if (! amqp_queue_delete (
@@ -4138,7 +3782,7 @@ delete_exchanges_and_queues (void *v)
 	{
 		for (i = 0; _e[i]; ++i)
 		{
-			snprintf(my_exchange,129,"%s%s",id,_e[i]);
+			snprintf(my_exchange,MAX_LEN_RESOURCE_ID + 1,"%s%s",id,_e[i]);
 
 			debug_printf("[entity] deleting exchange {%s}\n",my_exchange);
 
@@ -4163,7 +3807,7 @@ delete_exchanges_and_queues (void *v)
 
 		for (i = 0; _q[i]; ++i)
 		{
-			snprintf(my_queue,129,"%s%s",id,_q[i]);
+			snprintf(my_queue,MAX_LEN_RESOURCE_ID + 1,"%s%s",id,_q[i]);
 
 			debug_printf("[entity] deleting queue {%s}\n",my_queue);
 
@@ -4289,4 +3933,379 @@ string_to_lower (const char *str)
 
 		++p;
 	}
+}
+
+/////////////////////////////////////////////////////////////////////////////
+//////////////////////////// ASYNC RELATED FUNCTIONS ////////////////////////
+//////////////////////////// ... not yet tested ... /////////////////////////
+/////////////////////////////////////////////////////////////////////////////
+
+bool
+async_login_success (const char *id, const char *apikey, bool *is_autonomous)
+{
+#if 0
+	char *salt;
+	char *password_hash;
+	char *str_is_autonomous;
+
+	bool login_result = false;
+
+	if (id == NULL || apikey == NULL || *id == '\0' || *apikey == '\0')
+		goto done;
+
+	if (id[0] < 'a' || id[0] > 'z')
+		goto done;	
+
+	if (! is_string_safe(id))
+		goto done;
+
+	CREATE_STRING (async_query,
+		"SELECT salt,password_hash,is_autonomous FROM users "
+			"WHERE id='%s' AND blocked='f'",
+				id
+	);
+
+	debug_printf("async login query = {%s}\n",async_query->data);
+
+	kore_pgsql_cleanup(&async_sql);
+	kore_pgsql_init(&async_sql);
+	if (! kore_pgsql_setup(&async_sql,"db",KORE_PGSQL_SYNC))
+	{
+		kore_pgsql_logerror(&async_sql);
+		goto done;
+	}
+	if (! kore_pgsql_query(&async_sql,(const char *)async_query->data))
+	{
+		kore_pgsql_logerror(&async_sql);
+		goto done;
+	}
+
+	if (kore_pgsql_ntuples(&async_sql) == 0)
+		goto done;
+
+	salt 	 		= kore_pgsql_getvalue(&async_sql,0,0);
+	password_hash		= kore_pgsql_getvalue(&async_sql,0,1);
+	str_is_autonomous 	= kore_pgsql_getvalue(&async_sql,0,2);
+
+	if (is_autonomous)
+		*is_autonomous = false; 
+
+	// there is no salt or password hash in db ?
+	if (salt[0] == '\0' || password_hash[0] == '\0')
+		goto done;
+
+	if (is_autonomous)
+		*is_autonomous = str_is_autonomous[0] == 't'; 
+
+	snprintf (string_to_be_hashed, 
+			MAX_LEN_HASH_INPUT + 1,
+				"%s%s%s",
+					apikey, salt, id);
+
+	SHA256 (
+		(const uint8_t*)string_to_be_hashed,
+		strnlen (string_to_be_hashed,MAX_LEN_HASH_INPUT),
+		binary_hash
+	);
+
+	debug_printf("login success STRING TO BE HASHED = {%s}\n",
+			string_to_be_hashed);
+	snprintf
+	(
+		hash_string,
+		1 + 2*SHA256_DIGEST_LENGTH,
+		"%02x%02x%02x%02x"
+		"%02x%02x%02x%02x"
+		"%02x%02x%02x%02x"
+		"%02x%02x%02x%02x"
+		"%02x%02x%02x%02x"
+		"%02x%02x%02x%02x"
+		"%02x%02x%02x%02x"
+		"%02x%02x%02x%02x",
+		binary_hash[ 0],binary_hash[ 1],binary_hash[ 2],binary_hash[ 3],
+		binary_hash[ 4],binary_hash[ 5],binary_hash[ 6],binary_hash[ 7],
+		binary_hash[ 8],binary_hash[ 9],binary_hash[10],binary_hash[11],
+		binary_hash[12],binary_hash[13],binary_hash[14],binary_hash[15],
+		binary_hash[16],binary_hash[17],binary_hash[18],binary_hash[19],
+		binary_hash[20],binary_hash[21],binary_hash[22],binary_hash[23],
+		binary_hash[24],binary_hash[25],binary_hash[26],binary_hash[27],
+		binary_hash[28],binary_hash[29],binary_hash[30],binary_hash[31]
+	);
+
+	hash_string[2*SHA256_DIGEST_LENGTH] = '\0';
+
+	debug_printf("Expecting it to be {%s} got {%s}\n",
+			password_hash,
+				hash_string
+	);
+
+	if (strncmp(hash_string,password_hash,64) == 0) {
+		login_result = true;
+		debug_printf("Login OK\n");
+	}
+
+done:
+	kore_buf_reset(async_query);
+	kore_pgsql_cleanup(&async_sql);
+
+	return login_result;
+#endif
+
+	return false;
+}
+
+void*
+async_publish_function (void *v)
+{
+	// XXX: this api is not tested and must not be used
+
+	return NULL;
+#if 0
+
+	Q *q = (Q *)v;
+
+	publish_async_data_t *data = NULL; 
+
+	node *n = NULL;
+	char key [MAX_LEN_HASH_KEY + 1];
+
+	const char *id;
+	const char *apikey;
+	const char *subject;
+	const char *message;
+	const char *content_type;
+
+	char *async_exchange;
+
+	amqp_connection_state_t	*async_cached_conn = NULL;
+	
+	amqp_rpc_reply_t 	async_login_reply;
+	amqp_rpc_reply_t 	async_rpc_reply;
+	amqp_basic_properties_t	async_props;
+
+	memset(&async_props, 0, sizeof props);
+	async_props._flags = AMQP_BASIC_CONTENT_TYPE_FLAG | AMQP_BASIC_USER_ID_FLAG;
+
+	ht_init (&async_connection_ht);
+
+	while (1)
+	{
+		while ((data = q_delete(q)))
+		{
+			id		= data->id;
+			apikey		= data->apikey;
+			subject		= data->subject;
+			message		= data->message;
+			content_type	= data->content_type;
+			async_exchange	= data->exchange;
+
+			snprintf (key, MAX_LEN_HASH_KEY + 1, "%s%s", id, apikey);
+
+			if ((n = ht_search(&async_connection_ht,key)) != NULL)
+			{
+				async_cached_conn = n->value;
+			}
+			else
+			{
+
+/////////////////////////////////////////////////
+
+				if (! looks_like_a_valid_entity(id))
+					goto done;	
+
+				if (! login_success(id,apikey,NULL))
+					goto done;	
+
+/////////////////////////////////////////////////
+
+				async_cached_conn = malloc(sizeof(amqp_connection_state_t));
+
+				if (async_cached_conn == NULL)
+					goto done;	
+
+				*async_cached_conn = amqp_new_connection();
+				amqp_socket_t *socket = amqp_tcp_socket_new(*async_cached_conn);
+
+				if (socket == NULL)
+					goto done;	
+
+				if (amqp_socket_open(socket, "broker" , 5672))
+					goto done;	
+	
+				async_login_reply = amqp_login(
+					*async_cached_conn, 
+					"/",
+					0,
+					131072,
+					HEART_BEAT,
+					AMQP_SASL_METHOD_PLAIN,
+					id,
+					apikey
+				);
+
+				if (async_login_reply.reply_type != AMQP_RESPONSE_NORMAL)
+					goto done;	
+
+				if(! amqp_channel_open(*async_cached_conn, 1))
+					goto done;	
+
+				async_rpc_reply = amqp_get_rpc_reply(*async_cached_conn);
+				if (async_rpc_reply.reply_type != AMQP_RESPONSE_NORMAL)
+					goto done;	
+
+				ht_insert (&async_connection_ht, key, async_cached_conn);
+			}
+
+			async_props.user_id 		= amqp_cstring_bytes(id);
+			async_props.content_type 	= amqp_cstring_bytes(content_type);
+
+			if ( AMQP_STATUS_OK != amqp_basic_publish (
+					*async_cached_conn,
+					1,
+					amqp_cstring_bytes(async_exchange),
+        				amqp_cstring_bytes(subject),
+					0,
+					0,
+					&async_props,
+					amqp_cstring_bytes(message)
+				)
+			)
+				goto done;
+
+done:
+			free (data);
+		}
+
+		sleep (1);
+	}
+#endif
+}
+
+int
+publish_async (struct http_request *req)
+{
+#if 0
+	const char *id;
+	const char *apikey;
+	const char *to;
+	const char *subject;
+	const char *message;
+	const char *message_type;
+
+	const char *content_type;
+
+	char topic_to_publish[MAX_LEN_TOPIC + 1];
+
+	req->status = 403;
+
+	BAD_REQUEST_if
+	(
+		KORE_RESULT_OK != http_request_header(req, "id", &id)
+				||
+		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+				||
+		KORE_RESULT_OK != http_request_header(req, "to", &to)
+				||
+		KORE_RESULT_OK != http_request_header(req, "subject", &subject)
+				||
+		KORE_RESULT_OK != http_request_header(req, "message-type", &message_type)
+			,
+		"inputs missing in headers"
+	);
+
+	if (! looks_like_a_valid_entity(to))
+		BAD_REQUEST("'to' is not a valid entity");
+
+	// ok to publish to himself
+	if (strcmp(id,to) == 0)
+	{
+		if (
+			(strcmp(message_type,"public") 		!= 0)	&&
+			(strcmp(message_type,"private") 	!= 0)	&&
+			(strcmp(message_type,"protected") 	!= 0)	&&
+			(strcmp(message_type,"diagnostics") 	!= 0)	
+		)
+		{
+			BAD_REQUEST("message-type is not valid");
+		}
+
+		snprintf(exchange,MAX_LEN_RESOURCE_ID + 1,"%s.%s",id,message_type);
+		strlcpy(topic_to_publish,subject,MAX_LEN_TOPIC);
+
+		debug_printf("==> exchange = %s\n",exchange);
+		debug_printf("==> topic = %s\n",topic_to_publish);
+	}
+	else
+	{
+		if (strcmp(message_type,"command") != 0)
+		{
+			BAD_REQUEST("message-type can only be command");		
+		}
+
+		snprintf(topic_to_publish,MAX_LEN_TOPIC + 1,"%s.%s.%s",to,message_type,subject);
+		snprintf(exchange,MAX_LEN_RESOURCE_ID + 1,"%s.publish",id);
+
+		debug_printf("==> exchange = %s\n",exchange);
+		debug_printf("==> topic = %s\n",topic_to_publish);
+	}
+
+	if (http_request_header(req, "message", &message) != KORE_RESULT_OK)
+	{
+		if (req->http_body == NULL)
+			BAD_REQUEST("no message found in request");
+
+		if ((message = (char *)req->http_body->data) == NULL)
+			BAD_REQUEST("no message found in request");
+	}
+
+	if (http_request_header(req, "content-type", &content_type) != KORE_RESULT_OK)
+		content_type = "";
+
+	publish_async_data_t *data = malloc (sizeof(publish_async_data_t));
+
+	if (data == NULL)
+		ERROR("out of memory");
+
+	data->id 		=
+	data->apikey 		=
+	data->message		=
+	data->exchange		=
+	data->subject		=
+	data->content_type	= NULL;
+
+	if (!(data->id 			= strdup(id)))			ERROR("out of memmory");
+	if (!(data->apikey		= strdup(apikey)))		ERROR("out of memmory");
+	if (!(data->message		= strdup(message)))		ERROR("out of memmory");
+	if (!(data->exchange 		= strdup(exchange)))		ERROR("out of memmory");
+	if (!(data->subject		= strdup(topic_to_publish)))	ERROR("out of memmory");
+	if (!(data->content_type	= strdup(content_type)))	ERROR("out of memmory");
+
+	if (q_insert (&async_q[async_queue_index], data) < 0)
+		ERROR("inserting into queue failed");
+
+	async_queue_index = (async_queue_index + 1) % MAX_ASYNC_THREADS;
+
+	OK_202();
+
+done:
+	if (req->status == 500)
+	{
+		if (data)
+		{
+			if (data->id)		free (data->id);
+			if (data->apikey)	free (data->apikey);
+			if (data->message)	free (data->message);
+			if (data->exchange)	free (data->exchange);
+			if (data->subject)	free (data->subject);
+			if (data->content_type)	free (data->content_type);
+
+			free (data);
+		}
+	}
+
+#endif
+
+	OK();
+done:
+	END();
 }
