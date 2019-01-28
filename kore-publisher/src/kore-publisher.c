@@ -1578,7 +1578,10 @@ catalog (struct http_request *req)
 	else
 	{
 		entity = NULL;
-		CREATE_STRING (query,"SELECT id,schema FROM users LIMIT 50");
+
+		CREATE_STRING (query,
+			"SELECT id,schema FROM users ORDER BY id LIMIT 50"
+		);
 	}
 
 	RUN_QUERY (query,"unable to query catalog data");
