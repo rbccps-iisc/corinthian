@@ -1407,7 +1407,7 @@ get_entities (struct http_request *req)
 /////////////////////////////////////////////////
 
 	CREATE_STRING(query,
-		 	"SELECT id,blocked,is_autonomous FROM users WHERE id LIKE '%s/%%'",
+		 	"SELECT id,blocked,is_autonomous FROM users WHERE id LIKE '%s/%%' ORDER BY id",
 				id
 	);
 
@@ -1428,8 +1428,8 @@ get_entities (struct http_request *req)
 				response,
 					"{\"%s\":[%s,%s]},",
 						entity,
-						is_blocked	[0] == 't' ? "true" : "false",
-						is_autonomous	[0] == 't' ? "true" : "false"
+						is_blocked	[0] == 't' ? "1" : "0",
+						is_autonomous	[0] == 't' ? "1" : "0"
 		);
 	}
 
@@ -1771,7 +1771,7 @@ get_owners(struct http_request *req)
 
 /////////////////////////////////////////////////
 
-	CREATE_STRING (query, "SELECT id,blocked FROM users WHERE id NOT LIKE '%%/%%'");
+	CREATE_STRING (query, "SELECT id,blocked FROM users WHERE id NOT LIKE '%%/%%' ORDER BY id");
 	RUN_QUERY(query,"failed to query user table");
 
 	int num_rows = kore_pgsql_ntuples(&sql);
@@ -1781,11 +1781,14 @@ get_owners(struct http_request *req)
 
 	for (i = 0; i < num_rows; ++i)
 	{
+		char *owner		= kore_pgsql_getvalue(&sql,i,0);
+		char *is_blocked	= kore_pgsql_getvalue(&sql,i,1);
+
 		kore_buf_appendf (
 			response,
 				"\"%s\":%s,",
-					kore_pgsql_getvalue(&sql,i,0),
-					kore_pgsql_getvalue(&sql,i,1)
+					owner,	
+					is_blocked [0] == 't' ? "1" : "0"
 		);
 	}
 
