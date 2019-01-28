@@ -1377,7 +1377,7 @@ done:
 }
 
 int
-entities (struct http_request *req)
+get_entities (struct http_request *req)
 {
 	int i;
 
@@ -1407,7 +1407,7 @@ entities (struct http_request *req)
 /////////////////////////////////////////////////
 
 	CREATE_STRING(query,
-		 	"SELECT id,is_autonomous FROM users WHERE id LIKE '%s/%%'",
+		 	"SELECT id,blocked,is_autonomous FROM users WHERE id LIKE '%s/%%'",
 				id
 	);
 
@@ -1421,13 +1421,15 @@ entities (struct http_request *req)
 	for (i = 0; i < num_rows; ++i)
 	{
 		char *entity 		= kore_pgsql_getvalue(&sql,i,0);
-		char *is_autonomous 	= kore_pgsql_getvalue(&sql,i,1);
+		char *is_blocked	= kore_pgsql_getvalue(&sql,i,1);
+		char *is_autonomous 	= kore_pgsql_getvalue(&sql,i,2);
 
 		kore_buf_appendf (
 				response,
-					"{\"%s\":%s},",
+					"{\"%s\":[%s,%s]},",
 						entity,
-						is_autonomous[0] == 't' ? "true" : "false"
+						is_blocked	[0] == 't' ? "true" : "false",
+						is_autonomous	[0] == 't' ? "true" : "false"
 		);
 	}
 
@@ -1738,6 +1740,70 @@ done:
 }
 
 int
+get_owners(struct http_request *req)
+{
+	int i;
+
+	const char *id;
+	const char *apikey;
+
+	req->status = 403;
+
+	if (! is_request_from_localhost(req))
+		FORBIDDEN("this API can only be called from localhost");
+
+	BAD_REQUEST_if
+	(
+		KORE_RESULT_OK != http_request_header(req, "id", &id)
+				||
+		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+			,
+		"inputs missing in headers"
+	);
+
+/////////////////////////////////////////////////
+
+	if (strcmp(id,"admin") != 0)
+		FORBIDDEN("unauthorized");
+
+	if (! login_success(id,apikey,NULL))
+		FORBIDDEN("invalid id or apikey");
+
+/////////////////////////////////////////////////
+
+	CREATE_STRING (query, "SELECT id,blocked FROM users WHERE id NOT LIKE '%%/%%'");
+	RUN_QUERY(query,"failed to query user table");
+
+	int num_rows = kore_pgsql_ntuples(&sql);
+
+	kore_buf_reset(response);
+	kore_buf_append(response,"{",1);
+
+	for (i = 0; i < num_rows; ++i)
+	{
+		kore_buf_appendf (
+			response,
+				"\"%s\":%s,",
+					kore_pgsql_getvalue(&sql,i,0),
+					kore_pgsql_getvalue(&sql,i,1)
+		);
+	}
+
+	if (num_rows > 0)
+	{
+		// remove the last COMMA 
+		--(response->offset);
+	}
+
+	kore_buf_append(response,"}",1);
+
+	OK();
+
+done:
+	END();
+}
+
+int
 deregister_owner(struct http_request *req)
 {
 	int i, num_rows;
@@ -1855,69 +1921,6 @@ done:
 		}
 	}
 
-	END();
-}
-
-int
-get_owners(struct http_request *req)
-{
-	int i;
-
-	const char *id;
-	const char *apikey;
-
-	req->status = 403;
-
-	if (! is_request_from_localhost(req))
-		FORBIDDEN("this API can only be called from localhost");
-
-	BAD_REQUEST_if
-	(
-		KORE_RESULT_OK != http_request_header(req, "id", &id)
-				||
-		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
-			,
-		"inputs missing in headers"
-	);
-
-/////////////////////////////////////////////////
-
-	if (strcmp(id,"admin") != 0)
-		FORBIDDEN("unauthorized");
-
-	if (! login_success(id,apikey,NULL))
-		FORBIDDEN("invalid id or apikey");
-
-/////////////////////////////////////////////////
-
-	CREATE_STRING (query, "SELECT id FROM users WHERE id NOT LIKE '%%/%%'");
-	RUN_QUERY(query,"failed to query user table");
-
-	int num_rows = kore_pgsql_ntuples(&sql);
-
-	kore_buf_reset(response);
-	kore_buf_append(response,"[",1);
-
-	for (i = 0; i < num_rows; ++i)
-	{
-		kore_buf_appendf (
-			response,
-				"\"%s\",",
-				kore_pgsql_getvalue(&sql,i,0)
-		);
-	}
-
-	if (num_rows > 0)
-	{
-		// remove the last COMMA 
-		--(response->offset);
-	}
-
-	kore_buf_append(response,"]",1);
-
-	OK();
-
-done:
 	END();
 }
 
