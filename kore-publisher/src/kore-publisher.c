@@ -1048,10 +1048,13 @@ reset_apikey (struct http_request *req)
 	const char *id;
 	const char *apikey;
 	const char *entity;
+	const char *owner;
 
 	char salt		[MAX_LEN_APIKEY + 1];
-	char entity_apikey	[MAX_LEN_APIKEY + 1];
+	char new_apikey		[MAX_LEN_APIKEY + 1];
 	char password_hash	[2*SHA256_DIGEST_LENGTH + 1];
+
+	char *reset_api_key_of = NULL;
 
 	req->status = 403;
 
@@ -1060,8 +1063,6 @@ reset_apikey (struct http_request *req)
 		KORE_RESULT_OK != http_request_header(req, "id", &id)
 				||
 		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
-				||
-		KORE_RESULT_OK != http_request_header(req, "entity", &entity)
 			,
 		"inputs missing in headers"
 	);
@@ -1071,22 +1072,39 @@ reset_apikey (struct http_request *req)
 	if (! looks_like_a_valid_owner(id))
 		FORBIDDEN("id is not valid");
 
-	if (! is_string_safe(entity))
-		FORBIDDEN("invalid entity");
-
-	if (! looks_like_a_valid_entity(entity))
-		FORBIDDEN("entity is not valid");
 
 	// either "id" should be owner of the "entity", or an "admin" 
 	if (strcmp(id,"admin") == 0)
 	{
 		if (! is_request_from_localhost(req))
 			FORBIDDEN("admin can only call APIs from localhost");
+
+		if (KORE_RESULT_OK != http_request_header(req, "owner", &owner))
+			FORBIDDEN("owner field missing in header");
+
+		if (! is_string_safe(owner))
+			FORBIDDEN("invalid owner");
+
+		if (! looks_like_a_valid_owner(owner))
+			FORBIDDEN("owner is not valid");
+
+		reset_api_key_of = owner;
 	}
 	else
 	{
+		if (KORE_RESULT_OK != http_request_header(req, "entity", &entity))
+			FORBIDDEN("entity field missing in header");
+
 		if (! is_owner(id,entity))
 			FORBIDDEN("you are not the owner of the entity");
+
+		if (! is_string_safe(entity))
+			FORBIDDEN("invalid entity");
+
+		if (! looks_like_a_valid_entity(entity))
+			FORBIDDEN("entity is not valid");
+
+		reset_api_key_of = entity;
 	}
 
 	if (! login_success(id,apikey,NULL))
@@ -1094,21 +1112,26 @@ reset_apikey (struct http_request *req)
 
 /////////////////////////////////////////////////
 
-	gen_salt_password_and_apikey (entity, salt, password_hash, entity_apikey);
+	gen_salt_password_and_apikey (
+		reset_api_key_of,
+		salt,
+		password_hash,
+		new_apikey	
+	);
 
 	CREATE_STRING (query,
 		"UPDATE users SET password_hash='%s', salt='%s' WHERE id='%s'",
 			password_hash,
 			salt,
-			entity
+			reset_api_key_of	
 	);
 
 	// generate response
 	kore_buf_reset(response);
 	kore_buf_appendf (response,
 		"{\"id\":\"%s\",\"apikey\":\"%s\"}\n",
-			entity,
-			entity_apikey
+			reset_api_key_of,
+			new_apikey	
 	);
 
 	RUN_QUERY (query,"failed to reset the apikey");
