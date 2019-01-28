@@ -51,7 +51,7 @@ Quickstart
     ./test-suite/test fxnl --random
 
 
-Disabling admin APIs
+Restricting admin APIs
 ====================
 By default the admin related APIs are allowed from any host. To restrict access 
 of admin APIs through localhost only: unset the "ALLOW_ADMIN_APIS_FROM_OTHER_HOSTS"
@@ -75,6 +75,9 @@ Sequence diagrams
 
 API
 ===
+
+All APIs are based on the following format: /<caller of the API>/<action>
+
 - /admin/register-owner
 
 .. image:: https://raw.githubusercontent.com/rbccps-iisc/corinthian/master/DOCS/api/register-owner.svg?sanitize=true
