@@ -1054,7 +1054,7 @@ reset_apikey (struct http_request *req)
 	char new_apikey		[MAX_LEN_APIKEY + 1];
 	char password_hash	[2*SHA256_DIGEST_LENGTH + 1];
 
-	char *reset_api_key_of = NULL;
+	const char *reset_api_key_for = NULL;
 
 	req->status = 403;
 
@@ -1088,7 +1088,7 @@ reset_apikey (struct http_request *req)
 		if (! looks_like_a_valid_owner(owner))
 			FORBIDDEN("owner is not valid");
 
-		reset_api_key_of = owner;
+		reset_api_key_for = owner;
 	}
 	else
 	{
@@ -1104,7 +1104,7 @@ reset_apikey (struct http_request *req)
 		if (! looks_like_a_valid_entity(entity))
 			FORBIDDEN("entity is not valid");
 
-		reset_api_key_of = entity;
+		reset_api_key_for = entity;
 	}
 
 	if (! login_success(id,apikey,NULL))
@@ -1113,7 +1113,7 @@ reset_apikey (struct http_request *req)
 /////////////////////////////////////////////////
 
 	gen_salt_password_and_apikey (
-		reset_api_key_of,
+		reset_api_key_for,
 		salt,
 		password_hash,
 		new_apikey	
@@ -1123,14 +1123,14 @@ reset_apikey (struct http_request *req)
 		"UPDATE users SET password_hash='%s', salt='%s' WHERE id='%s'",
 			password_hash,
 			salt,
-			reset_api_key_of	
+			reset_api_key_for	
 	);
 
 	// generate response
 	kore_buf_reset(response);
 	kore_buf_appendf (response,
 		"{\"id\":\"%s\",\"apikey\":\"%s\"}\n",
-			reset_api_key_of,
+			reset_api_key_for,
 			new_apikey	
 	);
 
@@ -1280,6 +1280,8 @@ register_entity (struct http_request *req)
 
 	if (body)
 		json_sanitize(body);
+	else
+		body = "{}";
 
 /////////////////////////////////////////////////
 
@@ -1297,7 +1299,6 @@ register_entity (struct http_request *req)
 			ERROR("could not create exchanges and queues");
 	}
 
-
 	// conflict if entity_name already exist
 
 	CREATE_STRING(query,
@@ -1312,58 +1313,42 @@ register_entity (struct http_request *req)
 
 	gen_salt_password_and_apikey (entity_name, salt, password_hash, entity_apikey);
 
-	if (body)
+	// use parameterized query for inserting json
+
+	CREATE_STRING (query,
+		"INSERT INTO users(id,password_hash,schema,salt,blocked,is_autonomous) "
+		"VALUES('%s','%s',$1,'%s','f','%s')",	// $1 is the schema (in body) 
+		entity_name,
+		password_hash,
+		salt,
+		is_autonomous ? "t" : "f"
+	);
+
+	kore_pgsql_cleanup(&sql);
+	kore_pgsql_init(&sql);
+
+	if (! kore_pgsql_setup(&sql,"db",KORE_PGSQL_SYNC))
 	{
-		// use parameterized query for inserting json
+		kore_pgsql_logerror(&sql);
+		ERROR("DB error while setup");
+	}
 
-		CREATE_STRING (query,
-			"INSERT INTO users(id,password_hash,schema,salt,blocked,is_autonomous) "
-			"VALUES('%s','%s',$1,'%s','f','%s')",	// $1 is the schema (in body) 
-			entity_name,
-			password_hash,
-			salt,
-			is_autonomous ? "t" : "f"
-		);
-
-		kore_pgsql_cleanup(&sql);
-		kore_pgsql_init(&sql);
-
-		if (! kore_pgsql_setup(&sql,"db",KORE_PGSQL_SYNC))
-		{
-			kore_pgsql_logerror(&sql);
-			ERROR("DB error while setup");
-		}
-
-		if ( 
-			! kore_pgsql_query_params (
-				&sql,
-				(char *)query->data,
-				0,
-				1,
-				body,
-				req->http_body_length,
-				0
-			)
+	if ( 
+		! kore_pgsql_query_params (
+			&sql,
+			(char *)query->data,
+			0,
+			1,
+			body,
+			req->http_body_length,
+			0
 		)
-		{
-			kore_pgsql_logerror(&sql);
-			ERROR("failed to create the entity with schema");
-		}
-	}
-	else
+	)
 	{
-		CREATE_STRING (query,
-			"INSERT INTO users(id,password_hash,schema,salt,blocked,is_autonomous) "
-			"VALUES('%s','%s','%s',NULL,'f','%s')",
-			entity_name,
-			password_hash,
-			salt,
-			is_autonomous ? "t" : "f"
-		);
-
-		RUN_QUERY (query,"failed to create the entity");
+		kore_pgsql_logerror(&sql);
+		ERROR("failed to create the entity with schema");
 	}
-
+	
 	// generate response
 	kore_buf_reset(response);
 	kore_buf_appendf (response,
@@ -1584,14 +1569,14 @@ catalog (struct http_request *req)
 			FORBIDDEN("invalid entity");
 
 		CREATE_STRING (query,
-				"SELECT schema FROM users WHERE schema IS NOT NULL AND id='%s'",
+				"SELECT schema FROM users WHERE id='%s'",
 					entity
 		);
 	}
 	else
 	{
 		entity = NULL;
-		CREATE_STRING (query,"SELECT id,schema FROM users WHERE schema IS NOT NULL LIMIT 50");
+		CREATE_STRING (query,"SELECT id,schema FROM users LIMIT 50");
 	}
 
 	RUN_QUERY (query,"unable to query catalog data");
@@ -1601,14 +1586,14 @@ catalog (struct http_request *req)
 	kore_buf_reset(response);
 	if (entity == NULL) // get top 50 data 
 	{
-		kore_buf_append(response,"[",1);
+		kore_buf_append(response,"{",1);
 
 		for (i = 0; i < num_rows; ++i)
 		{
-			char *user 	= kore_pgsql_getvalue(&sql,i,0);
+			char *id	= kore_pgsql_getvalue(&sql,i,0);
 			char *schema 	= kore_pgsql_getvalue(&sql,i,1);
 
-			kore_buf_appendf(response,"{\"%s\":%s},",user,schema);
+			kore_buf_appendf(response,"\"%s\":%s,",id,schema);
 		} 
 		if (num_rows > 0)
 		{
@@ -1616,7 +1601,7 @@ catalog (struct http_request *req)
 			--(response->offset);
 		}
 
-		kore_buf_append(response,"]",1);
+		kore_buf_append(response,"}",1);
 	}
 	else
 	{
