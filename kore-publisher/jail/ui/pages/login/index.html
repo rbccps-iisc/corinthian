@@ -53,7 +53,7 @@
            <div data-ng-repeat="link in navbar_links">
            	<li class="nav-item">
               <a class="nav-link nav-link-icon" href="{{link.href}}">
-                <i class="ni ni-{{link.legend}}"></i>
+                <i class="{{link.legend}}"></i>
                 <span class="nav-link-inner--text">{{link.text}}</span>
               </a>
             </li>
@@ -140,7 +140,7 @@
 </div>
           <div class="row mt-4">
             <div class="col-6">
-              <a href="#" class="text-light"><small>Forgot password?</small></a>
+              <!-- <a href="#" class="text-light"><small>Forgot password?</small></a> -->
             </div>
             <div class="col-6 text-right">
               <a href="#" class="text-light"><small>Create new account</small></a>
