@@ -17,7 +17,7 @@ session_checker.controller('session_checkerCtrl', ['$scope', function($scope) {
 					window.location = location.origin + "/ui/pages/admin";
 				}else if(_id.includes('/')){
 					//Go to auto-entity's dashboard
-					window.location = location.origin + "/ui/pages/auto-entity";
+					window.location = location.origin + "/ui/pages/entity";
 				}else{
 					//Go to owner's dashboard
 					window.location = location.origin + "/ui/pages/owner";
@@ -46,11 +46,11 @@ session_checker.controller('session_checkerCtrl', ['$scope', function($scope) {
 		}
 
 		//Auto-Entity		
-		if (window.location.href === location.origin + "/ui/pages/auto-entity/" && role != 'auto-entity'){
+		if (window.location.href === location.origin + "/ui/pages/entity/" && role != 'entity'){
 				window.location = location.origin + "/ui/pages/error/403";		
 		}
 
-		if (window.location.href === location.origin + "/ui/pages/auto-entity/catalog" && role != 'auto-entity'){
+		if (window.location.href === location.origin + "/ui/pages/entity/catalog" && role != 'entity'){
 				window.location = location.origin + "/ui/pages/error/403";		
 		}
 

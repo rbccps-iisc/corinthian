@@ -70,7 +70,7 @@ login.controller('loginCtrl', function($scope, $http, origin, api){
 			
 		}else if(id.includes('/')){
 			//Trigger auto entity login
-			$scope._login(api['auto-entity']['login'], id, apikey, 'auto-entity');
+			$scope._login(api['entity']['login'], id, apikey, 'entity');
 		}else{
 			//Trigger owner login
 			$scope._login(api['owner']['login'], id, apikey, 'owner');

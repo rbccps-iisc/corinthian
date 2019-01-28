@@ -27,8 +27,8 @@ const api = {
 		"reset-apikey": "/owner/reset-apikey",
 		"login": "/owner/entities"
 	},
-	"auto_entity": {
-		"follow": "/owner/follow",
+	"entity": {
+		"follow": "/entity/follow",
 		"block": "/entity/block",
 		"unfollow": "/entity/unfollow",
 		"share": "/entity/share",
