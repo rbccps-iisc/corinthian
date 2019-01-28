@@ -51,7 +51,7 @@
           <a class="nav-link" href="#" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
             <div class="media align-items-center">
               <span class="avatar avatar-sm rounded-circle">
-                <img alt="Image placeholder" src="../../assets/img/logo/owner.png">
+                <img alt="Image placeholder" src="../../assets/img/logo/admin.png">
               </span>
             </div>
           </a>
@@ -204,7 +204,7 @@
             <a class="nav-link pr-0" href="#" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
               <div class="media align-items-center">
                 <span class="avatar avatar-sm rounded-circle">
-                  <img alt="Admin logo" src="../../assets/img/logo/owner.png">
+                  <img alt="Admin logo" src="../../assets/img/logo/admin.png">
                 </span>
                 <div class="media-body ml-2 d-none d-lg-block">
                   <span class="mb-0 text-sm  font-weight-bold">{{id}}</span>
@@ -395,7 +395,7 @@
                     <th scope="row">
                       <div class="media align-items-center">
                         <a href="#" class="avatar rounded-circle mr-3">
-                          <img alt="Image placeholder" src="../../assets/img/logo/owner-1.png">
+                          <img alt="Image placeholder" src="../../assets/img/logo/owner.png">
                         </a>
                         <div class="media-body">
                           <span class="mb-0 text-sm">`+owner['own']+`</span>
@@ -424,7 +424,7 @@
                             </div>
                             <div id="reset_password_modal_footer`+owner['own']+`" class="modal-footer">
                               <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
-                              <button type="button" class="btn btn-primary" onclick="owner_reset_password('`+owner['own']+`', '`+owner['own']+`')"><i class="fas fa-thumbs-up"></i></button>
+                              <button type="button" class="btn btn-primary" onclick="owner_reset_password('`+owner['own']+`')"><i class="fas fa-thumbs-up"></i></button>
                             </div>
                           </div>
                         </div>
@@ -451,7 +451,7 @@
                             </div>
                             <div id="block_modal_footer`+owner['own']+`" class="modal-footer">
                               <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
-                              <button type="button" class="btn btn-default"  onclick="owner_block('`+owner['own']+`', '`+owner['own']+`')"><i class="fas fa-thumbs-up"></i></button>
+                              <button type="button" class="btn btn-default"  onclick="owner_block('`+owner['own']+`')"><i class="fas fa-thumbs-up"></i></button>
                             </div>
                           </div>
                         </div>
@@ -478,7 +478,7 @@
                             </div>
                             <div  id="unblock_modal_footer`+owner['own']+`" class="modal-footer">
                               <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
-                              <button type="button" class="btn btn-outline-default"  onclick="owner_unblock('`+owner['own']+`', '`+owner['own']+`')"><i class="fas fa-thumbs-up"></i></button>
+                              <button type="button" class="btn btn-outline-default"  onclick="owner_unblock('`+owner['own']+`')"><i class="fas fa-thumbs-up"></i></button>
                             </div>
                           </div>
                         </div>
@@ -505,7 +505,7 @@
                             </div>
                             <div id="delete_modal_footer`+owner['own']+`" class="modal-footer">
                               <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
-                              <button type="button" class="btn btn-danger" onclick="owner_delete('`+owner['own']+`', '`+owner['own']+`')"><i class="fas fa-thumbs-up"></i></button>
+                              <button type="button" class="btn btn-danger" onclick="owner_delete('`+owner['own']+`')"><i class="fas fa-thumbs-up"></i></button>
                             </div>
                           </div>
                         </div>
@@ -524,13 +524,195 @@
       var owner_list = $('#owner_list');
       for (var i = (owner_data.length-1); i >=0 ; i--) {
         owner_list.append(get_table_row(owner_data[i])); 
-        console.log(owner_data[i])
+        // console.log(owner_data[i])
       }
+    }
+
+    function copyToClipboard(element_id) {
+      var $temp = $("<input>");
+      $("body").append($temp);
+      $temp.val($("#new_apikey_"+element_id).text()).select();
+      $("#copied_"+element_id).html("APIKEY copied!")
+      document.execCommand("copy");
+      $temp.remove();
     }
 
     $( document ).ready(function() {
       display_owners();
     });
+
+        function owner_reset_password(owner_id){
+      $.ajax({
+           url: api['admin']['reset-apikey'],
+           data: {},
+           type: "POST",
+           contentType: 'application/json; charset=utf-8',
+           dataType: 'jsonp',
+           headers:{
+            'id': sessionStorage.getItem('id'),
+            'apikey': sessionStorage.getItem('apikey'),
+            'owner': owner_id,
+           },
+           dataType: 'json',
+           complete: function(jqXHR) {
+             if(jqXHR['status'] == 200) {
+                    // console.log(d[i]);
+                    $( "#alert_message").html(`<br><center><div class="alert alert-success alert-dismissible fade show in" role="alert">
+                            <span class="alert-inner--icon"><i class="ni ni-like-2"></i></span>
+                            <span class="alert-inner--text"><strong>Success! </strong> Password for <strong>` + owner_id + `</strong> has been reset to <strong id="new_apikey_`+ owner_id +`">`+ jqXHR['responseJSON']['apikey'] +`</strong>.<br> <strong id="copied_`+ owner_id +`" onclick="copyToClipboard('`+owner_id+`')"><i style="font-size:30px;" class="far fa-copy"></i></strong></span>
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div></center>`);
+                    // $( "#alert_message").fadeOut();
+                    window.setTimeout(function(){
+                      $( "#reset_passwd_modal"+ owner_id).modal('hide');
+                      $( '.modal-backdrop').remove();
+                      $( "#alert_message").fadeIn();
+                      $( "#alert_message").fadeOut(3050);
+                    }, 900);
+             }else{
+                $( "#alert_message").html(`<br><div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <span class="alert-inner--icon"><i class="fas fa-exclamation-triangle"></i></span>
+                            <span class="alert-inner--text"><strong>Error! </strong>` + jqXHR['responseJSON']['error'] + `</span>
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>`);
+
+                window.setTimeout(function(){
+                      $( "#alert_message").fadeIn();
+                      $( "#alert_message").fadeOut(450);
+                    }, 900);
+            
+            }
+             
+          }  
+
+        });
+    }
+
+
+    function owner_block(owner_id){
+      var modal_body = $( "#block_modal_body"+owner_id).html();
+      var modal_footer = $( "#block_modal_footer"+owner_id).html();
+      $.ajax({
+           url: api['admin']['block'],
+           data: {},
+           type: "POST",
+           contentType: 'application/json; charset=utf-8',
+           dataType: 'jsonp',
+           headers:{
+            'id': sessionStorage.getItem('id'),
+            'apikey': sessionStorage.getItem('apikey'),
+            'entity': owner_id,
+           },
+           dataType: 'json',
+           complete: function(jqXHR) {
+             if(jqXHR['status'] == 200) {
+                    // console.log(d[i]);
+                    localStorage.setItem('data', JSON.stringify(d));
+                    $( "#block_modal_body"+owner_id).html(`<br><div class="alert alert-success alert-dismissible fade show in" role="alert">
+                            <span class="alert-inner--icon"><i class="ni ni-like-2"></i></span>
+                            <span class="alert-inner--text"><strong>Success! </strong> <strong>` + owner_id + `</strong> blocked.</span>
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>`);
+                    // $( "#alert_message").fadeOut();
+                    $( "#block_modal_footer"+ owner_id).html("");
+                    
+                    window.setTimeout(function(){
+                      $( "#block_modal"+ owner_id).modal('hide');
+                      $( '.modal-backdrop').remove();
+                      $( "#block_modal_body"+owner_id).html(modal_body);   
+                      $( "#block_modal_footer"+owner_id).html(modal_footer);   
+                    }, 2000);
+             }else{
+                $( "#block_modal_body"+owner_id).html(`<br><div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <span class="alert-inner--icon"><i class="fas fa-exclamation-triangle"></i></span>
+                            <span class="alert-inner--text"><strong>Error! </strong>` + jqXHR['responseJSON']['error'] + `</span>
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>`);
+
+                $( "#block_modal_footer"+ owner_id).html("");
+
+                  window.setTimeout(function(){
+                      $( "#block_modal"+ owner_id).modal('hide');
+                      $('.modal-backdrop').remove();
+                      $( "#block_modal_body"+owner_id).html(modal_body);   
+                      $( "#block_modal_footer"+owner_id).html(modal_footer);                
+                    }, 2000);
+
+            
+            }
+             
+          }  
+
+        });
+    }
+
+    function owner_unblock(owner_id){
+      var modal_body = $( "#unblock_modal_body"+owner_id).html();
+      var modal_footer = $( "#unblock_modal_footer"+owner_id).html();
+      $.ajax({
+           url: api['admin']['unblock'],
+           data: {},
+           type: "POST",
+           contentType: 'application/json; charset=utf-8',
+           dataType: 'jsonp',
+           headers:{
+            'id': sessionStorage.getItem('id'),
+            'apikey': sessionStorage.getItem('apikey'),
+            'entity': owner_id,
+           },
+           dataType: 'json',
+           complete: function(jqXHR) {
+             if(jqXHR['status'] == 200) {                    
+                    $( "#unblock_modal_body"+owner_id).html(`<br><div class="alert alert-success alert-dismissible fade show in" role="alert">
+                            <span class="alert-inner--icon"><i class="ni ni-like-2"></i></span>
+                            <span class="alert-inner--text"><strong>Success! </strong> <strong>` + owner_id + `</strong> unblocked.</span>
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>`);
+                    // $( "#alert_message").fadeOut();
+                    $( "#unblock_modal_footer"+ owner_id).html("");
+                    
+                    window.setTimeout(function(){
+                      $( "#unblock_modal"+ owner_id).modal('hide');
+                      $( '.modal-backdrop').remove();
+                      $( "#unblock_modal_body"+owner_id).html(modal_body);   
+                      $( "#unblock_modal_footer"+owner_id).html(modal_footer);   
+                    }, 2000);
+             }else{
+                $( "#unblock_modal_body"+owner_id).html(`<br><div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <span class="alert-inner--icon"><i class="fas fa-exclamation-triangle"></i></span>
+                            <span class="alert-inner--text"><strong>Error! </strong>` + jqXHR['responseJSON']['error'] + `</span>
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>`);
+
+                $( "#unblock_modal_footer"+ owner_id).html("");
+
+                  window.setTimeout(function(){
+                      $( "#unblock_modal"+ owner_id).modal('hide');
+                      $('.modal-backdrop').remove();
+                      $( "#unblock_modal_body"+owner_id).html(modal_body);   
+                      $( "#unblock_modal_footer"+owner_id).html(modal_footer);                
+                    }, 2000);
+
+            
+            }
+             
+          }  
+
+        });
+    }
+
 
     function owner_delete(owner_id){
       $.ajax({

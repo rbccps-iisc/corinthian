@@ -6,7 +6,8 @@ const api = {
 		"deregister-owner": "/admin/deregister-owner",
 		"block": "/admin/block",
 		"unblock": "/admin/unblock",
-		"login": "/admin/owners"
+		"login": "/admin/owners",
+		"reset-apikey": "/admin/reset-apikey"
 	},
 	"owner": {
 		"follow": "/owner/follow",
@@ -26,18 +27,18 @@ const api = {
 		"reset-apikey": "/owner/reset-apikey",
 		"login": "/owner/entities"
 	},
-	"auto-entity": {
+	"auto_entity": {
 		"follow": "/owner/follow",
-		"block": "/owner/block",
-		"unfollow": "/owner/unfollow",
-		"share": "/owner/share",
-		"bind": "/owner/bind",
-		"unbind": "/owner/unbind",
-		"permissions": "owner/permissions",
-		"reject-follow": "/owner/reject-follow",
-		"follow-status": "/owner/follow-status",
-		"follow-requests": "/owner/follow-requests",
-		"login": "/entity/ae"
+		"block": "/entity/block",
+		"unfollow": "/entity/unfollow",
+		"share": "/entity/share",
+		"bind": "/entity/bind",
+		"unbind": "/entity/unbind",
+		"permissions": "entity/permissions",
+		"reject-follow": "/entity/reject-follow",
+		"follow-status": "/entity/follow-status",
+		"follow-requests": "/entity/follow-requests",
+		"login": "/entity/permissions"
 	},
 	"general_apis": {
 		"catalog": "/catalog"

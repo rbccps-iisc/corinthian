@@ -4,25 +4,12 @@ var d;
 var SCOPE;
 
 admin.controller('adminCtrl', function($scope, $compile, $http){
-    $scope.brand = "IUDX";
-    $scope.brand_full_form = "Indian Urban Data Exchange";
-    $scope.navbar_links = [
-      {"text":"Link-1","href":"#", "legend":"planet"},
-      {"text":"Link-2","href":"#", "legend":"compass-04"},
-      {"text":"Link-3","href":"#", "legend":"diamond"}
-    ];
    
     $scope.data = JSON.parse(localStorage.getItem('data'));    
     $scope.id = sessionStorage.getItem('id');
     $scope.apikey = sessionStorage.getItem('apikey');
     d=$scope.data
 
-    SCOPE = $scope;
-    $scope.compile_and_prepend = function (elem_from, elem_to) {
-        var content = $compile(angular.element(elem_from))($scope);
-        angular.element(elem_to).prepend(content);
-    }
-    
     // ADD/Register owner
     $scope.addOwner=function(){
       
@@ -38,6 +25,15 @@ admin.controller('adminCtrl', function($scope, $compile, $http){
       }).then(function (response)
             {
   
+                     function copyToClipboard(element_id) {
+                        var $temp = $("<input>");
+                        $("body").append($temp);
+                        $temp.val($("#new_apikey_"+element_id).text()).select();
+                        $("#copied_"+element_id).html("APIKEY copied!")
+                        document.execCommand("copy");
+                        $temp.remove();
+                      }
+
                     var data=JSON.parse(localStorage.getItem('data'));
                     var _obj = {'own':$scope.owner_name}
                     data.push(_obj);
@@ -178,14 +174,14 @@ admin.controller('adminCtrl', function($scope, $compile, $http){
                     // $("cb_"+ _obj['own']).prop('checked', _obj['is_autonomous'])
                     $("#alert_message").html(`<br><div class="alert alert-success alert-dismissible fade show in" role="alert">
                             <span class="alert-inner--icon"><i class="ni ni-like-2"></i></span>
-                            <span class="alert-inner--text"><strong>Success! </strong>` + _obj['own'] + ` registered.</span>
+                            <span class="alert-inner--text"><strong>Success! </strong> <strong>` + response.data.id + `</strong> has been registered as an owner with apikey <strong id="new_apikey_`+ _obj['i'] +`">`+ response.data.apikey +`</strong> <strong id="copied_`+ _obj['index'] +`" onclick="copyToClipboard('`+_obj['index']+`')"><i style="font-size:30px;" class="far fa-copy"></i></strong></span>
                             <button type="button" class="close" data-dismiss="alert" aria-label="Close">
                                 <span aria-hidden="true">&times;</span>
                             </button>
                         </div>`);
                     window.setTimeout(function(){
                       $( "#alert_message").fadeIn();
-                      $( "#alert_message").fadeOut(450);
+                      $( "#alert_message").fadeOut(3050);
                     }, 900);
                   
 

@@ -1,9 +1,9 @@
-const owner = angular.module("owner", ['session_checker', 'footer', 'logout', 'ui_urls', 'owner_sidebar']);
+const auto_entity = angular.module("auto_entity", ['session_checker', 'footer', 'logout', 'ui_urls', 'auto_entity_sidebar']);
 
 var d;
 var SCOPE;
 
-owner.controller('ownerCtrl', function($scope, $compile, $http){
+auto_entity.controller('auto_entityCtrl', function($scope, $compile, $http){
    
     $scope.data = JSON.parse(localStorage.getItem('data'));    
     $scope.id = sessionStorage.getItem('id');
@@ -17,7 +17,7 @@ owner.controller('ownerCtrl', function($scope, $compile, $http){
       var is_autonomous=($scope.is_autonomous==undefined || $scope.is_autonomous==false)?false:true;
       $http({
           method: 'POST',
-          url: api['owner']['register-entity'],
+          url: api['auto_entity']['register-entity'],
           headers: {
               'id': $scope.id,
               'apikey': $scope.apikey,
@@ -54,7 +54,7 @@ owner.controller('ownerCtrl', function($scope, $compile, $http){
                     <th scope="row">
                       <div class="media align-items-center">
                         <a href="#" class="avatar rounded-circle mr-3">
-                          <img alt="Image placeholder" src="../../assets/img/logo/owner-1.png">
+                          <img alt="Image placeholder" src="../../assets/img/logo/auto_entity-1.png">
                         </a>
                         <div class="media-body">
                           <span class="mb-0 text-sm">`+_obj['ent']+`</span>
