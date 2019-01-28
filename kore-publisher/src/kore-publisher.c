@@ -1580,7 +1580,7 @@ catalog (struct http_request *req)
 		entity = NULL;
 
 		CREATE_STRING (query,
-			"SELECT id,schema FROM users ORDER BY id LIMIT 50"
+			"SELECT id,schema FROM users WHERE id LIKE '%%/%%' ORDER BY id LIMIT 50"
 		);
 	}
 
