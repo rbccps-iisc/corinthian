@@ -19,14 +19,8 @@
   <link href="../../assets/vendor/@fortawesome/fontawesome-free/css/all.min.css" rel="stylesheet">
   <!-- Argon CSS -->
   <link type="text/css" href="../../assets/css/argon.min.css?v=1.0.0" rel="stylesheet">
-  <style type="text/css">
-    #alert_message{
-      position: absolute;
-      z-index: 1;
-      top: 0px;
-      left: 0px;
-    }
-  </style>
+  <link type="text/css" href="../../assets/css/iudx.css" rel="stylesheet">
+  
 </head>
 <body class="bg-default" ng-controller="logoutCtrl"  oncontextmenu="return false">
   
@@ -732,10 +726,10 @@
         });
     }
 
-    function change_blocked_state(owner_id, checkbox){
-      // console.log(owner_id, checkbox.checked)
-      $.ajax({
-           url: (checkbox.checked) ? api['admin']['block'] : api['admin']['unblock'],
+function change_blocked_state(owner_id, checkbox){
+      if(checkbox.checked){
+        $.ajax({
+           url: api['owner']['block'],
            data: {},
            type: "POST",
            contentType: 'application/json; charset=utf-8',
@@ -750,11 +744,10 @@
              if(jqXHR['status'] == 200) {
                 var d=JSON.parse(localStorage.getItem('data'));
                 for (var i = 0; i < d.length ; i++) {
-                  if (d[i]['ent']==owner_id){
+                  if (d[i]['own']==owner_id){
                     // console.log(d[i]);
                     d[i]['is_blocked']=checkbox.checked;
                     localStorage.setItem('data', JSON.stringify(d));
-                    if(checkbox.checked){
                       $( "#alert_message").html(`<br><div class="alert alert-success alert-dismissible fade show in" role="alert">
                             <span class="alert-inner--icon"><i class="ni ni-like-2"></i></span>
                             <span class="alert-inner--text"><strong>Success! </strong> <strong>` + owner_id + `</strong> is now blocked.</span>
@@ -762,15 +755,7 @@
                                 <span aria-hidden="true">&times;</span>
                             </button>
                         </div>`);
-                    }else{
-                      $( "#alert_message").html(`<br><div class="alert alert-success alert-dismissible fade show in" role="alert">
-                            <span class="alert-inner--icon"><i class="ni ni-like-2"></i></span>
-                            <span class="alert-inner--text"><strong>Success! </strong> <strong>` + owner_id + `</strong> is now unblocked.</span>
-                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                                <span aria-hidden="true">&times;</span>
-                            </button>
-                        </div>`);
-                    }
+                   
                     // $( "#alert_message").fadeOut();
                     
                      window.setTimeout(function(){
@@ -796,8 +781,62 @@
           }  
 
         });
-    }
+      }else{
+        $.ajax({
+           url: api['owner']['unblock'],
+           data: {},
+           type: "POST",
+           contentType: 'application/json; charset=utf-8',
+           dataType: 'jsonp',
+           headers:{
+            'id': sessionStorage.getItem('id'),
+            'apikey': sessionStorage.getItem('apikey'),
+            'entity': owner_id
+           },
+           dataType: 'json',
+           complete: function(jqXHR) {
+             if(jqXHR['status'] == 200) {
+                var d=JSON.parse(localStorage.getItem('data'));
+                for (var i = 0; i < d.length ; i++) {
+                  if (d[i]['own']==owner_id){
+                    // console.log(d[i]);
+                    d[i]['is_blocked']=checkbox.checked;
+                    localStorage.setItem('data', JSON.stringify(d));
+                      $( "#alert_message").html(`<br><div class="alert alert-success alert-dismissible fade show in" role="alert">
+                            <span class="alert-inner--icon"><i class="ni ni-like-2"></i></span>
+                            <span class="alert-inner--text"><strong>Success! </strong> <strong>` + owner_id + `</strong> is now unblocked.</span>
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>`);
+                   
+                    // $( "#alert_message").fadeOut();
+                    
+                     window.setTimeout(function(){
+                      $( "#alert_message").fadeIn();
+                      $( "#alert_message").fadeOut(3050);
+                    }, 900);
+                    break;
+                  }
+                }
+             }else{
+                $( "#alert_message").html(`<br><div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <span class="alert-inner--icon"><i class="fas fa-exclamation-triangle"></i></span>
+                            <span class="alert-inner--text"><strong>Error! </strong>` + jqXHR['responseJSON']['error'] + `</span>
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>`);
+                  window.setTimeout(function(){
+                      $( "#alert_message").fadeIn();
+                      $( "#alert_message").fadeOut(3050);
+                    }, 900);
+             }   
+          }  
 
+        });
+      }
+    }
 
   </script>
  
