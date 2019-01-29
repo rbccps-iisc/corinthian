@@ -1047,14 +1047,12 @@ reset_apikey (struct http_request *req)
 {
 	const char *id;
 	const char *apikey;
-	const char *entity;
-	const char *owner;
+	const char *reset_api_key_for;
 
 	char salt		[MAX_LEN_APIKEY + 1];
 	char new_apikey		[MAX_LEN_APIKEY + 1];
 	char password_hash	[2*SHA256_DIGEST_LENGTH + 1];
 
-	const char *reset_api_key_for = NULL;
 
 	req->status = 403;
 
@@ -1070,8 +1068,7 @@ reset_apikey (struct http_request *req)
 /////////////////////////////////////////////////
 
 	if (! looks_like_a_valid_owner(id))
-		FORBIDDEN("id is not valid");
-
+		BAD_REQUEST("id is not valid");
 
 	// either "id" should be owner of the "entity", or an "admin" 
 	if (strcmp(id,"admin") == 0)
@@ -1079,32 +1076,28 @@ reset_apikey (struct http_request *req)
 		if (! is_request_from_localhost(req))
 			FORBIDDEN("admin can only call APIs from localhost");
 
-		if (KORE_RESULT_OK != http_request_header(req, "owner", &owner))
-			FORBIDDEN("owner field missing in header");
+		if (KORE_RESULT_OK != http_request_header(req, "owner", &reset_api_key_for))
+			BAD_REQUEST("owner field missing in header");
 
-		if (! is_string_safe(owner))
-			FORBIDDEN("invalid owner");
+		if (! is_string_safe(reset_api_key_for))
+			BAD_REQUEST("invalid owner");
 
-		if (! looks_like_a_valid_owner(owner))
-			FORBIDDEN("owner is not valid");
-
-		reset_api_key_for = owner;
+		if (! looks_like_a_valid_owner(reset_api_key_for))
+			BAD_REQUEST("owner is not valid");
 	}
 	else
 	{
-		if (KORE_RESULT_OK != http_request_header(req, "entity", &entity))
-			FORBIDDEN("entity field missing in header");
+		if (KORE_RESULT_OK != http_request_header(req, "entity", &reset_api_key_for))
+			BAD_REQUEST("entity field missing in header");
 
-		if (! is_owner(id,entity))
+		if (! is_owner(id,reset_api_key_for))
 			FORBIDDEN("you are not the owner of the entity");
 
-		if (! is_string_safe(entity))
-			FORBIDDEN("invalid entity");
+		if (! is_string_safe(reset_api_key_for))
+			BAD_REQUEST("invalid entity");
 
-		if (! looks_like_a_valid_entity(entity))
-			FORBIDDEN("entity is not valid");
-
-		reset_api_key_for = entity;
+		if (! looks_like_a_valid_entity(reset_api_key_for))
+			BAD_REQUEST("entity is not valid");
 	}
 
 	if (! login_success(id,apikey,NULL))
@@ -1182,13 +1175,13 @@ set_autonomous(struct http_request *req)
 /////////////////////////////////////////////////
 
 	if (! looks_like_a_valid_owner(id))
-		FORBIDDEN("id is not valid");
+		BAD_REQUEST("id is not valid");
 
 	if (! is_string_safe(entity))
-		FORBIDDEN("invalid entity");
+		BAD_REQUEST("invalid entity");
 
 	if (! looks_like_a_valid_entity(entity))
-		FORBIDDEN("entity is not valid");
+		BAD_REQUEST("entity is not valid");
 
 	// either "id" should be owner of the "entity", or an "admin" 
 	if (strcmp(id,"admin") == 0)
@@ -1253,7 +1246,7 @@ register_entity (struct http_request *req)
 
 	// deny if the user is not a owner
 	if (! looks_like_a_valid_owner(id))
-		FORBIDDEN("id is not valid");
+		BAD_REQUEST("id is not valid");
 
 	// entity at the time of registration has the same criteria as the owner's id
 	// later on we will add owner/ in front of it
@@ -1273,7 +1266,7 @@ register_entity (struct http_request *req)
 	string_to_lower(entity);
 
 	if (! is_string_safe(entity))
-		FORBIDDEN("invalid entity");
+		BAD_REQUEST("invalid entity");
 
 	if (! login_success(id,apikey,NULL))
 		FORBIDDEN("invalid id or apikey");
@@ -1399,7 +1392,7 @@ get_entities (struct http_request *req)
 
 	// deny if the user is not a owner
 	if (! looks_like_a_valid_owner(id))
-		FORBIDDEN("id is not valid");
+		BAD_REQUEST("id is not valid");
 
 	if (! login_success(id,apikey,NULL))
 		FORBIDDEN("invalid id or apikey");
@@ -1472,13 +1465,13 @@ deregister_entity (struct http_request *req)
 
 	// deny if the id does not look like an owner
 	if (! looks_like_a_valid_owner(id))
-		FORBIDDEN("id is not an owner");
+		BAD_REQUEST("id is not an owner");
 
 	if (! is_string_safe(entity))
-		FORBIDDEN("invalid entity");
+		BAD_REQUEST("invalid entity");
 
 	if (! looks_like_a_valid_entity(entity))
-		FORBIDDEN("entity is not valid");
+		BAD_REQUEST("entity is not valid");
 
 	if (! is_owner(id,entity))
 		FORBIDDEN("you are not the owner of the entity");
@@ -1565,10 +1558,10 @@ catalog (struct http_request *req)
 	{
 		// if not a valid entity
 		if (! looks_like_a_valid_entity(entity))
-			FORBIDDEN("id is not a valid entity");
+			BAD_REQUEST("id is not a valid entity");
 
 		if (! is_string_safe(entity))
-			FORBIDDEN("invalid entity");
+			BAD_REQUEST("invalid entity");
 
 		CREATE_STRING (query,
 				"SELECT schema FROM users WHERE id='%s'",
@@ -1668,7 +1661,7 @@ register_owner(struct http_request *req)
 	for (i = 0; _invalid_owner_names [i]; ++i)
 	{
 		if (strcmp(owner,_invalid_owner_names[i]) == 0)
-			FORBIDDEN("cannot create owner");
+			BAD_REQUEST("cannot create owner");
 	}
 
 
@@ -1677,7 +1670,7 @@ register_owner(struct http_request *req)
 		BAD_REQUEST("invalid owner");
 
 	if (! is_string_safe(owner))
-		FORBIDDEN("invalid owner");
+		BAD_REQUEST("invalid owner");
 
 	if (! login_success("admin",apikey,NULL))
 		FORBIDDEN("invalid id or apikey");
@@ -1843,7 +1836,7 @@ deregister_owner(struct http_request *req)
 	for (i = 0; _invalid_owner_names[i]; ++i)
 	{
 		if (strcmp(owner,_invalid_owner_names[i]) == 0)
-			FORBIDDEN("cannot delete owner");
+			BAD_REQUEST("cannot delete owner");
 	}
 
 	// it should look like an owner
@@ -1853,7 +1846,7 @@ deregister_owner(struct http_request *req)
 /////////////////////////////////////////////////
 
 	if (! is_string_safe(owner))
-		FORBIDDEN("invalid owner");
+		BAD_REQUEST("invalid owner");
 
 	if (! login_success("admin",apikey,NULL))
 		FORBIDDEN("invalid id or apikey");
@@ -1966,10 +1959,10 @@ queue_bind (struct http_request *req)
 	if (looks_like_a_valid_owner(id))
 	{
 		if (KORE_RESULT_OK != http_request_header(req, "from", &from))
-			FORBIDDEN("'from' value missing in header");
+			BAD_REQUEST("'from' value missing in header");
 
 		if (! looks_like_a_valid_entity(from))
-			FORBIDDEN("'from' is not a valid entity");
+			BAD_REQUEST("'from' is not a valid entity");
 
 		// check if the he is the owner of from 
 		if (! is_owner(id,from))
@@ -1982,7 +1975,7 @@ queue_bind (struct http_request *req)
 	}
 
 	if (! looks_like_a_valid_entity(to))
-		FORBIDDEN("'to' is not a valid entity");
+		BAD_REQUEST("'to' is not a valid entity");
 
 	if (
 		(strcmp(message_type,"public") 		!= 0) &&
@@ -2007,13 +2000,13 @@ queue_bind (struct http_request *req)
 /////////////////////////////////////////////////
 
 	if (! is_string_safe(from))
-		FORBIDDEN("invalid from");
+		BAD_REQUEST("invalid from");
 
 	if (! is_string_safe(to))
-		FORBIDDEN("invalid to");
+		BAD_REQUEST("invalid to");
 
 	if (! is_string_safe(topic))
-		FORBIDDEN("invalid topic");
+		BAD_REQUEST("invalid topic");
 
 	bool is_autonomous = false;
 
@@ -2132,10 +2125,10 @@ queue_unbind (struct http_request *req)
 	if (looks_like_a_valid_owner(id))
 	{
 		if (KORE_RESULT_OK != http_request_header(req, "from", &from))
-			FORBIDDEN("'from' value missing in header");
+			BAD_REQUEST("'from' value missing in header");
 
 		if (! looks_like_a_valid_entity(from))
-			FORBIDDEN("'from' is not a valid entity");
+			BAD_REQUEST("'from' is not a valid entity");
 
 		// check if the he is the owner of from 
 		if (! is_owner(id,from))
@@ -2148,7 +2141,7 @@ queue_unbind (struct http_request *req)
 	}
 
 	if (! looks_like_a_valid_entity(to))
-		FORBIDDEN("'to' is not a valid entity");
+		BAD_REQUEST("'to' is not a valid entity");
 
 	if (
 		(strcmp(message_type,"public") != 0) &&
@@ -2171,13 +2164,13 @@ queue_unbind (struct http_request *req)
 /////////////////////////////////////////////////
 
 	if (! is_string_safe(from))
-		FORBIDDEN("invalid from");
+		BAD_REQUEST("invalid from");
 
 	if (! is_string_safe(to))
-		FORBIDDEN("invalid to");
+		BAD_REQUEST("invalid to");
 
 	if (! is_string_safe(topic))
-		FORBIDDEN("invalid topic");
+		BAD_REQUEST("invalid topic");
 
 	bool is_autonomous = false;
 
@@ -2318,10 +2311,10 @@ follow (struct http_request *req)
 	if (looks_like_a_valid_owner(id))
 	{
 		if (KORE_RESULT_OK != http_request_header(req, "from", &from))
-			FORBIDDEN("'from' value missing in header");
+			BAD_REQUEST("'from' value missing in header");
 
 		if (! looks_like_a_valid_entity(from))
-			FORBIDDEN("'from' is not a valid entity");
+			BAD_REQUEST("'from' is not a valid entity");
 
 		// check if the he is the owner of from 
 		if (! is_owner(id,from))
@@ -2336,19 +2329,19 @@ follow (struct http_request *req)
 /////////////////////////////////////////////////
 
 	if (! looks_like_a_valid_entity(to))
-		FORBIDDEN("'to' is not a valid entity");
+		BAD_REQUEST("'to' is not a valid entity");
 
 	if (! is_string_safe(from))
-		FORBIDDEN("invalid from");
+		BAD_REQUEST("invalid from");
 
 	if (! is_string_safe(to))
-		FORBIDDEN("invalid to");
+		BAD_REQUEST("invalid to");
 
 	if (! is_string_safe(validity))
-		FORBIDDEN("invalid validity");
+		BAD_REQUEST("invalid validity");
 
 	if (! is_string_safe(topic))
-		FORBIDDEN("invalid topic");
+		BAD_REQUEST("invalid topic");
 
 	BAD_REQUEST_if (
 		(strcmp(permission,"read") 		!= 0) &&
@@ -2392,7 +2385,7 @@ follow (struct http_request *req)
 	RUN_QUERY (query,"could not get info about 'to'");
 
 	if (kore_pgsql_ntuples(&sql) != 1)
-		FORBIDDEN("'to' does not exist OR has been blocked");
+		BAD_REQUEST("'to' does not exist OR has been blocked");
 
 	char *char_is_to_autonomous	= kore_pgsql_getvalue(&sql,0,0);
 	bool is_to_autonomous		= char_is_to_autonomous[0] == 't';
@@ -2627,10 +2620,10 @@ unfollow (struct http_request *req)
 	if (looks_like_a_valid_owner(id))
 	{
 		if (KORE_RESULT_OK != http_request_header(req, "from", &from))
-			FORBIDDEN("'from' value missing in header");
+			BAD_REQUEST("'from' value missing in header");
 
 		if (! looks_like_a_valid_entity(from))
-			FORBIDDEN("'from' is not a valid entity");
+			BAD_REQUEST("'from' is not a valid entity");
 
 		// check if the he is the owner of from 
 		if (! is_owner(id,from))
@@ -2656,13 +2649,13 @@ unfollow (struct http_request *req)
 /////////////////////////////////////////////////
 
 	if (! is_string_safe(from))
-		FORBIDDEN("invalid from");
+		BAD_REQUEST("invalid from");
 
 	if (! is_string_safe(to))
-		FORBIDDEN("invalid to");
+		BAD_REQUEST("invalid to");
 
 	if (! is_string_safe(topic))
-		FORBIDDEN("invalid topic");
+		BAD_REQUEST("invalid topic");
 
 	bool is_autonomous = false;
 
@@ -2873,7 +2866,7 @@ share (struct http_request *req)
 /////////////////////////////////////////////////
 
 	if (! is_string_safe(follow_id))
-		FORBIDDEN("invalid follow-id");
+		BAD_REQUEST("invalid follow-id");
 
 	bool is_autonomous = false;
 
@@ -2924,7 +2917,7 @@ share (struct http_request *req)
 	RUN_QUERY (query,"could not get info about 'from'");
 
 	if (kore_pgsql_ntuples(&sql) != 1)
-		FORBIDDEN("'from' does not exist OR has been blocked");
+		BAD_REQUEST("'from' does not exist OR has been blocked");
 
 	char *char_is_from_autonomous	= kore_pgsql_getvalue(&sql,0,0);
 	bool is_from_autonomous		= char_is_from_autonomous[0] == 't';
@@ -3083,7 +3076,7 @@ reject_follow (struct http_request *req)
 /////////////////////////////////////////////////
 
 	if (! is_string_safe(follow_id))
-		FORBIDDEN("invalid follow-id");
+		BAD_REQUEST("invalid follow-id");
 
 	bool is_autonomous = false;
 
@@ -3332,15 +3325,13 @@ block (struct http_request *req)
 {
 	const char *id;
 	const char *apikey;
-	const char *entity;
+	const char *entity_to_be_blocked;
 
 	BAD_REQUEST_if
 	(
 		KORE_RESULT_OK != http_request_header(req, "id", &id)
 				||
 		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
-				||
-		KORE_RESULT_OK != http_request_header(req, "entity", &entity)
 			,
 		"inputs missing in headers"
 	);
@@ -3354,6 +3345,7 @@ block (struct http_request *req)
 		if (! is_request_from_localhost(req))
 			FORBIDDEN("admin can only call APIs from localhost");
 
+<<<<<<< HEAD
 		if (KORE_RESULT_OK != http_request_header(req, "owner", &owner))
 			FORBIDDEN("owner field missing in header");
 
@@ -3380,16 +3372,34 @@ block (struct http_request *req)
 			FORBIDDEN("entity is not valid");
 
 		block = entity;
+=======
+		if (KORE_RESULT_OK != http_request_header(req, "owner", &entity_to_be_blocked))
+		{
+			if (KORE_RESULT_OK != http_request_header(req, "entity", &entity_to_be_blocked))
+				BAD_REQUEST("owner/entity field missing in header");
+		}
+	}
+	else
+	{
+		if (KORE_RESULT_OK != http_request_header(req, "entity", &entity_to_be_blocked))
+			BAD_REQUEST("entity field missing in header");
+
+		if (! is_owner(id,entity_to_be_blocked))
+			FORBIDDEN("you are not the owner of the entity");
+
+		if (! looks_like_a_valid_entity(entity_to_be_blocked))
+			BAD_REQUEST("entity is not valid");
+>>>>>>> 23ac6a21e111d4362eb7103ad68c5a5642bfc9c6
 	}
 
 
 /////////////////////////////////////////////////
 
-	if (! is_string_safe(entity))
-		FORBIDDEN("invalid entity");
+	if (strcmp(id,entity_to_be_blocked) == 0)
+		BAD_REQUEST("cannot block yourself");
 
-	if (strcmp(id,entity) == 0)
-		FORBIDDEN("cannot block yourself");
+	if (! is_string_safe(entity_to_be_blocked))
+		BAD_REQUEST("invalid entity");
 
 	if (! login_success(id,apikey,NULL))
 		FORBIDDEN("invalid id or apikey");
@@ -3398,7 +3408,11 @@ block (struct http_request *req)
 
 	CREATE_STRING(query,
 			"UPDATE users set blocked='t' WHERE id='%s'",
+<<<<<<< HEAD
 				block
+=======
+				entity_to_be_blocked	
+>>>>>>> 23ac6a21e111d4362eb7103ad68c5a5642bfc9c6
 	);
 
 	RUN_QUERY(query, "could not block the entity");
@@ -3414,15 +3428,13 @@ unblock (struct http_request *req)
 {
 	const char *id;
 	const char *apikey;
-	const char *entity;
+	const char *entity_to_be_unblocked;
 
 	BAD_REQUEST_if
 	(
 		KORE_RESULT_OK != http_request_header(req, "id", &id)
 				||
 		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
-				||
-		KORE_RESULT_OK != http_request_header(req, "entity", &entity)
 			,
 		"inputs missing in headers"
 	);
@@ -3434,17 +3446,29 @@ unblock (struct http_request *req)
 	{
 		if (! is_request_from_localhost(req))
 			FORBIDDEN("admin can only call APIs from localhost");
+
+		if (KORE_RESULT_OK != http_request_header(req, "owner", &entity_to_be_unblocked))
+		{
+			if (KORE_RESULT_OK != http_request_header(req, "entity", &entity_to_be_unblocked))
+				BAD_REQUEST("owner/entity field missing in header");
+		}
 	}
 	else
 	{
-		if (! is_owner(id,entity))
+		if (KORE_RESULT_OK != http_request_header(req, "owner", &entity_to_be_unblocked))
+			BAD_REQUEST("entity field missing in header");
+
+		if (! looks_like_a_valid_entity(entity_to_be_unblocked))
+			BAD_REQUEST("invalid entity");
+
+		if (! is_owner(id,entity_to_be_unblocked))
 			FORBIDDEN("you are not the owner of the entity");
 	}
 
 /////////////////////////////////////////////////
 
-	if (! is_string_safe(entity))
-		FORBIDDEN("invalid entity");
+	if (! is_string_safe(entity_to_be_unblocked))
+		BAD_REQUEST("invalid entity");
 
 	if (! login_success(id,apikey,NULL))
 		FORBIDDEN("invalid id or apikey");
@@ -3453,7 +3477,7 @@ unblock (struct http_request *req)
 
 	CREATE_STRING(query,
 			"UPDATE users set blocked='f' WHERE id='%s'",
-				entity
+				entity_to_be_unblocked
 	);
 
 	RUN_QUERY(query, "could not block the entity");
@@ -3498,7 +3522,7 @@ permissions (struct http_request *req)
 /////////////////////////////////////////////////
 
 	if (! is_string_safe(entity))
-		FORBIDDEN("invalid entity");
+		BAD_REQUEST("invalid entity");
 
 	if (! login_success(id,apikey,NULL))
 		FORBIDDEN("invalid id or apikey");
