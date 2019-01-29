@@ -547,128 +547,6 @@
         });
     }
 
-
-    function owner_block(owner_id){
-      var modal_body = $( "#block_modal_body"+owner_id).html();
-      var modal_footer = $( "#block_modal_footer"+owner_id).html();
-      $.ajax({
-           url: api['admin']['block'],
-           data: {},
-           type: "POST",
-           contentType: 'application/json; charset=utf-8',
-           dataType: 'jsonp',
-           headers:{
-            'id': sessionStorage.getItem('id'),
-            'apikey': sessionStorage.getItem('apikey'),
-            'entity': owner_id,
-           },
-           dataType: 'json',
-           complete: function(jqXHR) {
-             if(jqXHR['status'] == 200) {
-                    // console.log(d[i]);
-                    localStorage.setItem('data', JSON.stringify(d));
-                    $( "#block_modal_body"+owner_id).html(`<br><div class="alert alert-success alert-dismissible fade show in" role="alert">
-                            <span class="alert-inner--icon"><i class="ni ni-like-2"></i></span>
-                            <span class="alert-inner--text"><strong>Success! </strong> <strong>` + owner_id + `</strong> blocked.</span>
-                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                                <span aria-hidden="true">&times;</span>
-                            </button>
-                        </div>`);
-                    // $( "#alert_message").fadeOut();
-                    $( "#block_modal_footer"+ owner_id).html("");
-                    
-                    window.setTimeout(function(){
-                      $( "#block_modal"+ owner_id).modal('hide');
-                      $( '.modal-backdrop').remove();
-                      $( "#block_modal_body"+owner_id).html(modal_body);   
-                      $( "#block_modal_footer"+owner_id).html(modal_footer);   
-                    }, 2000);
-             }else{
-                $( "#block_modal_body"+owner_id).html(`<br><div class="alert alert-danger alert-dismissible fade show" role="alert">
-                            <span class="alert-inner--icon"><i class="fas fa-exclamation-triangle"></i></span>
-                            <span class="alert-inner--text"><strong>Error! </strong>` + jqXHR['responseJSON']['error'] + `</span>
-                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                                <span aria-hidden="true">&times;</span>
-                            </button>
-                        </div>`);
-
-                $( "#block_modal_footer"+ owner_id).html("");
-
-                  window.setTimeout(function(){
-                      $( "#block_modal"+ owner_id).modal('hide');
-                      $('.modal-backdrop').remove();
-                      $( "#block_modal_body"+owner_id).html(modal_body);   
-                      $( "#block_modal_footer"+owner_id).html(modal_footer);                
-                    }, 2000);
-
-            
-            }
-             
-          }  
-
-        });
-    }
-
-    function owner_unblock(owner_id){
-      var modal_body = $( "#unblock_modal_body"+owner_id).html();
-      var modal_footer = $( "#unblock_modal_footer"+owner_id).html();
-      $.ajax({
-           url: api['admin']['unblock'],
-           data: {},
-           type: "POST",
-           contentType: 'application/json; charset=utf-8',
-           dataType: 'jsonp',
-           headers:{
-            'id': sessionStorage.getItem('id'),
-            'apikey': sessionStorage.getItem('apikey'),
-            'entity': owner_id,
-           },
-           dataType: 'json',
-           complete: function(jqXHR) {
-             if(jqXHR['status'] == 200) {                    
-                    $( "#unblock_modal_body"+owner_id).html(`<br><div class="alert alert-success alert-dismissible fade show in" role="alert">
-                            <span class="alert-inner--icon"><i class="ni ni-like-2"></i></span>
-                            <span class="alert-inner--text"><strong>Success! </strong> <strong>` + owner_id + `</strong> unblocked.</span>
-                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                                <span aria-hidden="true">&times;</span>
-                            </button>
-                        </div>`);
-                    // $( "#alert_message").fadeOut();
-                    $( "#unblock_modal_footer"+ owner_id).html("");
-                    
-                    window.setTimeout(function(){
-                      $( "#unblock_modal"+ owner_id).modal('hide');
-                      $( '.modal-backdrop').remove();
-                      $( "#unblock_modal_body"+owner_id).html(modal_body);   
-                      $( "#unblock_modal_footer"+owner_id).html(modal_footer);   
-                    }, 2000);
-             }else{
-                $( "#unblock_modal_body"+owner_id).html(`<br><div class="alert alert-danger alert-dismissible fade show" role="alert">
-                            <span class="alert-inner--icon"><i class="fas fa-exclamation-triangle"></i></span>
-                            <span class="alert-inner--text"><strong>Error! </strong>` + jqXHR['responseJSON']['error'] + `</span>
-                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                                <span aria-hidden="true">&times;</span>
-                            </button>
-                        </div>`);
-
-                $( "#unblock_modal_footer"+ owner_id).html("");
-
-                  window.setTimeout(function(){
-                      $( "#unblock_modal"+ owner_id).modal('hide');
-                      $('.modal-backdrop').remove();
-                      $( "#unblock_modal_body"+owner_id).html(modal_body);   
-                      $( "#unblock_modal_footer"+owner_id).html(modal_footer);                
-                    }, 2000);
-
-            
-            }
-             
-          }  
-
-        });
-    }
-
-
     function owner_delete(owner_id){
       $.ajax({
            url: api['admin']['deregister-owner'],
@@ -791,7 +669,7 @@ function change_blocked_state(owner_id, checkbox){
            headers:{
             'id': sessionStorage.getItem('id'),
             'apikey': sessionStorage.getItem('apikey'),
-            'entity': owner_id
+            'owner': owner_id
            },
            dataType: 'json',
            complete: function(jqXHR) {
