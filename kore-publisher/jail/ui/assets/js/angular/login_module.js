@@ -30,19 +30,20 @@ login.controller('loginCtrl', function($scope, $http, origin, api){
 				  sessionStorage.setItem("apikey", _APIKEY);
 				  sessionStorage.setItem("role", _ROLE);
 				  var _data = [];
-				  var ent_dic;
-				  console.log(response.data)
+				  var _dic;
+				  var keys = Object.keys(response.data);
+				  // console.log(response.data, keys)
 				  if(_ROLE=='admin'){
-				  	for (var i = response.data.length - 1; i >= 0; i--) {
-				  		ent_dic = {'own': response.data[i]};
-				  		_data.push(ent_dic);
+				  	for (var i = keys.length - 1; i >= 0; i--) {
+				  		_dic = {'own': keys[i], 'is_blocked': (response.data[keys[i]] ? true:false)};
+					  	_data.push(_dic);
 				  	}
 				  }else if(_ROLE=='owner'){
-				  	for(var i in response.data){
-					  	ent_dic = {'ent':Object.keys(response.data[i])[0], 'is_autonomous':Object.values(response.data[i])[0], 'index': Object.keys(response.data[i])[0].replace("/","_")};
-					  	_data.push(ent_dic);
-					 }
-				  }else if(_ROLE=='auto-entity'){
+				  	for (var i = keys.length - 1; i >= 0; i--) {
+				  		_dic = {'ent':keys[i], 'is_blocked': (response.data[keys[i]][0] ? true:false), 'is_autonomous': (response.data[keys[i]][1] ? true:false)};
+					  	_data.push(_dic);
+				  	}
+				  }else if(_ROLE=='entity'){
 				  	
 				  }
 				  

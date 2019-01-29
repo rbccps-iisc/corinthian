@@ -19,6 +19,14 @@
   <link href="../../assets/vendor/@fortawesome/fontawesome-free/css/all.min.css" rel="stylesheet">
   <!-- Argon CSS -->
   <link type="text/css" href="../../assets/css/argon.min.css?v=1.0.0" rel="stylesheet">
+  <style type="text/css">
+    #alert_message{
+      position: absolute;
+      z-index: 1;
+      top: 0px;
+      left: 0px;
+    }
+  </style>
 </head>
 <body class="bg-default" ng-controller="logoutCtrl"  oncontextmenu="return false">
   
@@ -57,7 +65,7 @@
           </a>
           <div class="dropdown-menu dropdown-menu-arrow dropdown-menu-right" >
             <div class=" dropdown-header noti-title">
-              <h6 class="text-overflow m-0">Welcome!</h6>
+              <h6 class="text-overflow m-0">Welcome! You have logged in as Admin.</h6>
             </div>
             <!--a href="./examples/profile.html" class="dropdown-item">
               <i class="ni ni-single-02"></i>
@@ -102,7 +110,7 @@
           </div>
         </div>
         <!-- Form -->
-        <form class="mt-4 mb-3 d-md-none">
+        <!-- <form class="mt-4 mb-3 d-md-none">
           <div class="input-group input-group-rounded input-group-merge">
             <input type="search" class="form-control form-control-rounded form-control-prepended" placeholder="Search" aria-label="Search">
             <div class="input-group-prepend">
@@ -111,7 +119,7 @@
               </div>
             </div>
           </div>
-        </form>
+        </form> -->
         <!-- Navigation -->
         <ul class="navbar-nav"  ng-controller="admin_sidebarCtrl">
           <!--li class="nav-item">
@@ -188,7 +196,7 @@
         <!-- Brand -->
         <a class="h4 mb-0 text-white text-uppercase d-none d-lg-inline-block" href="#">Dashboard</a>
         <!-- Form -->
-        <form class="navbar-search navbar-search-dark form-inline mr-3 d-none d-md-flex ml-lg-auto">
+        <!-- <form class="navbar-search navbar-search-dark form-inline mr-3 d-none d-md-flex ml-lg-auto">
           <div class="form-group mb-0">
             <div class="input-group input-group-alternative">
               <div class="input-group-prepend">
@@ -197,7 +205,7 @@
               <input class="form-control" placeholder="Search" type="text">
             </div>
           </div>
-        </form>
+        </form> -->
         <!-- User -->
         <ul class="navbar-nav align-items-center d-none d-md-flex">
           <li class="nav-item dropdown">
@@ -286,9 +294,8 @@
                   <tr>
                     <th scope="col">Owner</th>
                     <th scope="col">Reset Password</th>
-                    <th scope="col">Block</th>
-                    <th scope="col">UnBlock</th>
                     <th scope="col">Delete</th>
+                    <th scope="col">Blocked</th>
                     <!--th scope="col"></th-->
                     <!--th scope="col"></th-->
                   </tr>
@@ -298,7 +305,7 @@
                 </tbody>
               </table>
             </div>
-            <div class="card-footer py-4">
+       <!--      <div class="card-footer py-4">
               <nav aria-label="...">
                 <ul class="pagination justify-content-end mb-0">
                   <li class="page-item disabled">
@@ -322,13 +329,13 @@
                   </li>
                 </ul>
               </nav>
-            </div>
+            </div> -->
           </div>
         </div>
       </div>
       <br>
 <!-- Footer -->
-      <footer class="footer">
+      <!-- <footer class="footer">
         <div class="row align-items-center justify-content-xl-between">
           <div class="col-xl-6">
             <div class="copyright text-center text-xl-left text-muted">
@@ -352,7 +359,7 @@
             </ul>
           </div>
         </div>
-      </footer>
+      </footer> -->
     </div>
   </div>
     <!-- Argon Scripts -->
@@ -430,60 +437,7 @@
                         </div>
                       </div>
                     </td>
-                      <td>
-                      <!-- Button trigger modal -->
-                      <button type="button" class="btn btn-default" data-toggle="modal" data-target="#block_modal`+owner['own']+`">
-                        Block | <i class="fas fa-ban"></i>
-                      </button>
-
-                      <!-- Modal -->
-                      <div class="modal fade" id="block_modal`+owner['own']+`" tabindex="-1" role="dialog" aria-labelledby="block_modal_label" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered" role="document">
-                          <div class="modal-content">
-                            <div class="modal-header">
-                              <h5 class="modal-title" id="block_modal_label`+owner['own']+`">Block Owner</h5>
-                              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                <span aria-hidden="true">&times;</span>
-                              </button>
-                            </div>
-                            <div id="block_modal_body`+owner['own']+`" class="modal-body">
-                              <center>Are you sure you want to block <br><strong>`+owner['own']+`</strong>?</center>
-                            </div>
-                            <div id="block_modal_footer`+owner['own']+`" class="modal-footer">
-                              <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
-                              <button type="button" class="btn btn-default"  onclick="owner_block('`+owner['own']+`')"><i class="fas fa-thumbs-up"></i></button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <!-- Button trigger modal -->
-                      <button type="button" class="btn btn-outline-default" data-toggle="modal" data-target="#unblock_modal`+owner['own']+`">
-                        UnBlock | <i class="far fa-circle"></i>
-                      </button>
-
-                      <!-- Modal -->
-                      <div class="modal fade" id="unblock_modal`+owner['own']+`" tabindex="-1" role="dialog" aria-labelledby="unblock_modal_label" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered" role="document">
-                          <div class="modal-content">
-                            <div class="modal-header">
-                              <h5 class="modal-title" id="unblock_modal_label`+owner['own']+`">UnBlock Owner</h5>
-                              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                <span aria-hidden="true">&times;</span>
-                              </button>
-                            </div>
-                            <div  id="unblock_modal_body`+owner['own']+`" class="modal-body">
-                              <center>Are you sure you want to unblock <br><strong>`+owner['own']+`</strong>?</center>
-                            </div>
-                            <div  id="unblock_modal_footer`+owner['own']+`" class="modal-footer">
-                              <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
-                              <button type="button" class="btn btn-outline-default"  onclick="owner_unblock('`+owner['own']+`')"><i class="fas fa-thumbs-up"></i></button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </td>
+                     
                       <td>
                       <!-- Button trigger modal -->
                       <button type="button" class="btn btn-danger" data-toggle="modal" data-target="#delete_modal`+owner['own']+`">
@@ -511,6 +465,13 @@
                         </div>
                       </div>
                     </td>
+
+                     <td>
+                              <label class="custom-toggle">
+                                <input type="checkbox" onchange="change_blocked_state('`+owner['own']+`',this)" `+ checker(owner['is_blocked']) +`>
+                                <span class="custom-toggle-slider rounded-circle"></span>
+                              </label>
+                            </td>
                      
                     
                     
@@ -582,7 +543,7 @@
 
                 window.setTimeout(function(){
                       $( "#alert_message").fadeIn();
-                      $( "#alert_message").fadeOut(450);
+                      $( "#alert_message").fadeOut(3050);
                     }, 900);
             
             }
@@ -770,6 +731,73 @@
 
         });
     }
+
+    function change_blocked_state(owner_id, checkbox){
+      // console.log(owner_id, checkbox.checked)
+      $.ajax({
+           url: (checkbox.checked) ? api['admin']['block'] : api['admin']['unblock'],
+           data: {},
+           type: "POST",
+           contentType: 'application/json; charset=utf-8',
+           dataType: 'jsonp',
+           headers:{
+            'id': sessionStorage.getItem('id'),
+            'apikey': sessionStorage.getItem('apikey'),
+            'owner': owner_id
+           },
+           dataType: 'json',
+           complete: function(jqXHR) {
+             if(jqXHR['status'] == 200) {
+                var d=JSON.parse(localStorage.getItem('data'));
+                for (var i = 0; i < d.length ; i++) {
+                  if (d[i]['ent']==owner_id){
+                    // console.log(d[i]);
+                    d[i]['is_blocked']=checkbox.checked;
+                    localStorage.setItem('data', JSON.stringify(d));
+                    if(checkbox.checked){
+                      $( "#alert_message").html(`<br><div class="alert alert-success alert-dismissible fade show in" role="alert">
+                            <span class="alert-inner--icon"><i class="ni ni-like-2"></i></span>
+                            <span class="alert-inner--text"><strong>Success! </strong> <strong>` + owner_id + `</strong> is now blocked.</span>
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>`);
+                    }else{
+                      $( "#alert_message").html(`<br><div class="alert alert-success alert-dismissible fade show in" role="alert">
+                            <span class="alert-inner--icon"><i class="ni ni-like-2"></i></span>
+                            <span class="alert-inner--text"><strong>Success! </strong> <strong>` + owner_id + `</strong> is now unblocked.</span>
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>`);
+                    }
+                    // $( "#alert_message").fadeOut();
+                    
+                     window.setTimeout(function(){
+                      $( "#alert_message").fadeIn();
+                      $( "#alert_message").fadeOut(3050);
+                    }, 900);
+                    break;
+                  }
+                }
+             }else{
+                $( "#alert_message").html(`<br><div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <span class="alert-inner--icon"><i class="fas fa-exclamation-triangle"></i></span>
+                            <span class="alert-inner--text"><strong>Error! </strong>` + jqXHR['responseJSON']['error'] + `</span>
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>`);
+                  window.setTimeout(function(){
+                      $( "#alert_message").fadeIn();
+                      $( "#alert_message").fadeOut(3050);
+                    }, 900);
+             }   
+          }  
+
+        });
+    }
+
 
   </script>
  

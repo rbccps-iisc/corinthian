@@ -35,7 +35,7 @@ admin.controller('adminCtrl', function($scope, $compile, $http){
                       }
 
                     var data=JSON.parse(localStorage.getItem('data'));
-                    var _obj = {'own':$scope.owner_name}
+                    var _obj = {'own':$scope.owner_name, 'is_blocked': false}
                     data.push(_obj);
                     localStorage.setItem('data', JSON.stringify(data));
                     // console.log(JSON.parse(localStorage.getItem('data')))
@@ -43,7 +43,7 @@ admin.controller('adminCtrl', function($scope, $compile, $http){
                     <th scope="row">
                       <div class="media align-items-center">
                         <a href="#" class="avatar rounded-circle mr-3">
-                          <img alt="Image placeholder" src="../../assets/img/logo/owner-1.png">
+                          <img alt="Image placeholder" src="../../assets/img/logo/owner.png">
                         </a>
                         <div class="media-body">
                           <span class="mb-0 text-sm">`+_obj['own']+`</span>
@@ -78,60 +78,7 @@ admin.controller('adminCtrl', function($scope, $compile, $http){
                         </div>
                       </div>
                     </td>
-                      <td>
-                      <!-- Button trigger modal -->
-                      <button type="button" class="btn btn-default" data-toggle="modal" data-target="#block_modal`+_obj['own']+`">
-                        Block | <i class="fas fa-ban"></i>
-                      </button>
-
-                      <!-- Modal -->
-                      <div class="modal fade" id="block_modal`+_obj['own']+`" tabindex="-1" role="dialog" aria-labelledby="block_modal_label" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered" role="document">
-                          <div class="modal-content">
-                            <div class="modal-header">
-                              <h5 class="modal-title" id="block_modal_label`+_obj['own']+`">Block Owner</h5>
-                              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                <span aria-hidden="true">&times;</span>
-                              </button>
-                            </div>
-                            <div id="block_modal_body`+_obj['own']+`" class="modal-body">
-                              <center>Are you sure you want to block <br><strong>`+_obj['own']+`</strong>?</center>
-                            </div>
-                            <div id="block_modal_footer`+_obj['own']+`" class="modal-footer">
-                              <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
-                              <button type="button" class="btn btn-default"  onclick="owner_block('`+_obj['own']+`', '`+_obj['own']+`')"><i class="fas fa-thumbs-up"></i></button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <!-- Button trigger modal -->
-                      <button type="button" class="btn btn-outline-default" data-toggle="modal" data-target="#unblock_modal`+_obj['own']+`">
-                        UnBlock | <i class="far fa-circle"></i>
-                      </button>
-
-                      <!-- Modal -->
-                      <div class="modal fade" id="unblock_modal`+_obj['own']+`" tabindex="-1" role="dialog" aria-labelledby="unblock_modal_label" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered" role="document">
-                          <div class="modal-content">
-                            <div class="modal-header">
-                              <h5 class="modal-title" id="unblock_modal_label`+_obj['own']+`">UnBlock Owner</h5>
-                              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                <span aria-hidden="true">&times;</span>
-                              </button>
-                            </div>
-                            <div id="unblock_modal_body`+_obj['own']+`" class="modal-body">
-                              <center>Are you sure you want to unblock <br><strong>`+_obj['own']+`</strong>?</center>
-                            </div>
-                            <div id="unblock_modal_footer`+_obj['own']+`" class="modal-footer">
-                              <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
-                              <button type="button" class="btn btn-outline-default"  onclick="owner_unblock('`+_obj['own']+`', '`+_obj['own']+`')"><i class="fas fa-thumbs-up"></i></button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </td>
+                      
                       <td>
                       <!-- Button trigger modal -->
                       <button type="button" class="btn btn-danger" data-toggle="modal" data-target="#delete_modal`+_obj['own']+`">
@@ -159,6 +106,13 @@ admin.controller('adminCtrl', function($scope, $compile, $http){
                         </div>
                       </div>
                     </td>
+
+                     <td>
+                              <label class="custom-toggle">
+                                <input type="checkbox" onchange="change_blocked_state('`+_obj['own']+`',this)" `+ checker(_obj['is_blocked']) +`>
+                                <span class="custom-toggle-slider rounded-circle"></span>
+                              </label>
+                            </td>
                     
                   </tr>`;
 

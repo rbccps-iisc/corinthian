@@ -1416,7 +1416,7 @@ get_entities (struct http_request *req)
 	int num_rows = kore_pgsql_ntuples(&sql);
 
 	kore_buf_reset(response);
-	kore_buf_append(response,"[",1);
+	kore_buf_append(response,"{",1);
 
 	for (i = 0; i < num_rows; ++i)
 	{
@@ -1426,7 +1426,7 @@ get_entities (struct http_request *req)
 
 		kore_buf_appendf (
 				response,
-					"{\"%s\":[%s,%s]},",
+					"\"%s\":[%s,%s],",
 						entity,
 						is_blocked	[0] == 't' ? "1" : "0",
 						is_autonomous	[0] == 't' ? "1" : "0"
@@ -1437,7 +1437,7 @@ get_entities (struct http_request *req)
 	if (num_rows > 0)
 		--(response->offset);
 
-	kore_buf_append(response,"]",1);
+	kore_buf_append(response,"}",1);
 
 	OK();
 
@@ -3348,16 +3348,40 @@ block (struct http_request *req)
 	if (! looks_like_a_valid_owner(id))
 		BAD_REQUEST("id is not valid owner");
 
+	// either "id" should be owner of the "entity", or an "admin" 
 	if (strcmp(id,"admin") == 0)
 	{
 		if (! is_request_from_localhost(req))
 			FORBIDDEN("admin can only call APIs from localhost");
+
+		if (KORE_RESULT_OK != http_request_header(req, "owner", &owner))
+			FORBIDDEN("owner field missing in header");
+
+		if (! is_string_safe(owner))
+			FORBIDDEN("invalid owner");
+
+		if (! looks_like_a_valid_owner(owner))
+			FORBIDDEN("owner is not valid");
+
+		block = owner;
 	}
 	else
 	{
+		if (KORE_RESULT_OK != http_request_header(req, "entity", &entity))
+			FORBIDDEN("entity field missing in header");
+
 		if (! is_owner(id,entity))
 			FORBIDDEN("you are not the owner of the entity");
+
+		if (! is_string_safe(entity))
+			FORBIDDEN("invalid entity");
+
+		if (! looks_like_a_valid_entity(entity))
+			FORBIDDEN("entity is not valid");
+
+		block = entity;
 	}
+
 
 /////////////////////////////////////////////////
 
@@ -3374,7 +3398,7 @@ block (struct http_request *req)
 
 	CREATE_STRING(query,
 			"UPDATE users set blocked='t' WHERE id='%s'",
-				entity
+				block
 	);
 
 	RUN_QUERY(query, "could not block the entity");

@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html ng-app="owner" ng-controller="session_checkerCtrl" data-ng-init="check_session()">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <meta name="description" content="IUDX | Indian Urban Data Exchange">
+  <meta name="organization" content="RBCCPS, IISc Bangalore">
+  <meta name="keywords" content="IUDX, CATALOGUE, RBCCPS, IISc BANGALORE">
+  <meta name="author" content="Jishnu Jaykumar P (http://jishnujayakumar.github.io)">
+  <title>
+    IUDX | Indian Urban Data Exchange
+  </title>
+  <!-- Favicon -->
+  <link href="../../assets/img/logo/iudx.png" rel="icon" type="image/png">
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans:300,400,600,700" rel="stylesheet">
+  <!-- Icons -->
+  <link href="../../assets/vendor/nucleo/css/nucleo.css" rel="stylesheet">
+  <link href="../../assets/vendor/@fortawesome/fontawesome-free/css/all.min.css" rel="stylesheet">
+  <!-- Argon CSS -->
+  <link type="text/css" href="../../assets/css/argon.min.css?v=1.0.0" rel="stylesheet">
+</head>
+<body class="bg-default" ng-controller="logoutCtrl"  oncontextmenu="return false">
+  
+  
+  <!-- Sidenav -->
+  <nav class="navbar navbar-vertical fixed-left navbar-expand-md navbar-light bg-white" id="sidenav-main">
+    <div class="container-fluid">
+      <!-- Toggler -->
+      <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#sidenav-collapse-main" aria-controls="sidenav-main" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <!-- Brand -->
+      <a class="navbar-brand pt-0" href="./index.html">
+        <img src="../../assets/img/logo/iudx.png" class="navbar-brand-img" alt="IUDX logo">
+      </a>
+      <!-- User -->
+      <ul class="nav align-items-center d-md-none">
+        <!--li class="nav-item dropdown">
+          <a class="nav-link nav-link-icon" href="#" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            <i class="ni ni-bell-55"></i>
+          </a>
+          <div class="dropdown-menu dropdown-menu-arrow dropdown-menu-right" aria-labelledby="navbar-default_dropdown_1">
+            <a class="dropdown-item" href="#">Action</a>
+            <a class="dropdown-item" href="#">Another action</a>
+            <div class="dropdown-divider"></div>
+            <a class="dropdown-item" href="#">Something else here</a>
+          </div>
+        </li-->
+        <li class="nav-item dropdown">
+          <a class="nav-link" href="#" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            <div class="media align-items-center">
+              <span class="avatar avatar-sm rounded-circle">
+                <img alt="Image placeholder" src="../../assets/img//logo/owner.png">
+              </span>
+            </div>
+          </a>
+          <div class="dropdown-menu dropdown-menu-arrow dropdown-menu-right" >
+            <div class=" dropdown-header noti-title">
+              <h6 class="text-overflow m-0">Welcome!</h6>
+            </div>
+            <!--a href="./examples/profile.html" class="dropdown-item">
+              <i class="ni ni-single-02"></i>
+              <span>My profile</span>
+            </a>
+            <a href="./examples/profile.html" class="dropdown-item">
+              <i class="ni ni-settings-gear-65"></i>
+              <span>Settings</span>
+            </a>
+            <a href="./examples/profile.html" class="dropdown-item">
+              <i class="ni ni-calendar-grid-58"></i>
+              <span>Activity</span>
+            </a>
+            <a href="./examples/profile.html" class="dropdown-item">
+              <i class="ni ni-support-16"></i>
+              <span>Support</span>
+            </a-->
+            <div class="dropdown-divider"></div>
+            <a href="#!" class="dropdown-item" ng-click="_logout()">
+              <i class="ni ni-user-run"></i>
+              <span>Logout</span>
+            </a>
+          </div>
+        </li>
+      </ul>
+      <!-- Collapse -->
+      <div class="collapse navbar-collapse" id="sidenav-collapse-main">
+        <!-- Collapse header -->
+        <div class="navbar-collapse-header d-md-none">
+          <div class="row">
+            <div class="col-6 collapse-brand">
+              <a href="./index.html">
+                <img src="../../assets/img/logo/iudx.png">
+              </a>
+            </div>
+            <div class="col-6 collapse-close">
+              <button type="button" class="navbar-toggler" data-toggle="collapse" data-target="#sidenav-collapse-main" aria-controls="sidenav-main" aria-expanded="false" aria-label="Toggle sidenav">
+                <span></span>
+                <span></span>
+              </button>
+            </div>
+          </div>
+        </div>
+        <!-- Form -->
+        <form class="mt-4 mb-3 d-md-none">
+          <div class="input-group input-group-rounded input-group-merge">
+            <input type="search" class="form-control form-control-rounded form-control-prepended" placeholder="Search" aria-label="Search">
+            <div class="input-group-prepend">
+              <div class="input-group-text">
+                <span class="fa fa-search"></span>
+              </div>
+            </div>
+          </div>
+        </form>
+        <!-- Navigation -->
+        <ul class="navbar-nav"  ng-controller="owner_sidebarCtrl">
+          <!--li class="nav-item">
+            <a class="nav-link" href="/owner">
+              <i class="ni ni-tv-2 text-primary"></i> Dashboard
+            </a>
+          </li-->
+           <li class="nav-item" ng-repeat="option in sidebar">
+            <a class="nav-link" href="{{option.href}}">
+              <i class="ni ni-{{option.legend}} text-{{option.color}}"></i> {{option.text}}
+            </a>
+          </li>
+          <!--li class="nav-item">
+            <a class="nav-link" href="./examples/icons.html">
+              <i class="ni ni-planet text-blue"></i> Icons
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="./examples/maps.html">
+              <i class="ni ni-pin-3 text-orange"></i> Maps
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="./examples/profile.html">
+              <i class="ni ni-single-02 text-yellow"></i> User profile
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="./examples/tables.html">
+              <i class="ni ni-bullet-list-67 text-red"></i> Tables
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="./examples/login.html">
+              <i class="ni ni-key-25 text-info"></i> Login
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="./examples/register.html">
+              <i class="ni ni-circle-08 text-pink"></i> Register
+            </a>
+          </li-->
+        </ul>
+        <!-- Divider -->
+        <hr class="my-3">
+        <!-- Heading -->
+        <!--h6 class="navbar-heading text-muted">Documentation</h6-->
+        <!-- Navigation -->
+        <!--ul class="navbar-nav mb-md-3">
+          <li class="nav-item">
+            <a class="nav-link" href="#">
+              <i class="ni ni-spaceship"></i> Getting started
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#">
+              <i class="ni ni-palette"></i> Foundation
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#">
+              <i class="ni ni-ui-04"></i> Components
+            </a>
+          </li>
+        </ul-->
+      </div>
+    </div>
+  </nav>
+  <!-- Main content -->
+  <div class="main-content" ng-controller="ownerCtrl">
+    <!-- Top navbar -->
+    <nav class="navbar navbar-top navbar-expand-md navbar-dark" id="navbar-main">
+      <div class="container-fluid">
+        <!-- Brand -->
+        <a class="h4 mb-0 text-white text-uppercase d-none d-lg-inline-block" href="#">Dashboard</a>
+        <!-- Form -->
+        <form class="navbar-search navbar-search-dark form-inline mr-3 d-none d-md-flex ml-lg-auto">
+          <div class="form-group mb-0">
+            <div class="input-group input-group-alternative">
+              <div class="input-group-prepend">
+                <span class="input-group-text"><i class="fas fa-search"></i></span>
+              </div>
+              <input class="form-control" placeholder="Search" type="text">
+            </div>
+          </div>
+        </form>
+        <!-- User -->
+        <ul class="navbar-nav align-items-center d-none d-md-flex">
+          <li class="nav-item dropdown">
+            <a class="nav-link pr-0" href="#" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+              <div class="media align-items-center">
+                <span class="avatar avatar-sm rounded-circle">
+                  <img alt="Admin logo" src="../../assets/img/logo/owner.png">
+                </span>
+                <div class="media-body ml-2 d-none d-lg-block">
+                  <span class="mb-0 text-sm  font-weight-bold">{{id}}</span>
+                </div>
+              </div>
+            </a>
+            <div class="dropdown-menu dropdown-menu-arrow dropdown-menu-right">
+              <div class=" dropdown-header noti-title">
+                <h6 class="text-overflow m-0">Welcome! You have logged in as Owner.</h6>
+              </div>
+              <!--a href="./examples/profile.html" class="dropdown-item">
+                <i class="ni ni-single-02"></i>
+                <span>My profile</span>
+              </a>
+              <a href="./examples/profile.html" class="dropdown-item">
+                <i class="ni ni-settings-gear-65"></i>
+                <span>Settings</span>
+              </a>
+              <a href="./examples/profile.html" class="dropdown-item">
+                <i class="ni ni-calendar-grid-58"></i>
+                <span>Activity</span>
+              </a>
+              <a href="./examples/profile.html" class="dropdown-item">
+                <i class="ni ni-support-16"></i>
+                <span>Support</span>
+              </a-->
+              <div ng-controller="logoutCtrl" class="dropdown-divider"></div>
+              <a href="#!" class="dropdown-item" ng-click="_logout()">
+                <i class="ni ni-user-run"></i>
+                <span>Logout</span>
+              </a>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </nav>
+    <!-- Header -->
+    <div class="header bg-gradient-primary pb-8 pt-5 pt-md-8">
+      <div class="container-fluid">
+        <div class="header-body">
+           <!-- Card stats -->
+          <form name="addEntityForm" role="form">
+  <div class="row">
+    <div class="col-sm-3">
+      <div class="form-group has-success">
+        <input type="text" placeholder="Entity-Name" class="form-control is-valid" ng-model='entity_name' required/>
+      </div>
+    </div>
+    <div class="col-sm-2">
+    <label class="custom-toggle">
+      <div class="custom-control custom-control-alternative custom-checkbox mb-3" >
+      <input class="custom-control-input" id="customCheck5" type="checkbox" ng-model='is_autonomous'>
+      <label class="custom-control-label" for="customCheck5" style="color:white;">is_autonomous</label>
+    </div>
+    </label>
+      
+    </div>
+    <div class="col-sm-4">
+      <button class="btn btn-icon btn-3 btn-success" type="submit"  ng-click="addEntityForm.$valid && addEntity()" >
+      <span class="btn-inner--icon"><i class="ni ni-fat-add"></i></span>
+  
+      <span class="btn-inner--text">Add Entity</span>
+    
+      </button>
+      <!-- <span id="alert_message"></span>  -->
+    </div>
+    <div class="col-sm-6">
+      <span id="alert_message"></span>
+    </div>
+  </div>
+</form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Page content -->
+    <div class="container-fluid mt--7">
+      <!-- Table -->
+      <div class="row">
+        <div class="col">
+          <div class="card shadow">
+            <div class="card-header border-0">
+              <h3 class="mb-0">Entities registered</h3>
+            </div>
+            <div class="table-responsive">
+              <table class="table align-items-center table-flush">
+                <thead class="thead-light">
+                  <tr>
+                    <th scope="col">Entity</th>
+                    <th scope="col">Reset Password</th>
+                    <th scope="col">Block</th>
+                    <th scope="col">UnBlock</th>
+                    <th scope="col">Delete</th>
+                    <th scope="col">Autonomous Entity</th>
+                    <!--th scope="col"></th-->
+                    <!--th scope="col"></th-->
+                  </tr>
+                </thead>
+                <tbody id="entity_list">
+               
+                </tbody>
+              </table>
+            </div>
+            <div class="card-footer py-4">
+              <nav aria-label="...">
+                <ul class="pagination justify-content-end mb-0">
+                  <li class="page-item disabled">
+                    <a class="page-link" href="#" tabindex="-1">
+                      <i class="fas fa-angle-left"></i>
+                      <span class="sr-only">Previous</span>
+                    </a>
+                  </li>
+                  <li class="page-item active">
+                    <a class="page-link" href="#">1</a>
+                  </li>
+                  <li class="page-item">
+                    <a class="page-link" href="#">2 <span class="sr-only">(current)</span></a>
+                  </li>
+                  <li class="page-item"><a class="page-link" href="#">3</a></li>
+                  <li class="page-item">
+                    <a class="page-link" href="#">
+                      <i class="fas fa-angle-right"></i>
+                      <span class="sr-only">Next</span>
+                    </a>
+                  </li>
+                </ul>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      <br>
+<!-- Footer -->
+      <footer class="footer">
+        <div class="row align-items-center justify-content-xl-between">
+          <div class="col-xl-6">
+            <div class="copyright text-center text-xl-left text-muted">
+              &copy; 2018 <a href="#" class="font-weight-bold ml-1" target="_blank">IUDX</a>
+            </div>
+          </div>
+          <div class="col-xl-6">
+            <ul class="nav nav-footer justify-content-center justify-content-xl-end">
+              <li class="nav-item">
+                <a href="https://rbccps.org" class="nav-link" target="_blank">RBCCPS</a>
+              </li>
+              <li class="nav-item">
+                <a href="#" class="nav-link" target="_blank">About Us</a>
+              </li>
+              <li class="nav-item">
+                <a href="#" class="nav-link" target="_blank">Blog</a>
+              </li>
+              <li class="nav-item">
+                <a href="#" class="nav-link" target="_blank">MIT License</a>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </footer>
+    </div>
+  </div>
+    <!-- Argon Scripts -->
+  <!-- Core -->
+  <script src="../../assets/vendor/jquery/dist/jquery.min.js"></script>
+  <script src="../../assets/vendor/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- Optional JS -->
+  <script src="../../assets/vendor/chart.js/dist/Chart.min.js"></script>
+  <script src="../../assets/vendor/chart.js/dist/Chart.extension.js"></script>
+  <!-- Argon JS -->
+  <script src="../../assets/js/argon.js?v=1.0.0"></script>
+  <!-- Template used is argon from creative Tim -->
+  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.6.9/angular.min.js"></script>
+  <script src="../../assets/js/angular/owner_module.js"></script>
+  <script src="../../assets/js/angular/footer_module.js"></script>
+  <script src="../../assets/js/angular/logout_module.js"></script>
+  <script src="../../assets/js/angular/ui_urls_module.js"></script>
+  <script src="../../assets/js/angular/owner_sidebar_module.js"></script>
+  <script src="../../assets/js/angular/session_checker_module.js"></script>
+  <script type="text/javascript">
+    // Disable ctrl+s to prevent downloading source code 
+    $(document).bind('keydown', function(e) {
+      if(e.ctrlKey && (e.which == 83)) {
+        e.preventDefault();
+        // alert('Ctrl+S');
+        return false;
+      }
+    });
+
+    function checker(flag){
+        if(flag){
+          return 'checked'
+        }else{
+          return ''
+        }
+    }
+    
+    function get_table_row(entity){
+       var html_to_be_appended = `<tr id="`+entity['index']+`">
+                    <th scope="row">
+                      <div class="media align-items-center">
+                        <a href="#" class="avatar rounded-circle mr-3">
+                          <img alt="Image placeholder" src="../../assets/img/logo/owner-1.png">
+                        </a>
+                        <div class="media-body">
+                          <span class="mb-0 text-sm">`+entity['ent']+`</span>
+                        </div>
+                      </div>
+                    </th>
+                    <td>
+                      <!-- Button trigger modal -->
+                      <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#reset_passwd_modal`+entity['index']+`
+                      ">
+                        Reset Password  | <i class="fas fa-key"></i>
+                      </button>
+
+                      <!-- Modal -->
+                      <div class="modal fade" id="reset_passwd_modal`+entity['index']+`" tabindex="-1" role="dialog" aria-labelledby="reset_passwd_modal_label" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered" role="document">
+                          <div class="modal-content">
+                            <div class="modal-header">
+                              <h5 class="modal-title" id="exampleModalLabel`+entity['ent']+`">Reset Password</h5>
+                              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                              </button>
+                            </div>
+                            <div id="reset_password_modal_body`+entity['index']+`" class="modal-body">
+                              <center>Are you sure you want to reset the password for <br><strong>`+entity['ent']+`</strong>?</center>
+                            </div>
+                            <div id="reset_password_modal_footer`+entity['index']+`" class="modal-footer">
+                              <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
+                              <button type="button" class="btn btn-primary" onclick="entity_reset_password('`+entity['ent']+`', '`+entity['index']+`')"><i class="fas fa-thumbs-up"></i></button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                      <td>
+                      <!-- Button trigger modal -->
+                      <button type="button" class="btn btn-default" data-toggle="modal" data-target="#block_modal`+entity['index']+`">
+                        Block | <i class="fas fa-ban"></i>
+                      </button>
+
+                      <!-- Modal -->
+                      <div class="modal fade" id="block_modal`+entity['index']+`" tabindex="-1" role="dialog" aria-labelledby="block_modal_label" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered" role="document">
+                          <div class="modal-content">
+                            <div class="modal-header">
+                              <h5 class="modal-title" id="block_modal_label`+entity['ent']+`">Block Entity</h5>
+                              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                              </button>
+                            </div>
+                            <div id="block_modal_body`+entity['index']+`" class="modal-body">
+                              <center>Are you sure you want to block <br><strong>`+entity['ent']+`</strong>?</center>
+                            </div>
+                            <div id="block_modal_footer`+entity['index']+`" class="modal-footer">
+                              <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
+                              <button type="button" class="btn btn-default"  onclick="entity_block('`+entity['ent']+`', '`+entity['index']+`')"><i class="fas fa-thumbs-up"></i></button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <!-- Button trigger modal -->
+                      <button type="button" class="btn btn-outline-default" data-toggle="modal" data-target="#unblock_modal`+entity['index']+`">
+                        UnBlock | <i class="far fa-circle"></i>
+                      </button>
+
+                      <!-- Modal -->
+                      <div class="modal fade" id="unblock_modal`+entity['index']+`" tabindex="-1" role="dialog" aria-labelledby="unblock_modal_label" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered" role="document">
+                          <div class="modal-content">
+                            <div class="modal-header">
+                              <h5 class="modal-title" id="unblock_modal_label`+entity['ent']+`">UnBlock Entity</h5>
+                              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                              </button>
+                            </div>
+                            <div  id="unblock_modal_body`+entity['index']+`" class="modal-body">
+                              <center>Are you sure you want to unblock <br><strong>`+entity['ent']+`</strong>?</center>
+                            </div>
+                            <div  id="unblock_modal_footer`+entity['index']+`" class="modal-footer">
+                              <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
+                              <button type="button" class="btn btn-outline-default"  onclick="entity_unblock('`+entity['ent']+`', '`+entity['index']+`')"><i class="fas fa-thumbs-up"></i></button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                      <td>
+                      <!-- Button trigger modal -->
+                      <button type="button" class="btn btn-danger" data-toggle="modal" data-target="#delete_modal`+entity['index']+`">
+                        Delete | <i class="far fa-trash-alt"></i>
+                      </button>
+
+                      <!-- Modal -->
+                      <div class="modal fade" id="delete_modal`+entity['index']+`" tabindex="-1" role="dialog" aria-labelledby="delete_modal_label" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered" role="document">
+                          <div class="modal-content">
+                            <div class="modal-header">
+                              <h5 class="modal-title" id="delete_modal_label`+entity['ent']+`">Delete Entity</h5>
+                              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                              </button>
+                            </div>
+                            <div id="delete_modal_body`+entity['index']+`" class="modal-body">
+                              <center>Are you sure you want to delete <br><strong>`+entity['ent']+`</strong>?</center>
+                            </div>
+                            <div id="delete_modal_footer`+entity['index']+`" class="modal-footer">
+                              <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
+                              <button type="button" class="btn btn-danger" onclick="entity_delete('`+entity['ent']+`', '`+entity['index']+`')"><i class="fas fa-thumbs-up"></i></button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                     
+                    <td>
+                              <label class="custom-toggle">
+                                <input type="checkbox" onchange="change_autonomous_state('`+entity['ent']+`','`+entity['index']+`',this)" `+ checker(entity['is_autonomous']) +`>
+                                <span class="custom-toggle-slider rounded-circle"></span>
+                              </label>
+                            </td>
+                    
+                  </tr>`
+                          return html_to_be_appended;
+    }
+
+
+    function display_entities(){
+      var entity_data = JSON.parse(localStorage.getItem('data'));
+      var entity_list = $('#entity_list');
+      for (var i = (entity_data.length-1); i >=0 ; i--) {
+        entity_list.append(get_table_row(entity_data[i])); 
+      }
+    }
+
+    function copyToClipboard(element_id) {
+      var $temp = $("<input>");
+      $("body").append($temp);
+      $temp.val($("#new_apikey_"+element_id).text()).select();
+      $("#copied_"+element_id).html("APIKEY copied!")
+      document.execCommand("copy");
+      $temp.remove();
+    }
+
+    $( document ).ready(function() {
+      display_entities();
+    });
+
+    function entity_reset_password(entity_id, entity_index){
+      $.ajax({
+           url: api['owner']['reset-apikey'],
+           data: {},
+           type: "POST",
+           contentType: 'application/json; charset=utf-8',
+           dataType: 'jsonp',
+           headers:{
+            'id': sessionStorage.getItem('id'),
+            'apikey': sessionStorage.getItem('apikey'),
+            'entity': entity_id,
+           },
+           dataType: 'json',
+           complete: function(jqXHR) {
+             if(jqXHR['status'] == 200) {
+                    // console.log(d[i]);
+                    $( "#alert_message").html(`<br><center><div class="alert alert-success alert-dismissible fade show in" role="alert">
+                            <span class="alert-inner--icon"><i class="ni ni-like-2"></i></span>
+                            <span class="alert-inner--text"><strong>Success! </strong> Password for <strong>` + entity_id + `</strong> has been reset to <strong id="new_apikey_`+ entity_index +`">`+ jqXHR['responseJSON']['apikey'] +`</strong>.<br> <strong id="copied_`+ entity_index +`" onclick="copyToClipboard('`+entity_index+`')"><i style="font-size:30px;" class="far fa-copy"></i></strong></span>
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div></center>`);
+                    // $( "#alert_message").fadeOut();
+                    window.setTimeout(function(){
+                      $( "#reset_passwd_modal"+ entity_index).modal('hide');
+                      $( '.modal-backdrop').remove();
+                      $( "#alert_message").fadeIn();
+                      $( "#alert_message").fadeOut(3050);
+                    }, 900);
+             }else{
+                $( "#alert_message").html(`<br><div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <span class="alert-inner--icon"><i class="fas fa-exclamation-triangle"></i></span>
+                            <span class="alert-inner--text"><strong>Error! </strong>` + jqXHR['responseJSON']['error'] + `</span>
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>`);
+
+                window.setTimeout(function(){
+                      $( "#alert_message").fadeIn();
+                      $( "#alert_message").fadeOut(450);
+                    }, 900);
+            
+            }
+             
+          }  
+
+        });
+    }
+
+
+    function entity_block(entity_id, entity_index){
+      var modal_body = $( "#block_modal_body"+entity_index).html();
+      var modal_footer = $( "#block_modal_footer"+entity_index).html();
+      $.ajax({
+           url: api['owner']['block'],
+           data: {},
+           type: "POST",
+           contentType: 'application/json; charset=utf-8',
+           dataType: 'jsonp',
+           headers:{
+            'id': sessionStorage.getItem('id'),
+            'apikey': sessionStorage.getItem('apikey'),
+            'entity': entity_id,
+           },
+           dataType: 'json',
+           complete: function(jqXHR) {
+             if(jqXHR['status'] == 200) {
+                    // console.log(d[i]);
+                    localStorage.setItem('data', JSON.stringify(d));
+                    $( "#block_modal_body"+entity_index).html(`<br><div class="alert alert-success alert-dismissible fade show in" role="alert">
+                            <span class="alert-inner--icon"><i class="ni ni-like-2"></i></span>
+                            <span class="alert-inner--text"><strong>Success! </strong> <strong>` + entity_id + `</strong> blocked.</span>
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>`);
+                    // $( "#alert_message").fadeOut();
+                    $( "#block_modal_footer"+ entity_index).html("");
+                    
+                    window.setTimeout(function(){
+                      $( "#block_modal"+ entity_index).modal('hide');
+                      $( '.modal-backdrop').remove();
+                      $( "#block_modal_body"+entity_index).html(modal_body);   
+                      $( "#block_modal_footer"+entity_index).html(modal_footer);   
+                    }, 2000);
+             }else{
+                $( "#block_modal_body"+entity_index).html(`<br><div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <span class="alert-inner--icon"><i class="fas fa-exclamation-triangle"></i></span>
+                            <span class="alert-inner--text"><strong>Error! </strong>` + jqXHR['responseJSON']['error'] + `</span>
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>`);
+
+                $( "#block_modal_footer"+ entity_index).html("");
+
+                  window.setTimeout(function(){
+                      $( "#block_modal"+ entity_index).modal('hide');
+                      $('.modal-backdrop').remove();
+                      $( "#block_modal_body"+entity_index).html(modal_body);   
+                      $( "#block_modal_footer"+entity_index).html(modal_footer);                
+                    }, 2000);
+
+            
+            }
+             
+          }  
+
+        });
+    }
+
+    function entity_unblock(entity_id, entity_index){
+      var modal_body = $( "#unblock_modal_body"+entity_index).html();
+      var modal_footer = $( "#unblock_modal_footer"+entity_index).html();
+      $.ajax({
+           url: api['owner']['unblock'],
+           data: {},
+           type: "POST",
+           contentType: 'application/json; charset=utf-8',
+           dataType: 'jsonp',
+           headers:{
+            'id': sessionStorage.getItem('id'),
+            'apikey': sessionStorage.getItem('apikey'),
+            'entity': entity_id,
+           },
+           dataType: 'json',
+           complete: function(jqXHR) {
+             if(jqXHR['status'] == 200) {                    
+                    $( "#unblock_modal_body"+entity_index).html(`<br><div class="alert alert-success alert-dismissible fade show in" role="alert">
+                            <span class="alert-inner--icon"><i class="ni ni-like-2"></i></span>
+                            <span class="alert-inner--text"><strong>Success! </strong> <strong>` + entity_id + `</strong> unblocked.</span>
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>`);
+                    // $( "#alert_message").fadeOut();
+                    $( "#unblock_modal_footer"+ entity_index).html("");
+                    
+                    window.setTimeout(function(){
+                      $( "#unblock_modal"+ entity_index).modal('hide');
+                      $( '.modal-backdrop').remove();
+                      $( "#unblock_modal_body"+entity_index).html(modal_body);   
+                      $( "#unblock_modal_footer"+entity_index).html(modal_footer);   
+                    }, 2000);
+             }else{
+                $( "#unblock_modal_body"+entity_index).html(`<br><div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <span class="alert-inner--icon"><i class="fas fa-exclamation-triangle"></i></span>
+                            <span class="alert-inner--text"><strong>Error! </strong>` + jqXHR['responseJSON']['error'] + `</span>
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>`);
+
+                $( "#unblock_modal_footer"+ entity_index).html("");
+
+                  window.setTimeout(function(){
+                      $( "#unblock_modal"+ entity_index).modal('hide');
+                      $('.modal-backdrop').remove();
+                      $( "#unblock_modal_body"+entity_index).html(modal_body);   
+                      $( "#unblock_modal_footer"+entity_index).html(modal_footer);                
+                    }, 2000);
+
+            
+            }
+             
+          }  
+
+        });
+    }
+
+
+    function entity_delete(entity_id, entity_index){
+      $.ajax({
+           url: api['owner']['deregister-entity'],
+           data: {},
+           type: "POST",
+           contentType: 'application/json; charset=utf-8',
+           dataType: 'jsonp',
+           headers:{
+            'id': sessionStorage.getItem('id'),
+            'apikey': sessionStorage.getItem('apikey'),
+            'entity': entity_id,
+           },
+           dataType: 'json',
+           complete: function(jqXHR) {
+             if(jqXHR['status'] == 200) {
+                var d=JSON.parse(localStorage.getItem('data'));
+                for (var i = 0; i < d.length ; i++) {
+                  if (d[i]['ent']==entity_id){
+                    // console.log(d[i]);
+                    d.splice(i, 1);
+                    localStorage.setItem('data', JSON.stringify(d));
+                    $( "#delete_modal_body"+entity_index).html(`<br><div class="alert alert-success alert-dismissible fade show in" role="alert">
+                            <span class="alert-inner--icon"><i class="ni ni-like-2"></i></span>
+                            <span class="alert-inner--text"><strong>Success! </strong> <strong>` + entity_id + `</strong> deleted.</span>
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>`);
+                    // $( "#alert_message").fadeOut();
+                    $( "#delete_modal_footer"+ entity_index).html("");
+                    
+                    window.setTimeout(function(){
+                      $( "#delete_modal"+ entity_index).modal('hide');
+                      $('.modal-backdrop').remove();
+                      $( "#"+ entity_index).fadeOut(1, function() { $(this).remove(); });
+                    }, 2000);
+                    break;
+                  }
+                }
+             }else{
+                $( "#delete_modal_body"+entity_index).html(`<br><div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <span class="alert-inner--icon"><i class="fas fa-exclamation-triangle"></i></span>
+                            <span class="alert-inner--text"><strong>Error! </strong>` + jqXHR['responseJSON']['error'] + `</span>
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>`);
+                  window.setTimeout(function(){
+                      $( "#delete_modal"+ entity_index).modal('hide');
+                      $('.modal-backdrop').remove();
+                      $( "#"+ entity_index).fadeOut(1, function() { $(this).remove(); });
+                    }, 2000);
+             }   
+          }  
+
+        });
+    }
+
+  // function change_autonomous_state(entity_id, index, cb) {
+  //   console.log("Clicked, new value = " + cb.checked, entity_id, index);
+  // }
+
+    function change_autonomous_state(entity_id, entity_index, checkbox){
+      $.ajax({
+           url: api['owner']['set-autonomous'],
+           data: {},
+           type: "POST",
+           contentType: 'application/json; charset=utf-8',
+           dataType: 'jsonp',
+           headers:{
+            'id': sessionStorage.getItem('id'),
+            'apikey': sessionStorage.getItem('apikey'),
+            'entity': entity_id,
+            'is-autonomous': checkbox.checked
+           },
+           dataType: 'json',
+           complete: function(jqXHR) {
+             if(jqXHR['status'] == 200) {
+                var d=JSON.parse(localStorage.getItem('data'));
+                for (var i = 0; i < d.length ; i++) {
+                  if (d[i]['ent']==entity_id){
+                    // console.log(d[i]);
+                    d[i]['is_autonomous']=checkbox.checked;
+                    localStorage.setItem('data', JSON.stringify(d));
+                    if(checkbox.checked){
+                      $( "#alert_message").html(`<br><div class="alert alert-success alert-dismissible fade show in" role="alert">
+                            <span class="alert-inner--icon"><i class="ni ni-like-2"></i></span>
+                            <span class="alert-inner--text"><strong>Success! </strong> <strong>` + entity_id + `</strong> is now an autonomous entity.</span>
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>`);
+                    }else{
+                      $( "#alert_message").html(`<br><div class="alert alert-success alert-dismissible fade show in" role="alert">
+                            <span class="alert-inner--icon"><i class="ni ni-like-2"></i></span>
+                            <span class="alert-inner--text"><strong>Success! </strong> <strong>` + entity_id + `</strong> is now a non-autonomous entity.</span>
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>`);
+                    }
+                    // $( "#alert_message").fadeOut();
+                    
+                     window.setTimeout(function(){
+                      $( "#alert_message").fadeIn();
+                      $( "#alert_message").fadeOut(450);
+                    }, 900);
+                    break;
+                  }
+                }
+             }else{
+                $( "#alert_message").html(`<br><div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <span class="alert-inner--icon"><i class="fas fa-exclamation-triangle"></i></span>
+                            <span class="alert-inner--text"><strong>Error! </strong>` + jqXHR['responseJSON']['error'] + `</span>
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>`);
+                  window.setTimeout(function(){
+                      $( "#alert_message").fadeIn();
+                      $( "#alert_message").fadeOut(450);
+                    }, 900);
+             }   
+          }  
+
+        });
+    }
+
+  </script>
+ 
+</body>
+
+</html>

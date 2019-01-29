@@ -46,7 +46,7 @@ owner.controller('ownerCtrl', function($scope, $compile, $http){
                   }
                     
                     var data=JSON.parse(localStorage.getItem('data'));
-                    var _obj = {'ent':$scope.id+"/"+$scope.entity_name, 'is_autonomous':is_autonomous, 'index': $scope.id+"_"+$scope.entity_name}
+                    var _obj = {'ent':$scope.id+"/"+$scope.entity_name, 'is_blocked':false, 'is_autonomous':is_autonomous, 'index': $scope.id+"_"+$scope.entity_name}
                     data.push(_obj);
                     localStorage.setItem('data', JSON.stringify(data));
                     // console.log(JSON.parse(localStorage.getItem('data')))
@@ -89,60 +89,7 @@ owner.controller('ownerCtrl', function($scope, $compile, $http){
                         </div>
                       </div>
                     </td>
-                      <td>
-                      <!-- Button trigger modal -->
-                      <button type="button" class="btn btn-default" data-toggle="modal" data-target="#block_modal`+_obj['index']+`">
-                        Block | <i class="fas fa-ban"></i>
-                      </button>
 
-                      <!-- Modal -->
-                      <div class="modal fade" id="block_modal`+_obj['index']+`" tabindex="-1" role="dialog" aria-labelledby="block_modal_label" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered" role="document">
-                          <div class="modal-content">
-                            <div class="modal-header">
-                              <h5 class="modal-title" id="block_modal_label`+_obj['ent']+`">Block Entity</h5>
-                              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                <span aria-hidden="true">&times;</span>
-                              </button>
-                            </div>
-                            <div id="block_modal_body`+_obj['index']+`" class="modal-body">
-                              <center>Are you sure you want to block <br><strong>`+_obj['ent']+`</strong>?</center>
-                            </div>
-                            <div id="block_modal_footer`+_obj['index']+`" class="modal-footer">
-                              <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
-                              <button type="button" class="btn btn-default"  onclick="entity_block('`+_obj['ent']+`', '`+_obj['index']+`')"><i class="fas fa-thumbs-up"></i></button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <!-- Button trigger modal -->
-                      <button type="button" class="btn btn-outline-default" data-toggle="modal" data-target="#unblock_modal`+_obj['index']+`">
-                        UnBlock | <i class="far fa-circle"></i>
-                      </button>
-
-                      <!-- Modal -->
-                      <div class="modal fade" id="unblock_modal`+_obj['index']+`" tabindex="-1" role="dialog" aria-labelledby="unblock_modal_label" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered" role="document">
-                          <div class="modal-content">
-                            <div class="modal-header">
-                              <h5 class="modal-title" id="unblock_modal_label`+_obj['ent']+`">UnBlock Entity</h5>
-                              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                <span aria-hidden="true">&times;</span>
-                              </button>
-                            </div>
-                            <div id="unblock_modal_body`+_obj['index']+`" class="modal-body">
-                              <center>Are you sure you want to unblock <br><strong>`+_obj['ent']+`</strong>?</center>
-                            </div>
-                            <div id="unblock_modal_footer`+_obj['index']+`" class="modal-footer">
-                              <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
-                              <button type="button" class="btn btn-outline-default"  onclick="entity_unblock('`+_obj['ent']+`', '`+_obj['index']+`')"><i class="fas fa-thumbs-up"></i></button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </td>
                       <td>
                       <!-- Button trigger modal -->
                       <button type="button" class="btn btn-danger" data-toggle="modal" data-target="#delete_modal`+_obj['index']+`">
@@ -171,6 +118,14 @@ owner.controller('ownerCtrl', function($scope, $compile, $http){
                       </div>
                     </td>
                      
+                     <td>
+                              <label class="custom-toggle">
+                                <input type="checkbox" onchange="change_blocked_state('`+_obj['ent']+`','`+_obj['index']+`',this)" `+ checker(owner['is_blocked']) +`>
+                                <span class="custom-toggle-slider rounded-circle"></span>
+                              </label>
+                            </td>
+                    
+
                     <td>
                               <label class="custom-toggle">
                                 <input type="checkbox" onchange="change_autonomous_state('`+_obj['ent']+`','`+_obj['index']+`',this)" `+ checker(_obj['is_autonomous']) +`>

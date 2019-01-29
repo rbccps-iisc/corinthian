@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html ng-app="auto_entity" ng-controller="session_checkerCtrl" data-ng-init="check_session()">
+<html ng-app="entity" ng-controller="session_checkerCtrl" data-ng-init="check_session()">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
@@ -19,6 +19,14 @@
   <link href="../../assets/vendor/@fortawesome/fontawesome-free/css/all.min.css" rel="stylesheet">
   <!-- Argon CSS -->
   <link type="text/css" href="../../assets/css/argon.min.css?v=1.0.0" rel="stylesheet">
+  <style type="text/css">
+    #alert_message{
+      position: absolute;
+      z-index: 1;
+      top: 0px;
+      left: 0px;
+    }
+  </style>
 </head>
 <body class="bg-default" ng-controller="logoutCtrl"  oncontextmenu="return false">
   
@@ -57,7 +65,7 @@
           </a>
           <div class="dropdown-menu dropdown-menu-arrow dropdown-menu-right" >
             <div class=" dropdown-header noti-title">
-              <h6 class="text-overflow m-0">Welcome!</h6>
+              <h6 class="text-overflow m-0">Welcome! You have logged in as Entity.</h6>
             </div>
             <!--a href="./examples/profile.html" class="dropdown-item">
               <i class="ni ni-single-02"></i>
@@ -113,7 +121,7 @@
           </div>
         </form>
         <!-- Navigation -->
-        <ul class="navbar-nav"  ng-controller="auto_entity_sidebarCtrl">
+        <ul class="navbar-nav"  ng-controller="entity_sidebarCtrl">
           <!--li class="nav-item">
             <a class="nav-link" href="/owner">
               <i class="ni ni-tv-2 text-primary"></i> Dashboard
@@ -181,7 +189,7 @@
     </div>
   </nav>
   <!-- Main content -->
-  <div class="main-content" ng-controller="auto_entityCtrl">
+  <div class="main-content" ng-controller="entityCtrl">
     <!-- Top navbar -->
     <nav class="navbar navbar-top navbar-expand-md navbar-dark" id="navbar-main">
       <div class="container-fluid">
@@ -204,7 +212,7 @@
             <a class="nav-link pr-0" href="#" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
               <div class="media align-items-center">
                 <span class="avatar avatar-sm rounded-circle">
-                  <img alt="auto_entity logo" src="../../assets/img/logo/owner.png">
+                  <img alt="entity logo" src="../../assets/img/logo/owner.png">
                 </span>
                 <div class="media-body ml-2 d-none d-lg-block">
                   <span class="mb-0 text-sm  font-weight-bold">{{id}}</span>
@@ -213,7 +221,7 @@
             </a>
             <div class="dropdown-menu dropdown-menu-arrow dropdown-menu-right">
               <div class=" dropdown-header noti-title">
-                <h6 class="text-overflow m-0">Welcome! You have logged in as an autonomous entity.</h6>
+                <h6 class="text-overflow m-0">Welcome! You have logged in as Entity.</h6>
               </div>
               <!--a href="./examples/profile.html" class="dropdown-item">
                 <i class="ni ni-single-02"></i>
@@ -364,13 +372,14 @@
   <script src="../../assets/vendor/chart.js/dist/Chart.extension.js"></script>
   <!-- Argon JS -->
   <script src="../../assets/js/argon.js?v=1.0.0"></script>
+  <!-- <script src="../../assets/js/lib/mdl.js"></script> -->
   <!-- Template used is argon from creative Tim -->
   <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.6.9/angular.min.js"></script>
-  <script src="../../assets/js/angular/auto_entity_module.js"></script>
+  <script src="../../assets/js/angular/entity_module.js"></script>
   <script src="../../assets/js/angular/footer_module.js"></script>
   <script src="../../assets/js/angular/logout_module.js"></script>
   <script src="../../assets/js/angular/ui_urls_module.js"></script>
-  <script src="../../assets/js/angular/auto_entity_sidebar_module.js"></script>
+  <script src="../../assets/js/angular/entity_sidebar_module.js"></script>
   <script src="../../assets/js/angular/session_checker_module.js"></script>
   <script type="text/javascript">
     // Disable ctrl+s to prevent downloading source code 
