@@ -3,4 +3,12 @@
       z-index: 1;
       top: 0px;
       left: 0px;
-    }
+}
+
+.white_shade{
+	color:#e1e6f2
+}
+
+.follow_card{
+	margin-bottom: 10px;
+}

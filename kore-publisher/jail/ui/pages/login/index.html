@@ -19,13 +19,14 @@
   <link href="../../assets/vendor/@fortawesome/fontawesome-free/css/all.min.css" rel="stylesheet">
   <!-- Argon CSS -->
   <link type="text/css" href="../../assets/css/argon.min.css?v=1.0.0" rel="stylesheet">
+  <link type="text/css" href="../../assets/css/iudx.css" rel="stylesheet">
 </head>
 <body ng-controller="loginCtrl" class="bg-default" oncontextmenu="return false">
   <div class="main-content">
     <!-- Navbar -->
     <nav class="navbar navbar-top navbar-horizontal navbar-expand-md navbar-dark">
       <div class="container px-4">
-        <a class="navbar-brand" href="#"><strong>{{ brand }}</strong>
+        <a class="navbar-brand" href="http://www.iudx.org.in/" target="_blank"><strong>{{ brand }}</strong>
           <!--img src="../assets/img/logo/iudx.svg"/-->
         </a>
         <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbar-collapse-main" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
@@ -143,7 +144,7 @@
               <!-- <a href="#" class="text-light"><small>Forgot password?</small></a> -->
             </div>
             <div class="col-6 text-right">
-              <a href="#" class="text-light"><small>Create new account</small></a>
+              <!-- <a href="#" class="text-light"><small>Create new account</small></a> -->
             </div>
           </div>
         </div>
@@ -156,14 +157,14 @@
       <div class="row align-items-center justify-content-xl-between">
         <div class="col-xl-6">
           <div class="copyright text-center text-xl-left text-muted">
-            <i class="{{copyright_legend}}"></i> {{copyright_start_year}}-{{copyright_end_year}} <a href="{{copyright_owner.href}}" class="font-weight-bold ml-1" target="_blank">{{copyright_owner.name}}</a>
+            <i class="{{copyright_legend}} white_shade"  ></i> <span class=" white_shade" >{{copyright_start_year}}-{{copyright_end_year}} </span><a href="{{copyright_owner.href}}" class="font-weight-bold ml-1" target="_blank">{{copyright_owner.name}}</a>
           </div>
         </div>
         <div class="col-xl-6">
           <ul class="nav nav-footer justify-content-center justify-content-xl-end">
           	<div data-ng-repeat="link in footer_links">
            		<li class="nav-item">
-              <a href="{{link.href}}" class="nav-link" target="_blank">{{link.text}}</a>
+              <a href="{{link.href}}" class="nav-link white_shade" target="_blank" >{{link.text}}</a>
             </li>
            </div>
           </ul>

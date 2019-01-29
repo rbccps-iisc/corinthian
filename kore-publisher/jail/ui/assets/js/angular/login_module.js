@@ -6,7 +6,7 @@ login.controller('loginCtrl', function($scope, $http, origin, api){
     $scope.navbar_links = [
     	{"text":"Github","href":"https://github.com/rbccps-iisc/corinthian", "legend":"fab fa-github", "target": "_blank"},
     	{"text":"Documentation","href":"https://iudx.readthedocs.io/en/latest/", "legend":"fab fa-readme", "target": "_blank"},
-    	{"text":"iudx.org.in","href":"http://www.iudx.org.in/", "legend":"fas fa-receipt", "target": "_blank"}
+    	// {"text":"iudx.org.in","href":"http://www.iudx.org.in/", "legend":"fas fa-receipt", "target": "_blank"}
     ];
 
     $scope.data=[]

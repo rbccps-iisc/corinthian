@@ -3339,40 +3339,11 @@ block (struct http_request *req)
 	if (! looks_like_a_valid_owner(id))
 		BAD_REQUEST("id is not valid owner");
 
-	// either "id" should be owner of the "entity", or an "admin" 
 	if (strcmp(id,"admin") == 0)
 	{
 		if (! is_request_from_localhost(req))
 			FORBIDDEN("admin can only call APIs from localhost");
 
-<<<<<<< HEAD
-		if (KORE_RESULT_OK != http_request_header(req, "owner", &owner))
-			FORBIDDEN("owner field missing in header");
-
-		if (! is_string_safe(owner))
-			FORBIDDEN("invalid owner");
-
-		if (! looks_like_a_valid_owner(owner))
-			FORBIDDEN("owner is not valid");
-
-		block = owner;
-	}
-	else
-	{
-		if (KORE_RESULT_OK != http_request_header(req, "entity", &entity))
-			FORBIDDEN("entity field missing in header");
-
-		if (! is_owner(id,entity))
-			FORBIDDEN("you are not the owner of the entity");
-
-		if (! is_string_safe(entity))
-			FORBIDDEN("invalid entity");
-
-		if (! looks_like_a_valid_entity(entity))
-			FORBIDDEN("entity is not valid");
-
-		block = entity;
-=======
 		if (KORE_RESULT_OK != http_request_header(req, "owner", &entity_to_be_blocked))
 		{
 			if (KORE_RESULT_OK != http_request_header(req, "entity", &entity_to_be_blocked))
@@ -3389,9 +3360,7 @@ block (struct http_request *req)
 
 		if (! looks_like_a_valid_entity(entity_to_be_blocked))
 			BAD_REQUEST("entity is not valid");
->>>>>>> 23ac6a21e111d4362eb7103ad68c5a5642bfc9c6
 	}
-
 
 /////////////////////////////////////////////////
 
@@ -3408,11 +3377,7 @@ block (struct http_request *req)
 
 	CREATE_STRING(query,
 			"UPDATE users set blocked='t' WHERE id='%s'",
-<<<<<<< HEAD
-				block
-=======
 				entity_to_be_blocked	
->>>>>>> 23ac6a21e111d4362eb7103ad68c5a5642bfc9c6
 	);
 
 	RUN_QUERY(query, "could not block the entity");

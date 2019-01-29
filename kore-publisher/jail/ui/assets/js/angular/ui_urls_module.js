@@ -40,7 +40,7 @@ const api = {
 		"follow-requests": "/entity/follow-requests",
 		"login": "/entity/permissions"
 	},
-	"general_apis": {
+	"general-apis": {
 		"catalog": "/catalog"
 	}
 }
