@@ -12,3 +12,7 @@
 .follow_card{
 	margin-bottom: 10px;
 }
+
+.permission .topic {
+      display: block !important;
+}

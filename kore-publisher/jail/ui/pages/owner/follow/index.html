@@ -336,44 +336,119 @@
                     <div class="col">
                       <h5 class="card-title text-uppercase text-muted mb-0">Entity</h5>
                       <span class="h2 font-weight-bold mb-0">`+entity+`</span>
-                      &nbsp;<button type="button" class="btn btn-info btn-sm" data-toggle="modal" data-target="#follow_modal`+_entity_index+` onclick=follow('`+entity+`')>Follow <i class="ni ni-send"></i></button>
-                      <!-- Modal -->
-                      <div class="modal fade" id="follow_modal`+_entity_index+`" tabindex="-1" role="dialog" aria-labelledby="follow_modal_label" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered" role="document">
-                          <div class="modal-content">
-                            <div class="modal-header">
-                              <h5 class="modal-title" id="exampleModalLabel`+_entity_index+`">Reset Password</h5>
-                              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                <span aria-hidden="true">&times;</span>
-                              </button>
-                            </div>
-                            <div id="reset_password_modal_body`+_entity_index+`" class="modal-body">
-                              <center>Are you sure you want to reset the password for <br><strong>`+_entity_index+`</strong>?</center>
-                            </div>
-                            <div id="reset_password_modal_footer`+_entity_index+`" class="modal-footer">
-                              <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-thumbs-down"></i></button>
-                              <button type="button" class="btn btn-primary" onclick="owner_reset_password('`+_entity_index+`')"><i class="fas fa-thumbs-up"></i></button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="col-auto">
+                      &nbsp;
+                      <button type="button" class="btn btn-sm btn-default" data-toggle="modal" data-target="#follow_modal`+_entity_index+`">Follow <i class="ni ni-send"></i></button>
+  
+                          <div class="modal fade" id="follow_modal`+_entity_index+`" tabindex="-1" role="dialog" aria-labelledby="modal-form" aria-hidden="true">
+    <div class="modal-dialog modal- modal-dialog-centered modal-sm" role="document">
+        <div class="modal-content">
+          
+            <div class="modal-body p-0">
+              
+                  
+<div class="card bg-secondary shadow border-0">
+    
+    <div class="card-body px-lg-5 py-lg-5">
+        <div class="text-center text-muted mb-4">
+            <small>Fill your preferences</small>
+        </div>
+        <form role="form" id="form_`+_entity_index+`">
+ <div class="row">
+    <div class="col-md-12">
+      <div class="form-group">
+      <div class="input-group mb-4">
+          <div class="input-group-prepend">
+            <span class="input-group-text"><i class="fas fa-clock"></i></span>
+          </div>
+          <input class="form-control" placeholder="Validity in hours" type="number" required>
+        </div>
+        
+      </div>
+    </div>
+  </div>
+  <div class="row">
+    <div class="col-md-6">
+      <div class="form-group">
+        <div class="input-group mb-4 permission">Permission <br><br>
+          <div class="custom-control custom-radio mb-3"> 
+  <input name="permission_`+_entity_index+`" class="custom-control-input" id="permission_r_`+_entity_index+`" type="radio" value="read" required>
+  <label class="custom-control-label" for="permission_r_`+_entity_index+`" >Read Only</label>
+</div>
+<div class="custom-control custom-radio mb-3">
+  <input name="permission_`+_entity_index+`" class="custom-control-input" id="permission_w_`+_entity_index+`" type="radio"  value="write">
+  <label class="custom-control-label" for="permission_w_`+_entity_index+`">Write Only</label>
+</div>
+<div class="custom-control custom-radio mb-3">
+  <input name="permission_`+_entity_index+`" class="custom-control-input" id="permission_rw_`+_entity_index+`" type="radio" value="read-write">
+  <label class="custom-control-label" for="permission_rw_`+_entity_index+`" >Read-Write</label>
+</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="form-group">
+        <div class="input-group mb-4 topic">
+          <div class="input-group mb-4">Interested In <br><br>
+          <div class="custom-control custom-radio mb-3"> 
+  <input name="topic_`+_entity_index+`" class="custom-control-input" id="topic_data_`+_entity_index+`" type="radio" value="data" required>
+  <label class="custom-control-label" for="topic_data_`+_entity_index+`">Data Only</label>
+</div> <br>
+<div class="custom-control custom-radio mb-3">
+  <input name="topic_`+_entity_index+`" class="custom-control-input" id="topic_alerts_`+_entity_index+`" value="alerts" type="radio" >
+  <label class="custom-control-label" for="topic_alerts_`+_entity_index+`">Alerts Only</label>
+</div>
+<div class="custom-control custom-radio mb-3">
+  <input name="topic_`+_entity_index+`" class="custom-control-input" id="topic_logs_`+_entity_index+`" value="logs" type="radio" >
+  <label class="custom-control-label" for="topic_logs_`+_entity_index+`">Logs Only</label>
+</div>
+<div class="custom-control custom-radio mb-3">
+  <input name="topic_`+_entity_index+`" class="custom-control-input" id="topic_error_`+_entity_index+`"  value="errors" type="radio" >
+  <label class="custom-control-label" for="topic_error_`+_entity_index+`">Errors Only</label>
+</div>
+        </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+        </form>
+        <div class="text-center">
+                <button type="button" class="btn btn-primary my-4" data-dismiss="modal">Cancel <i class="fas fa-times"></i></button>
+                <button type="submit" class="btn btn-primary my-4" ng-click="form_`+_entity_index+`.$valid && follow()">Follow <i class="ni ni-send"></i></button>
+            </div>
+    </div>
+</div>
+</div>
+</div>
+</div>
+
+                    <!--<div class="col-auto">
                       <div class="icon icon-shape text-white rounded-circle shadow">
                         <img class="card-img-top" src="../../../assets/img/logo/owner-1.png" alt="Entity Logo">
                       </div>
-                    </div>
+
+                    </div>-->
+
                   </div>
                   <p class="mt-3 mb-0 text-muted text-sm">
                     <span class="text-success mr-2"><i class="ni ni-tag"></i> Tags</span>
                     <span class="text-nowrap">Streetlight, Light Sensor</span>
                   </p>
+
                 </div>
+
               </div>
+
             </div>`
                           return html_to_be_appended;
     }
 
+
+    function follow(entity_index){
+      // console.log($('#form'+entity_id).serializeArray());
+      console.log($("input[name='permission_"+entity_index+"']:checked").val())
+      console.log($("input[name='topic_"+entity_index+"']:checked").val())
+    }
 
     function display_entities(){
       var entity_list = $('#entity_list');
@@ -428,57 +503,57 @@
       display_entities();
     });
 
-       function follow(entity_id){
+    //    function follow(entity_id){
 
-        var entity_index = entity_id.replace('/','_');
+    //     var entity_index = entity_id.replace('/','_');
 
-        $.ajax({
-           url: api['owner']['follow'],
-           type: "POST",
-           contentType: 'application/json; charset=utf-8',
-           dataType: 'json',
-           headers:{
-            'id': sessionStorage.getItem('id'),
-            'apikey': sessionStorage.getItem('apikey'),
-            'entity': entity_id,
-           },
-           complete: function(jqXHR) {
-             if(jqXHR['status'] == 200) {
-                    // console.log(d[i]);
-                    $( "#alert_message").html(`<br><center><div class="alert alert-success alert-dismissible fade show in" role="alert">
-                            <span class="alert-inner--icon"><i class="ni ni-like-2"></i></span>
-                            <span class="alert-inner--text"><strong>Success! </strong> Password for <strong>` + entity_id + `</strong> has been reset to <strong id="new_apikey_`+ entity_index +`">`+ jqXHR['responseJSON']['apikey'] +`</strong>.<br> <strong id="copied_`+ entity_index +`" onclick="copyToClipboard('`+entity_index+`')"><i style="font-size:30px;" class="far fa-copy"></i></strong></span>
-                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                                <span aria-hidden="true">&times;</span>
-                            </button>
-                        </div></center>`);
-                    // $( "#alert_message").fadeOut();
-                    window.setTimeout(function(){
-                      $( "#reset_passwd_modal"+ entity_index).modal('hide');
-                      $( '.modal-backdrop').remove();
-                      $( "#alert_message").fadeIn();
-                      $( "#alert_message").fadeOut();
-                    }, 900);
-             }else{
-                $( "#alert_message").html(`<br><div class="alert alert-danger alert-dismissible fade show" role="alert">
-                            <span class="alert-inner--icon"><i class="fas fa-exclamation-triangle"></i></span>
-                            <span class="alert-inner--text"><strong>Error! </strong>` + jqXHR['responseJSON']['error'] + `</span>
-                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                                <span aria-hidden="true">&times;</span>
-                            </button>
-                        </div>`);
+    //     $.ajax({
+    //        url: api['owner']['follow'],
+    //        type: "POST",
+    //        contentType: 'application/json; charset=utf-8',
+    //        dataType: 'json',
+    //        headers:{
+    //         'id': sessionStorage.getItem('id'),
+    //         'apikey': sessionStorage.getItem('apikey'),
+    //         'entity': entity_id,
+    //        },
+    //        complete: function(jqXHR) {
+    //          if(jqXHR['status'] == 200) {
+    //                 // console.log(d[i]);
+    //                 $( "#alert_message").html(`<br><center><div class="alert alert-success alert-dismissible fade show in" role="alert">
+    //                         <span class="alert-inner--icon"><i class="ni ni-like-2"></i></span>
+    //                         <span class="alert-inner--text"><strong>Success! </strong> Password for <strong>` + entity_id + `</strong> has been reset to <strong id="new_apikey_`+ entity_index +`">`+ jqXHR['responseJSON']['apikey'] +`</strong>.<br> <strong id="copied_`+ entity_index +`" onclick="copyToClipboard('`+entity_index+`')"><i style="font-size:30px;" class="far fa-copy"></i></strong></span>
+    //                         <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+    //                             <span aria-hidden="true">&times;</span>
+    //                         </button>
+    //                     </div></center>`);
+    //                 // $( "#alert_message").fadeOut();
+    //                 window.setTimeout(function(){
+    //                   $( "#reset_passwd_modal"+ entity_index).modal('hide');
+    //                   $( '.modal-backdrop').remove();
+    //                   $( "#alert_message").fadeIn();
+    //                   $( "#alert_message").fadeOut();
+    //                 }, 900);
+    //          }else{
+    //             $( "#alert_message").html(`<br><div class="alert alert-danger alert-dismissible fade show" role="alert">
+    //                         <span class="alert-inner--icon"><i class="fas fa-exclamation-triangle"></i></span>
+    //                         <span class="alert-inner--text"><strong>Error! </strong>` + jqXHR['responseJSON']['error'] + `</span>
+    //                         <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+    //                             <span aria-hidden="true">&times;</span>
+    //                         </button>
+    //                     </div>`);
 
-                window.setTimeout(function(){
-                      $( "#alert_message").fadeIn();
-                      $( "#alert_message").fadeOut();
-                    }, 900);
+    //             window.setTimeout(function(){
+    //                   $( "#alert_message").fadeIn();
+    //                   $( "#alert_message").fadeOut();
+    //                 }, 900);
             
-            }
+    //         }
              
-          }  
+    //       }  
 
-        });
-    }
+    //     });
+    // }
 
 
     function entity_reset_password(entity_id, entity_index){
