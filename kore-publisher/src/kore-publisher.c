@@ -1620,6 +1620,49 @@ done:
 }
 
 int
+catalog_tags (struct http_request *req)
+{
+	int i, num_rows;
+
+	const char *entity;
+
+	req->status = 403;
+
+	kore_buf_reset(response);
+	kore_buf_append(response,"[",1);
+
+	// search for tags
+	/*	
+
+	CREATE_STRING (query,
+			"SELECT xxx" 
+	);
+
+	RUN_QUERY (query,"could not query catalog");
+
+	num_rows = kore_pgsql_ntuples(&sql);
+
+	for (i = 0; i < num_rows; ++i)
+	{
+		char *tag = kore_pgsql_getvalue(&sql,i,0);
+		kore_buf_appendf(response,"%s,",tag);
+	}
+
+	// remove the last comma
+	if (num_rows > 0)
+		--(response->offset);
+
+	*/
+
+	kore_buf_append(response,"]",1);
+
+	OK();
+
+done:
+	END();
+}
+
+int
 register_owner(struct http_request *req)
 {
 	int i;
