@@ -1580,10 +1580,11 @@ catalog_tags (struct http_request *req)
 	kore_buf_append(response,"{",1);
 
 	CREATE_STRING (query,
-			"SELECT RTRIM(LTRIM(tag::TEXT,'('),')'),COUNT(tag) "		// remove () from tags using RTRIM and LTRIM
-			"FROM (SELECT jsonb_array_elements_text(schema->'tags') "	// convert array to text 
-			"FROM users) AS tag "
-			"WHERE tag::TEXT NOT LIKE '%%\"%%' "				// remove the ones which contain double quotes 
+			"SELECT tag,COUNT(tag) FROM ("
+				"SELECT LOWER(jsonb_array_elements_text(schema->'tags')::TEXT) " // convert array to text 
+				"FROM users"
+			") AS tag "
+			"WHERE tag NOT LIKE '%%\"%%' "						// remove the ones which contain double quotes 
 			"GROUP BY tag"
 	);
 
@@ -2431,9 +2432,9 @@ follow (struct http_request *req)
 		if (strcmp(permission,"read") == 0 || strcmp(permission,"read-write") == 0)
 		{
 			CREATE_STRING (query,
-			"INSERT INTO acl "
-			"(acl_id,from_id,exchange,follow_id,permission,topic,valid_till) "
-			"VALUES(DEFAULT,'%s','%s.%s','%s','%s', '%s', now() + interval '%d hours')",
+				"INSERT INTO acl "
+				"(acl_id,from_id,exchange,follow_id,permission,topic,valid_till) "
+				"VALUES(DEFAULT,'%s','%s.%s','%s','%s', '%s', now() + interval '%d hours')",
 			        	from,
 					to,		// .message_type is appended to it
 					message_type,
@@ -2443,11 +2444,26 @@ follow (struct http_request *req)
 					int_validity
 			);
 
-			RUN_QUERY (query,"could not run insert query on acl - read ");
+			RUN_QUERY (query,"could not run insert query on acl - read");
 		}
 
 		if (strcmp(permission,"write") == 0 || strcmp(permission,"read-write") == 0)
 		{
+			CREATE_STRING (query,
+				"INSERT INTO acl "
+				"(acl_id,from_id,exchange,follow_id,permission,topic,valid_till) "
+				"VALUES(DEFAULT,'%s','%s.%s','%s','%s', '%s', now() + interval '%d hours')",
+			        	from,
+					to,		// .message_type is appended to it
+					message_type,
+					write_follow_id,
+					"write",
+					topic,
+					int_validity
+			);
+
+			RUN_QUERY (query,"could not run insert query on acl - write");
+
 			char write_exchange 	[MAX_LEN_RESOURCE_ID + 1];
 			char command_queue	[MAX_LEN_RESOURCE_ID + 1];
 			char write_topic	[MAX_LEN_TOPIC + 1];
