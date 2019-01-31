@@ -1580,7 +1580,11 @@ catalog_tags (struct http_request *req)
 	kore_buf_append(response,"{",1);
 
 	CREATE_STRING (query,
-			"SELECT tag,count(tag) FROM (SELECT json_array_elements_text(schema->'tags') FROM users) AS tag GROUP BY tag"
+			"SELECT RTRIM(LTRIM(tag::TEXT,'('),')'),COUNT(tag) "		// remove () from tags using RTRIM and LTRIM
+			"FROM (SELECT json_array_elements_text(schema->'tags') "	// convert array to text 
+			"FROM users) AS tag "
+			"WHERE tag NOT LIKE '%%\"%%' "					// remove the ones which contain double quotes 
+			"GROUP BY tag"
 	);
 
 	RUN_QUERY (query,"could not query catalog");
