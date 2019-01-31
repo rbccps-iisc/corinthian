@@ -1580,12 +1580,15 @@ catalog_tags (struct http_request *req)
 	kore_buf_append(response,"{",1);
 
 	CREATE_STRING (query,
-			"SELECT tag,COUNT(tag) FROM ("
-				"SELECT LOWER(jsonb_array_elements_text(schema->'tags')::TEXT) " // convert array to text 
+			// remove () from (tag), remove front and end spaces, limit tag length to 30
+			"SELECT SUBSTRING(TRIM(RTRIM(LTRIM(tag::TEXT,'('),')')) for 30) "
+			"as final_tag, COUNT(tag) as tag_count FROM "
+			"("
+				"SELECT LOWER(jsonb_array_elements_text(schema->'tags')::TEXT) "
 				"FROM users"
 			") AS tag "
-			"WHERE tag NOT LIKE '%%\"%%' "						// remove the ones which contain double quotes 
-			"GROUP BY tag"
+			"WHERE final_tag NOT LIKE '%%\"%%' "	// remove the ones which contain double quotes 
+			"GROUP BY final_tag ORDER BY tag_count DESC"
 	);
 
 	RUN_QUERY (query,"could not query catalog");
