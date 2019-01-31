@@ -16,12 +16,12 @@ sudo chown -R 0:0 ../kore-publisher/jail
 sudo chmod 1555   ../kore-publisher/jail
 sudo chmod 1555   ../kore-publisher/jail/etc
 
+sudo chown -R 0:0    ../kore-publisher/ui
+sudo chmod -R 1444   ../kore-publisher/ui
+
 sudo chown -R 0:0 ../authenticator/jail
 sudo chmod 1555   ../authenticator/jail
 sudo chmod 1555   ../authenticator/jail/etc
-
-sudo chown -R 0:0    ../ui
-sudo chmod -R 1444   ../ui
 
 admin_passwd=`cat /dev/urandom | env LC_CTYPE=C tr -dc a-zA-Z0-9 | head -c 32; echo`
 postgres_passwd=`cat /dev/urandom | env LC_CTYPE=C tr -dc a-zA-Z0-9 | head -c 32; echo`
