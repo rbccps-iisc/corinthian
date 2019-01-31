@@ -1581,9 +1581,9 @@ catalog_tags (struct http_request *req)
 
 	CREATE_STRING (query,
 			"SELECT RTRIM(LTRIM(tag::TEXT,'('),')'),COUNT(tag) "		// remove () from tags using RTRIM and LTRIM
-			"FROM (SELECT json_array_elements_text(schema->'tags') "	// convert array to text 
+			"FROM (SELECT jsonb_array_elements_text(schema->'tags') "	// convert array to text 
 			"FROM users) AS tag "
-			"WHERE tag NOT LIKE '%%\"%%' "					// remove the ones which contain double quotes 
+			"WHERE tag::TEXT NOT LIKE '%%\"%%' "				// remove the ones which contain double quotes 
 			"GROUP BY tag"
 	);
 
