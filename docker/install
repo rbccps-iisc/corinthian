@@ -20,6 +20,8 @@ sudo chown -R 0:0 ../authenticator/jail
 sudo chmod 1555   ../authenticator/jail
 sudo chmod 1555   ../authenticator/jail/etc
 
+sudo chmod -R 1444   ../ui
+
 admin_passwd=`cat /dev/urandom | env LC_CTYPE=C tr -dc a-zA-Z0-9 | head -c 32; echo`
 postgres_passwd=`cat /dev/urandom | env LC_CTYPE=C tr -dc a-zA-Z0-9 | head -c 32; echo`
 postgres_readonly_passwd=`cat /dev/urandom | env LC_CTYPE=C tr -dc a-zA-Z0-9 | head -c 32; echo`
