@@ -38,29 +38,41 @@
 #include<sys/socket.h>
 #include<errno.h>
 
-#define HEART_BEAT (0)
-
 #if 1
 	#define debug_printf(...)
 #else
 	#define debug_printf(...) (void)printf(__VA_ARGS__)
 #endif
 
-typedef struct publish_async_data {
+#define HEART_BEAT (0)
 
-	char *id;
-	char *apikey;
-	char *message;
-	char *exchange;
-	char *subject;
-	char *content_type;
-		
-} publish_async_data_t;
+#define MAX_LEN_SALT		(32)
+#define MAX_LEN_APIKEY	 	(32)
 
+#define MIN_LEN_OWNER_ID	(3)
+#define MAX_LEN_OWNER_ID	(32)
+
+/* min = abc/efg */
+#define MIN_LEN_ENTITY_ID 	(7)
+#define MAX_LEN_ENTITY_ID 	(65)
+
+// for queues and exchanges
+#define MIN_LEN_RESOURCE_ID	(MIN_LEN_ENTITY_ID)
+#define MAX_LEN_RESOURCE_ID	(128)
+
+#define MAX_LEN_HASH_KEY 	(MAX_LEN_ENTITY_ID + MAX_LEN_APIKEY)
+#define MAX_LEN_HASH_INPUT	(MAX_LEN_APIKEY + MAX_LEN_SALT + MAX_LEN_ENTITY_ID)
+
+#define MAX_LEN_FOLLOW_ID	(10)
+
+#define MAX_LEN_TOPIC		(128)
+
+#define MAX_AMQP_RETRIES	(3)
 
 /////////////////////// APIs /////////////////////////////////
 
 int catalog		(struct http_request *);
+int catalog_tags	(struct http_request *);
 
 int publish		(struct http_request *);
 int publish_async	(struct http_request *);
@@ -100,10 +112,10 @@ int db_cleanup		(struct http_request *);
 ///////////////////////////////////////////////////////////
 
 int init 			(int);
+int async_init 			(void);
 void init_admin_connection 	(void);
 
 bool login_success 		(const char *, const char *, bool *);
-bool async_login_success 	(const char *, const char *, bool *);
 
 void gen_salt_password_and_apikey (const char *, char *, char *, char *);
 bool check_acl 			  (const char *, const char *, const char *);
@@ -116,7 +128,6 @@ bool is_alpha_numeric 			(const char *str);
 bool is_owner				(const char *, const char *);
 
 // threads
-void *async_publish_function		(void *);
 void *create_exchanges_and_queues 	(void *);
 void *delete_exchanges_and_queues 	(void *);
 
