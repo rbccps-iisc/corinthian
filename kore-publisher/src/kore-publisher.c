@@ -1584,7 +1584,8 @@ catalog_tags (struct http_request *req)
 
 			"SELECT RTRIM(LTRIM(tag::TEXT,'('),')') as final_tag,"
 			"COUNT(tag) as tag_count FROM ("
-				"SELECT SUBSTRING(TRIM(LOWER(jsonb_array_elements_text(schema->'tags')::TEXT)) for 30) FROM users"
+				"SELECT SUBSTRING(TRIM(LOWER(jsonb_array_elements_text(schema->'tags')::TEXT)) for 30) "
+				"FROM users WHERE schema->'tags'->0 is NOT NULL"
 			") AS tag WHERE tag::TEXT NOT LIKE '%%\"%%' group by final_tag order by tag_count DESC"
 	);
 
