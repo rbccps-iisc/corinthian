@@ -3364,11 +3364,11 @@ block (struct http_request *req)
 		if (KORE_RESULT_OK != http_request_header(req, "entity", &entity_to_be_blocked))
 			BAD_REQUEST("entity field missing in header");
 
-		if (! is_owner(id,entity_to_be_blocked))
-			FORBIDDEN("you are not the owner of the entity");
-
 		if (! looks_like_a_valid_entity(entity_to_be_blocked))
 			BAD_REQUEST("entity is not valid");
+
+		if (! is_owner(id,entity_to_be_blocked))
+			FORBIDDEN("you are not the owner of the entity");
 	}
 
 /////////////////////////////////////////////////
@@ -3429,7 +3429,7 @@ unblock (struct http_request *req)
 	}
 	else
 	{
-		if (KORE_RESULT_OK != http_request_header(req, "owner", &entity_to_be_unblocked))
+		if (KORE_RESULT_OK != http_request_header(req, "entity", &entity_to_be_unblocked))
 			BAD_REQUEST("entity field missing in header");
 
 		if (! looks_like_a_valid_entity(entity_to_be_unblocked))
