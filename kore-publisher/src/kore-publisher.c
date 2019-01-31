@@ -70,7 +70,6 @@ amqp_basic_properties_t	props;
 
 amqp_rpc_reply_t r;
 
-
 bool admin_connection_open = false;
 
 void
@@ -136,8 +135,6 @@ init_admin_connection (void)
 int
 init (int state)
 {
-	int i;
-
 	// mask server name 
 	http_server_version("");
 
@@ -238,9 +235,8 @@ init (int state)
 	memset(&props, 0, sizeof props);
 	props._flags = AMQP_BASIC_CONTENT_TYPE_FLAG | AMQP_BASIC_USER_ID_FLAG;
 
-////////////// For async publish ///////////////////
-
-
+////////////////////////////////////////////////////
+	async_init ();
 ////////////////////////////////////////////////////
 
 	return KORE_RESULT_OK;
@@ -455,7 +451,7 @@ login_success (const char *id, const char *apikey, bool *is_autonomous)
 	char *password_hash;
 	char *str_is_autonomous;
 
-	bool login_result = false;
+	bool login_success = false;
 
 	if (id == NULL || apikey == NULL || *id == '\0' || *apikey == '\0')
 		goto done;
@@ -547,7 +543,7 @@ login_success (const char *id, const char *apikey, bool *is_autonomous)
 	);
 
 	if (strncmp(hash_string,password_hash,64) == 0) {
-		login_result = true;
+		login_success = true;
 		debug_printf("Login OK\n");
 	}
 
@@ -555,7 +551,7 @@ done:
 	kore_buf_reset(query);
 	kore_pgsql_cleanup(&sql);
 
-	return login_result;
+	return login_success;
 }
 
 int
@@ -1581,13 +1577,10 @@ catalog_tags (struct http_request *req)
 	req->status = 403;
 
 	kore_buf_reset(response);
-	kore_buf_append(response,"[",1);
-
-	// search for tags
-	/*	
+	kore_buf_append(response,"{",1);
 
 	CREATE_STRING (query,
-			"SELECT xxx" 
+			"SELECT tag,count(tag) FROM (SELECT json_array_elements_text(schema->'tags') FROM users) AS tag GROUP BY tag"
 	);
 
 	RUN_QUERY (query,"could not query catalog");
@@ -1596,17 +1589,17 @@ catalog_tags (struct http_request *req)
 
 	for (i = 0; i < num_rows; ++i)
 	{
-		char *tag = kore_pgsql_getvalue(&sql,i,0);
-		kore_buf_appendf(response,"%s,",tag);
+		char *tag 	= kore_pgsql_getvalue(&sql,i,0);
+		char *count 	= kore_pgsql_getvalue(&sql,i,1);
+
+		kore_buf_appendf(response,"\"%s\":%s,",tag,count);
 	}
 
 	// remove the last comma
 	if (num_rows > 0)
 		--(response->offset);
 
-	*/
-
-	kore_buf_append(response,"]",1);
+	kore_buf_append(response,"}",1);
 
 	OK();
 
@@ -3959,10 +3952,3 @@ string_to_lower (const char *str)
 		++p;
 	}
 }
-
-/////////////////////////////////////////////////////////////////////////////
-//////////////////////////// ASYNC RELATED FUNCTIONS ////////////////////////
-//////////////////////////// ... not yet tested ... /////////////////////////
-/////////////////////////////////////////////////////////////////////////////
-
-

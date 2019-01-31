@@ -3,8 +3,15 @@
 
 static struct kore_pgsql sql;
 
+//static char queue	[MAX_LEN_RESOURCE_ID + 1];
+static char exchange	[MAX_LEN_RESOURCE_ID + 1];
+
 static struct kore_buf *query 		= NULL;
 static struct kore_buf *response 	= NULL;
+
+static char 	string_to_be_hashed 	[MAX_LEN_APIKEY + MAX_LEN_SALT + MAX_LEN_ENTITY_ID + 1];
+static uint8_t	binary_hash 		[SHA256_DIGEST_LENGTH];
+static char 	hash_string		[2*SHA256_DIGEST_LENGTH + 1];
 
 static ht connection_ht;
 
@@ -12,19 +19,18 @@ static ht connection_ht;
 
 static int queue_index = 0;
 
-static Q 		q	[MAX_ASYNC_THREADS];
 static pthread_t 	thread	[MAX_ASYNC_THREADS];
+static Q 		thread_q[MAX_ASYNC_THREADS];
 
 static
 bool
 async_login_success (const char *id, const char *apikey, bool *is_autonomous)
 {
-#if 0
 	char *salt;
 	char *password_hash;
 	char *str_is_autonomous;
 
-	bool login_result = false;
+	bool login_success = false;
 
 	if (id == NULL || apikey == NULL || *id == '\0' || *apikey == '\0')
 		goto done;
@@ -116,7 +122,7 @@ async_login_success (const char *id, const char *apikey, bool *is_autonomous)
 	);
 
 	if (strncmp(hash_string,password_hash,64) == 0) {
-		login_result = true;
+		login_success = true;
 		debug_printf("Login OK\n");
 	}
 
@@ -124,21 +130,13 @@ done:
 	kore_buf_reset(query);
 	kore_pgsql_cleanup(&sql);
 
-	return login_result;
-#endif
-
-	return false;
+	return login_success;
 }
 
 static
 void*
 async_publish_function (void *v)
 {
-	// XXX: this api is not tested and must not be used
-
-	return NULL;
-#if 0
-
 	Q *q = (Q *)v;
 
 	publish_async_data_t *data = NULL; 
@@ -152,7 +150,7 @@ async_publish_function (void *v)
 	const char *message;
 	const char *content_type;
 
-	char *exchange;
+	char *my_exchange;
 
 	amqp_connection_state_t	*cached_conn = NULL;
 	
@@ -174,7 +172,7 @@ async_publish_function (void *v)
 			subject		= data->subject;
 			message		= data->message;
 			content_type	= data->content_type;
-			exchange	= data->exchange;
+			my_exchange	= data->exchange;
 
 			snprintf (key, MAX_LEN_HASH_KEY + 1, "%s%s", id, apikey);
 
@@ -190,7 +188,7 @@ async_publish_function (void *v)
 				if (! looks_like_a_valid_entity(id))
 					goto done;	
 
-				if (! login_success(id,apikey,NULL))
+				if (! async_login_success(id,apikey,NULL))
 					goto done;	
 
 /////////////////////////////////////////////////
@@ -239,7 +237,7 @@ async_publish_function (void *v)
 			if ( AMQP_STATUS_OK != amqp_basic_publish (
 					*cached_conn,
 					1,
-					amqp_cstring_bytes(exchange),
+					amqp_cstring_bytes(my_exchange),
         				amqp_cstring_bytes(subject),
 					0,
 					0,
@@ -255,13 +253,11 @@ done:
 
 		sleep (1);
 	}
-#endif
 }
 
 int
 publish_async (struct http_request *req)
 {
-#if 0
 	const char *id;
 	const char *apikey;
 	const char *to;
@@ -357,7 +353,7 @@ publish_async (struct http_request *req)
 	if (!(data->subject		= strdup(topic_to_publish)))	ERROR("out of memmory");
 	if (!(data->content_type	= strdup(content_type)))	ERROR("out of memmory");
 
-	if (q_insert (&q[queue_index], data) < 0)
+	if (q_insert (&thread_q[queue_index], data) < 0)
 		ERROR("inserting into queue failed");
 
 	queue_index = (queue_index + 1) % MAX_ASYNC_THREADS;
@@ -380,10 +376,6 @@ done:
 		}
 	}
 
-#endif
-
-	OK();
-done:
 	END();
 }
 
@@ -395,14 +387,14 @@ int async_init ()
 
 	for (i = 0; i < MAX_ASYNC_THREADS; ++i)
 	{
-		q_init(&q[i]);
+		q_init(&thread_q[i]);
 
 		if (
 			pthread_create(
 				&thread[i],
 				NULL,
 				async_publish_function,
-				(void *)&q[i]
+				(void *)&thread_q[i]
 			) != 0
 		)
 		{
