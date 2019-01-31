@@ -1581,14 +1581,11 @@ catalog_tags (struct http_request *req)
 
 	CREATE_STRING (query,
 			// remove () from (tag), remove front and end spaces, limit tag length to 30
-			"SELECT RTRIM(LTRIM(tag::TEXT,'('),')') "
-			"as final_tag, COUNT(tag) as tag_count FROM "
-			"("
-				"SELECT SUBSTRING(TRIM(LOWER(jsonb_array_elements_text(schema->'tags')::TEXT) for 30)) "
-				"FROM users"
-			") AS tag "
-			"WHERE final_tag NOT LIKE '%%\"%%' "	// remove the ones which contain double quotes 
-			"GROUP BY final_tag ORDER BY tag_count DESC"
+
+			"SELECT RTRIM(LTRIM(tag::TEXT,'('),')') as final_tag,"
+			"COUNT(tag) as tag_count FROM ("
+				"SELECT SUBSTRING(TRIM(LOWER(jsonb_array_elements_text(schema->'tags')::TEXT)) for 30) FROM users"
+			") AS tag WHERE tag::TEXT NOT LIKE '%%\"%%' group by final_tag order by tag_count DESC"
 	);
 
 	RUN_QUERY (query,"could not query catalog");
