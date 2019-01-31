@@ -1581,10 +1581,10 @@ catalog_tags (struct http_request *req)
 
 	CREATE_STRING (query,
 			// remove () from (tag), remove front and end spaces, limit tag length to 30
-			"SELECT SUBSTRING(TRIM(RTRIM(LTRIM(tag::TEXT,'('),')')) for 30) "
+			"SELECT RTRIM(LTRIM(tag::TEXT,'('),')') "
 			"as final_tag, COUNT(tag) as tag_count FROM "
 			"("
-				"SELECT LOWER(jsonb_array_elements_text(schema->'tags')::TEXT) "
+				"SELECT SUBSTRING(TRIM(LOWER(jsonb_array_elements_text(schema->'tags')::TEXT) for 30)) "
 				"FROM users"
 			") AS tag "
 			"WHERE final_tag NOT LIKE '%%\"%%' "	// remove the ones which contain double quotes 
