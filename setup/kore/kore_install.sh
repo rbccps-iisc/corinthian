@@ -19,8 +19,11 @@ adduser -h /dev/null -s /sbin/nologin -D -H kore_worker -u 8888
 adduser -h /dev/null -s /sbin/nologin -D -H kore_keymgr -u 9999
 
 head -c1024 < /dev/urandom > jail-keymgr/random.data 
+
 chown kore_keymgr:kore_keymgr jail-keymgr 
 chown kore_keymgr:kore_keymgr jail-keymgr/random.data
+chmod 600 jail-keymgr/random.data
+
 chmod u+rw jail-keymgr/random.data
 
 tmux new-session -d -s kore 'cd /kore-publisher && kodev build && kore -fc conf/kore-publisher.conf'
