@@ -1,53 +1,55 @@
 #include "kore-publisher.h"
 #include "assets.h"
 
-static const char password_chars[] = "abcdefghijklmnopqrstuvwxyz"
-			"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-			"0123456789"
-			"-";
+static const char password_chars[] = 
+	"abcdefghijklmnopqrstuvwxyz"
+	"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	"0123456789"
+	"-";
+
 // variables for exchanges and queues
 static const char *_e[] = {
-		".public",
-		".private",
-		".protected",
-		".notification",
-		".publish",
-		".diagnostics",
-		// ".public.validated",
-		// ".protected.validated",
-		NULL
+	".public",
+	".private",
+	".protected",
+	".notification",
+	".publish",
+	".diagnostics",
+	// ".public.validated",
+	// ".protected.validated",
+	NULL
 };
 
 static const char *_q[] = {
-		"\0",
-		".private",
-		".priority",
-		".command",
-		".notification",
-		NULL
+	"\0",
+	".private",
+	".priority",
+	".command",
+	".notification",
+	NULL
 };
 
 static const char *_invalid_owner_names [] = {
-		"admin",
-		"amq",
-		"amqp",
-		"mqtt",
-		"database",
-		"validator",
-		NULL
+	"admin",
+	"amq",
+	"amqp",
+	"mqtt",
+	"database",
+	"validator",
+	NULL
 };
 
 struct kore_pgsql sql;
 
-char queue	[MAX_LEN_RESOURCE_ID + 1];
-char exchange	[MAX_LEN_RESOURCE_ID + 1];
+char queue	[1 + MAX_LEN_RESOURCE_ID];
+char exchange	[1 + MAX_LEN_RESOURCE_ID];
 
 struct kore_buf *query 		= NULL;
 struct kore_buf *response 	= NULL;
 
-char 	string_to_be_hashed 	[MAX_LEN_APIKEY + MAX_LEN_SALT + MAX_LEN_ENTITY_ID + 1];
+char 	string_to_be_hashed	[1 + MAX_LEN_HASH_INPUT];
 uint8_t	binary_hash 		[SHA256_DIGEST_LENGTH];
-char 	hash_string		[2*SHA256_DIGEST_LENGTH + 1];
+char 	hash_string		[1 + 2*SHA256_DIGEST_LENGTH];
 
 ht connection_ht;
 
@@ -112,7 +114,7 @@ init_admin_connection (void)
 
 	if (login_reply.reply_type != AMQP_RESPONSE_NORMAL)
 	{
-		fprintf(stderr,"[%s:%d] invalid id or apikey\n",__FUNCTION__,__LINE__);
+		fprintf(stderr,"broker:login_reply -> invalid id or apikey\n");
 		exit (-1);
 	}
 
@@ -407,7 +409,7 @@ gen_salt_password_and_apikey (
 	apikey	[MAX_LEN_APIKEY] = '\0';
 
 	snprintf (string_to_be_hashed, 
-			MAX_LEN_HASH_INPUT + 1,
+			1 + MAX_LEN_HASH_INPUT,
 				"%s%s%s",
 					apikey, salt, entity);
 
@@ -501,7 +503,7 @@ login_success (const char *id, const char *apikey, bool *is_autonomous)
 		*is_autonomous = str_is_autonomous[0] == 't'; 
 
 	snprintf (string_to_be_hashed, 
-			MAX_LEN_HASH_INPUT + 1,
+			1 + MAX_LEN_HASH_INPUT,
 				"%s%s%s",
 					apikey, salt, id);
 
@@ -566,7 +568,7 @@ publish (struct http_request *req)
 
 	const char *content_type;
 
-	char topic_to_publish[MAX_LEN_TOPIC + 1];
+	char topic_to_publish [1 + MAX_LEN_TOPIC];
 
 	req->status = 403;
 
@@ -601,7 +603,14 @@ publish (struct http_request *req)
 			BAD_REQUEST("message-type is not valid");
 		}
 
-		snprintf(exchange,MAX_LEN_RESOURCE_ID + 1,"%s.%s",id,message_type);
+		snprintf(
+			exchange,
+			1 + MAX_LEN_RESOURCE_ID,
+			"%s.%s",
+				id,
+				message_type
+		);
+
 		strlcpy(topic_to_publish,subject,MAX_LEN_TOPIC);
 
 		debug_printf("==> exchange = %s\n",exchange);
@@ -614,8 +623,16 @@ publish (struct http_request *req)
 			BAD_REQUEST("message-type can only be command");		
 		}
 
-		snprintf(topic_to_publish,MAX_LEN_TOPIC + 1,"%s.%s.%s",to,message_type,subject);
-		snprintf(exchange,MAX_LEN_RESOURCE_ID + 1,"%s.publish",id);
+		snprintf (
+			topic_to_publish,
+			1 + MAX_LEN_TOPIC,
+			"%s.%s.%s",
+				to,
+				message_type,
+				subject
+		);
+
+		snprintf(exchange, 1 + MAX_LEN_RESOURCE_ID,"%s.publish",id);
 
 		debug_printf("==> exchange = %s\n",exchange);
 		debug_printf("==> topic = %s\n",topic_to_publish);
@@ -639,8 +656,8 @@ publish (struct http_request *req)
 	node *n = NULL;
 	amqp_connection_state_t	*cached_conn = NULL;
 
-	char key [MAX_LEN_HASH_KEY + 1];
-	snprintf (key, MAX_LEN_HASH_KEY + 1, "%s%s", id, apikey);
+	char key [1 + MAX_LEN_HASH_KEY];
+	snprintf (key, 1 + MAX_LEN_HASH_KEY, "%s%s", id, apikey);
 
 	if ((n = ht_search(&connection_ht,key)) != NULL)
 	{
@@ -692,7 +709,7 @@ publish (struct http_request *req)
 
 		rpc_reply = amqp_get_rpc_reply(*cached_conn);
 		if (rpc_reply.reply_type != AMQP_RESPONSE_NORMAL)
-			ERROR("did not receive expected response from the broker");
+			ERROR("did not receive expected response from broker");
 
 		ht_insert (&connection_ht, key, cached_conn);
 	}
@@ -795,8 +812,8 @@ subscribe (struct http_request *req)
 	node *n = NULL;
 	amqp_connection_state_t	*cached_conn = NULL;
 
-	char key [MAX_LEN_HASH_KEY + 1];
-	snprintf (key, MAX_LEN_HASH_KEY + 1, "%s%s", id, apikey);
+	char key [1 + MAX_LEN_HASH_KEY];
+	snprintf (key, 1 + MAX_LEN_HASH_KEY, "%s%s", id, apikey);
 
 	if ((n = ht_search(&connection_ht,key)) != NULL)
 	{
@@ -896,25 +913,37 @@ subscribe (struct http_request *req)
 		kore_buf_append(response,"{\"sent-by\":\"",12);
 
 		if (message.properties._flags & AMQP_BASIC_USER_ID_FLAG)
-			kore_buf_append (response,message.properties.user_id.bytes,
-				message.properties.user_id.len);
+			kore_buf_append (
+				response,
+				message.properties.user_id.bytes,
+				message.properties.user_id.len
+			);
 
 		kore_buf_append(response,"\",\"from\":\"",10);
 		if(header->exchange.len > 0)
-			kore_buf_append(response,header->exchange.bytes, header->exchange.len);
+			kore_buf_append (
+				response,header->exchange.bytes,
+				header->exchange.len
+			);
 
 		kore_buf_append(response,"\",\"subject\":\"",13);
 		if (header->routing_key.len > 0)
-			kore_buf_append(response,header->routing_key.bytes, header->routing_key.len);
-
+			kore_buf_append (
+				response,
+				header->routing_key.bytes,
+				header->routing_key.len
+			);
 
 		bool is_json = false;
 
 		kore_buf_append(response,"\",\"content-type\":\"",18);
 		if (message.properties._flags & AMQP_BASIC_CONTENT_TYPE_FLAG)
 		{
-			kore_buf_append(response,message.properties.content_type.bytes,
-				message.properties.content_type.len);
+			kore_buf_append (
+				response,
+				message.properties.content_type.bytes,
+				message.properties.content_type.len
+			);
 
 			if (
 				strncmp (
@@ -997,9 +1026,9 @@ reset_apikey (struct http_request *req)
 	const char *apikey;
 	const char *reset_api_key_for;
 
-	char salt		[MAX_LEN_APIKEY + 1];
-	char new_apikey		[MAX_LEN_APIKEY + 1];
-	char password_hash	[2*SHA256_DIGEST_LENGTH + 1];
+	char salt		[1 + MAX_LEN_APIKEY];
+	char new_apikey		[1 + MAX_LEN_APIKEY];
+	char password_hash	[1 + 2*SHA256_DIGEST_LENGTH];
 
 
 	req->status = 403;
@@ -1170,11 +1199,11 @@ register_entity (struct http_request *req)
 	const char *entity;
 	const char *char_is_autonomous;
 
-	char entity_name 	[MAX_LEN_ENTITY_ID + 1];
+	char entity_name 	[1 + MAX_LEN_ENTITY_ID];
 
-	char salt		[MAX_LEN_APIKEY + 1];
-	char entity_apikey	[MAX_LEN_APIKEY + 1];
-	char password_hash	[2*SHA256_DIGEST_LENGTH + 1];
+	char salt		[1 + MAX_LEN_APIKEY];
+	char entity_apikey	[1 + MAX_LEN_APIKEY];
+	char password_hash	[1 + 2*SHA256_DIGEST_LENGTH];
 
 	pthread_t thread;
 	bool thread_started = false; 
@@ -1196,8 +1225,7 @@ register_entity (struct http_request *req)
 	if (! looks_like_a_valid_owner(id))
 		BAD_REQUEST("id is not valid");
 
-	// entity at the time of registration has the same criteria as the owner's id
-	// later on we will add owner/ in front of it
+	// entity at the time of registration is simple alapha numeric
 	if (! is_alpha_numeric(entity))
 		BAD_REQUEST("entity is not valid");
 
@@ -1226,7 +1254,7 @@ register_entity (struct http_request *req)
 
 /////////////////////////////////////////////////
 
-	snprintf(entity_name,MAX_LEN_ENTITY_ID + 1,"%s/%s",id,entity);
+	snprintf(entity_name, 1 + MAX_LEN_ENTITY_ID,"%s/%s",id,entity);
 
 	// create entries in to RabbitMQ
 
@@ -1348,7 +1376,7 @@ get_entities (struct http_request *req)
 /////////////////////////////////////////////////
 
 	CREATE_STRING(query,
-		 	"SELECT id,blocked,is_autonomous FROM users WHERE id LIKE '%s/%%' ORDER BY id",
+			"SELECT id,blocked,is_autonomous FROM users WHERE id LIKE '%s/%%' ORDER BY id",
 				id
 	);
 
@@ -1367,10 +1395,10 @@ get_entities (struct http_request *req)
 
 		kore_buf_appendf (
 				response,
-					"\"%s\":[%s,%s],",
-						entity,
-						is_blocked	[0] == 't' ? "1" : "0",
-						is_autonomous	[0] == 't' ? "1" : "0"
+				"\"%s\":[%s,%s],",
+					entity,
+					is_blocked	[0] == 't' ? "1" : "0",
+					is_autonomous	[0] == 't' ? "1" : "0"
 		);
 	}
 
@@ -1580,13 +1608,17 @@ catalog_tags (struct http_request *req)
 	kore_buf_append(response,"{",1);
 
 	CREATE_STRING (query,
-			// remove () from (tag), remove front and end spaces, limit tag length to 30
 
-			"SELECT RTRIM(LTRIM(tag::TEXT,'('),')') as final_tag,"
-			"COUNT(tag) as tag_count FROM ("
-				"SELECT SUBSTRING(TRIM(LOWER(jsonb_array_elements_text(schema->'tags')::TEXT)) for 30) "
-				"FROM users WHERE jsonb_typeof(schema->'tags') = 'array'"
-			") AS tag WHERE tag::TEXT NOT LIKE '%%\"%%' group by final_tag order by tag_count DESC"
+		// 1. remove () from (tag),
+		// 2. remove front and end spaces
+		// 3. limit tag length to 30
+		// 4. ignore the ones with double quotes in tags 
+
+		"SELECT RTRIM(LTRIM(tag::TEXT,'('),')') as final_tag,"
+		"COUNT(tag) as tag_count FROM ("
+			"SELECT SUBSTRING(TRIM(LOWER(jsonb_array_elements_text(schema->'tags')::TEXT)) for 30) "
+			"FROM users WHERE jsonb_typeof(schema->'tags') = 'array'"
+		") AS tag WHERE tag::TEXT NOT LIKE '%%\"%%' group by final_tag order by tag_count DESC"
 	);
 
 	RUN_QUERY (query,"could not query catalog");
@@ -1622,9 +1654,9 @@ register_owner(struct http_request *req)
 	const char *apikey;
 	const char *owner;
 
-	char salt		[MAX_LEN_APIKEY + 1];
-	char owner_apikey	[MAX_LEN_APIKEY + 1];
-	char password_hash	[2*SHA256_DIGEST_LENGTH + 1];
+	char salt		[1 + MAX_LEN_APIKEY];
+	char owner_apikey	[1 + MAX_LEN_APIKEY];
+	char password_hash	[1 + 2*SHA256_DIGEST_LENGTH];
 
 	pthread_t thread;
 	bool thread_started = false;
@@ -1694,11 +1726,11 @@ register_owner(struct http_request *req)
 	gen_salt_password_and_apikey (owner, salt, password_hash, owner_apikey);
 
 	CREATE_STRING (query,
-			"INSERT INTO users (id,password_hash,schema,salt,blocked,is_autonomous) "
-				"VALUES('%s','%s',NULL,'%s','f','t')",
-				owner,
-				password_hash,
-				salt
+		"INSERT INTO users (id,password_hash,schema,salt,blocked,is_autonomous) "
+			"VALUES('%s','%s',NULL,'%s','f','t')",
+			owner,
+			password_hash,
+			salt
 	);
 
 	RUN_QUERY (query, "could not create a new owner");
@@ -1877,9 +1909,9 @@ deregister_owner(struct http_request *req)
 
 	// delete from acl
 	CREATE_STRING (query,
-			"DELETE FROM acl WHERE from_id LIKE '%s/%%' OR exchange LIKE '%s/%%'",
-				owner,
-				owner
+		"DELETE FROM acl WHERE from_id LIKE '%s/%%' OR exchange LIKE '%s/%%'",
+			owner,
+			owner
 	);
 
 	RUN_QUERY (query,"could not delete from acl table");
@@ -1947,8 +1979,9 @@ queue_bind (struct http_request *req)
 		"inputs missing in headers"
 	);
 
-	debug_printf("id = %s\n, apikey = %s\n, to =%s\n, topic = %s\n, message-type = %s\n", id, apikey, to, topic, message_type);
-
+	debug_printf("id = %s\n, apikey = %s\n, to =%s\n, topic = %s\n, "
+			"message-type = %s\n",
+				id, apikey, to, topic, message_type);
 
 	if (looks_like_a_valid_owner(id))
 	{
@@ -1989,7 +2022,7 @@ queue_bind (struct http_request *req)
 		}
 	}
 
-	snprintf (exchange,MAX_LEN_RESOURCE_ID + 1,"%s.%s", to,message_type); 
+	snprintf (exchange, 1 + MAX_LEN_RESOURCE_ID,"%s.%s", to,message_type); 
 
 /////////////////////////////////////////////////
 
@@ -2176,8 +2209,8 @@ queue_unbind (struct http_request *req)
 
 /////////////////////////////////////////////////
 
-	snprintf	(exchange,MAX_LEN_RESOURCE_ID + 1,"%s.%s", to,message_type); 
-	strlcpy		(queue,from,MAX_LEN_RESOURCE_ID);
+	snprintf(exchange, 1 + MAX_LEN_RESOURCE_ID,"%s.%s", to,message_type); 
+	strlcpy	(queue,from,MAX_LEN_RESOURCE_ID);
 
 	if (KORE_RESULT_OK == http_request_header(req, "is-priority", &is_priority))
 	{
@@ -2465,13 +2498,13 @@ follow (struct http_request *req)
 
 			RUN_QUERY (query,"could not run insert query on acl - write");
 
-			char write_exchange 	[MAX_LEN_RESOURCE_ID + 1];
-			char command_queue	[MAX_LEN_RESOURCE_ID + 1];
-			char write_topic	[MAX_LEN_TOPIC + 1];
+			char write_exchange 	[1 + MAX_LEN_RESOURCE_ID];
+			char command_queue	[1 + MAX_LEN_RESOURCE_ID];
+			char write_topic	[1 + MAX_LEN_TOPIC];
 
-			snprintf(write_exchange,MAX_LEN_RESOURCE_ID + 1,"%s.publish",from);
-			snprintf(command_queue, MAX_LEN_RESOURCE_ID + 1,"%s.command",to);
-			snprintf(write_topic,MAX_LEN_TOPIC + 1,"%s.command.%s",to,topic);
+			snprintf(write_exchange,1 + MAX_LEN_RESOURCE_ID,"%s.publish",from);
+			snprintf(command_queue, 1 + MAX_LEN_RESOURCE_ID,"%s.command",to);
+			snprintf(write_topic,   1 + MAX_LEN_TOPIC,	"%s.command.%s",to,topic);
 
 			for (tries = 1; tries <= MAX_AMQP_RETRIES; ++tries)
 			{
@@ -2521,7 +2554,7 @@ follow (struct http_request *req)
 	else
 	{
 		if (is_to_autonomous)
-			snprintf (exchange, MAX_LEN_RESOURCE_ID + 1, "%s.notification",to);
+			snprintf (exchange, 1 + MAX_LEN_RESOURCE_ID, "%s.notification",to);
 		else
 		{
 			int index = 0;
@@ -2681,7 +2714,7 @@ unfollow (struct http_request *req)
 		CREATE_STRING ( query,
 			"SELECT follow_id FROM follow "
 				"WHERE "
-				"requested_by = '%s' "
+				"from_id = '%s' "
 					"AND "
 				"exchange = '%s.command' "
 					"AND "
@@ -2701,13 +2734,13 @@ unfollow (struct http_request *req)
 
 		follow_id	= kore_pgsql_getvalue(&sql,0,0);
 		
-		char write_exchange 	[MAX_LEN_RESOURCE_ID + 1];
-		char command_queue	[MAX_LEN_RESOURCE_ID + 1];
-		char write_topic	[MAX_LEN_TOPIC + 1];
+		char write_exchange 	[1 + MAX_LEN_RESOURCE_ID];
+		char command_queue	[1 + MAX_LEN_RESOURCE_ID];
+		char write_topic	[1 + MAX_LEN_TOPIC];
 
-		snprintf(write_exchange,MAX_LEN_RESOURCE_ID + 1,"%s.publish",from);
-		snprintf(command_queue, MAX_LEN_RESOURCE_ID + 1,"%s.command",to);
-		snprintf(write_topic,MAX_LEN_TOPIC + 1,"%s.command.%s",to,topic);
+		snprintf(write_exchange,1 + MAX_LEN_RESOURCE_ID,"%s.publish",from);
+		snprintf(command_queue, 1 + MAX_LEN_RESOURCE_ID,"%s.command",to);
+		snprintf(write_topic,	1 + MAX_LEN_TOPIC,	"%s.command.%s",to,topic);
 
 		for (tries = 1; tries <= MAX_AMQP_RETRIES; ++tries)
 		{
@@ -2749,7 +2782,7 @@ unfollow (struct http_request *req)
 	}
 
 //// for read permissions /////
-	snprintf(exchange,MAX_LEN_RESOURCE_ID + 1,"%s.%s",to,message_type);
+	snprintf(exchange, 1 + MAX_LEN_RESOURCE_ID,"%s.%s",to,message_type);
 
 	CREATE_STRING ( query,
 		"SELECT acl_id,follow_id FROM acl "
@@ -2772,9 +2805,9 @@ unfollow (struct http_request *req)
 	if (kore_pgsql_ntuples(&sql) != 1)
 		FORBIDDEN("unauthorized");
 
-	char priority_queue[MAX_LEN_RESOURCE_ID + 1];
+	char priority_queue [1 + MAX_LEN_RESOURCE_ID];
 
-	snprintf(priority_queue,MAX_LEN_RESOURCE_ID + 1,"%s.priority", from);
+	snprintf(priority_queue,1 + MAX_LEN_RESOURCE_ID,"%s.priority", from);
 
 	acl_id		= kore_pgsql_getvalue(&sql,0,0);
 	follow_id	= kore_pgsql_getvalue(&sql,0,1);
@@ -2952,23 +2985,23 @@ share (struct http_request *req)
 
 	RUN_QUERY (query,"could not run insert query on acl");
 
-	char bind_exchange	[MAX_LEN_RESOURCE_ID + 1];
-	char bind_queue		[MAX_LEN_RESOURCE_ID + 1];
-	char bind_topic		[MAX_LEN_TOPIC + 1];
+	char bind_exchange	[1 + MAX_LEN_RESOURCE_ID];
+	char bind_queue		[1 + MAX_LEN_RESOURCE_ID];
+	char bind_topic		[1 + MAX_LEN_TOPIC];
 
 	if (strcmp(permission,"read") == 0)
 	{
 		/*
-		snprintf(bind_exchange,	MAX_LEN_RESOURCE_ID + 1,"%s",		my_exchange);
-		snprintf(bind_queue,	MAX_LEN_RESOURCE_ID + 1,"%s",		from_id); 		// TODO: what about priority queue
-		snprintf(bind_topic,	MAX_LEN_TOPIC + 1,      "%s",		topic);
+		snprintf(bind_exchange,	1 + MAX_LEN_RESOURCE_ID,"%s",	my_exchange);
+		snprintf(bind_queue,	1 + MAX_LEN_RESOURCE_ID,"%s",	from_id); 		// TODO: what about priority queue
+		snprintf(bind_topic,	1 + MAX_LEN_TOPIC,      "%s",	topic);
 		*/
 	}
 	else if (strcmp(permission,"write") == 0)
 	{
-		snprintf(bind_exchange,	MAX_LEN_RESOURCE_ID + 1,"%s.publish",	from_id);
-		snprintf(bind_queue,	MAX_LEN_RESOURCE_ID + 1,"%s",		my_exchange);		// exchange in follow is "device.command"
-		snprintf(bind_topic,	MAX_LEN_TOPIC + 1,      "%s.%s",	my_exchange,topic); 	// binding routing is "dev.command.topic"
+		snprintf(bind_exchange,	1 + MAX_LEN_RESOURCE_ID,"%s.publish",	from_id);
+		snprintf(bind_queue,	1 + MAX_LEN_RESOURCE_ID,"%s",		my_exchange);		// exchange in follow is "device.command"
+		snprintf(bind_topic,	1 + MAX_LEN_TOPIC,      "%s.%s",	my_exchange,topic); 	// binding routing is "dev.command.topic"
 
 		for (tries = 1; tries <= MAX_AMQP_RETRIES; ++tries)
 		{
@@ -3006,7 +3039,7 @@ share (struct http_request *req)
 	}
 
 	if (is_from_autonomous)
-		snprintf (exchange, MAX_LEN_RESOURCE_ID + 1, "%s.notification",from_id);
+		snprintf (exchange, 1 + MAX_LEN_RESOURCE_ID, "%s.notification",from_id);
 	else
 	{
 		int index = 0;
@@ -3548,8 +3581,8 @@ create_exchanges_and_queues (void *v)
 
 	// local variables
 	// int my_tries;
-	char my_queue	[MAX_LEN_RESOURCE_ID + 1];
-	char my_exchange[MAX_LEN_RESOURCE_ID + 1];
+	char my_queue	 [1 + MAX_LEN_RESOURCE_ID];
+	char my_exchange [1 + MAX_LEN_RESOURCE_ID];
 
 	amqp_rpc_reply_t my_r;
 
@@ -3558,7 +3591,7 @@ create_exchanges_and_queues (void *v)
 	if (looks_like_a_valid_owner(id))
 	{
 		// create notification exchange 
-		snprintf(my_exchange,MAX_LEN_RESOURCE_ID + 1,"%s.notification",id);
+		snprintf(my_exchange, 1 + MAX_LEN_RESOURCE_ID,"%s.notification",id);
 
 		debug_printf("[owner] creating exchange {%s}\n",my_exchange);
 
@@ -3585,7 +3618,7 @@ create_exchanges_and_queues (void *v)
 		debug_printf("[owner] done creating exchange {%s}\n",my_exchange);
 
 		// create notification queue
-		snprintf(my_queue,MAX_LEN_RESOURCE_ID + 1,"%s.notification",id);
+		snprintf(my_queue, 1 + MAX_LEN_RESOURCE_ID,"%s.notification",id);
 		debug_printf("[owner] creating queue {%s}\n",my_queue);
 
 		amqp_queue_declare (
@@ -3650,7 +3683,7 @@ create_exchanges_and_queues (void *v)
 	{
 		for (i = 0; _e[i]; ++i)
 		{
-			snprintf(my_exchange,MAX_LEN_RESOURCE_ID + 1,"%s%s",id,_e[i]);
+			snprintf(my_exchange, 1 + MAX_LEN_RESOURCE_ID,"%s%s",id,_e[i]);
 
 			debug_printf("[entity] creating exchange {%s}\n",my_exchange);
 
@@ -3695,7 +3728,7 @@ create_exchanges_and_queues (void *v)
 
 		for (i = 0; _q[i]; ++i)
 		{
-			snprintf(my_queue,MAX_LEN_RESOURCE_ID + 1,"%s%s",id,_q[i]);
+			snprintf(my_queue, 1 + MAX_LEN_RESOURCE_ID,"%s%s",id,_q[i]);
 
 			debug_printf("[entity] creating queue {%s}\n",my_queue);
 
@@ -3722,7 +3755,7 @@ create_exchanges_and_queues (void *v)
 			// bind .private and .notification 
 			if (strcmp(_q[i],".private") == 0 || strcmp(_q[i],".notification") == 0)
 			{
-				snprintf(my_exchange,MAX_LEN_RESOURCE_ID + 1,"%s%s",id,_q[i]);
+				snprintf(my_exchange, 1 + MAX_LEN_RESOURCE_ID,"%s%s",id,_q[i]);
 				debug_printf("[entity] binding {%s} -> {%s}\n",my_queue,my_exchange);
 
 				amqp_queue_bind (
@@ -3762,8 +3795,8 @@ delete_exchanges_and_queues (void *v)
 	const char *id = (const char *)v;
 
 	// local variables
-	char my_queue	[MAX_LEN_RESOURCE_ID + 1];
-	char my_exchange[MAX_LEN_RESOURCE_ID + 1];
+	char my_queue	 [1 + MAX_LEN_RESOURCE_ID];
+	char my_exchange [1 + MAX_LEN_RESOURCE_ID];
 
 	amqp_rpc_reply_t my_r;
 
@@ -3772,7 +3805,7 @@ delete_exchanges_and_queues (void *v)
 	if (looks_like_a_valid_owner(id))
 	{
 		// delete notification exchange 
-		snprintf(my_exchange,MAX_LEN_RESOURCE_ID + 1,"%s.notification",id);
+		snprintf(my_exchange, 1 + MAX_LEN_RESOURCE_ID,"%s.notification",id);
 
 		debug_printf("[owner] deleting exchange {%s}\n",my_exchange);
 
@@ -3795,7 +3828,7 @@ delete_exchanges_and_queues (void *v)
 		debug_printf("[owner] done deleting exchange {%s}\n",my_exchange);
 
 		// delete notification queue
-		snprintf(my_queue,MAX_LEN_RESOURCE_ID + 1,"%s.notification",id);
+		snprintf(my_queue, 1 + MAX_LEN_RESOURCE_ID,"%s.notification",id);
 		debug_printf("[owner] deleting queue {%s}\n",my_queue);
 
 		if (! amqp_queue_delete (
@@ -3821,7 +3854,7 @@ delete_exchanges_and_queues (void *v)
 	{
 		for (i = 0; _e[i]; ++i)
 		{
-			snprintf(my_exchange,MAX_LEN_RESOURCE_ID + 1,"%s%s",id,_e[i]);
+			snprintf(my_exchange, 1 + MAX_LEN_RESOURCE_ID,"%s%s",id,_e[i]);
 
 			debug_printf("[entity] deleting exchange {%s}\n",my_exchange);
 
@@ -3846,7 +3879,7 @@ delete_exchanges_and_queues (void *v)
 
 		for (i = 0; _q[i]; ++i)
 		{
-			snprintf(my_queue,MAX_LEN_RESOURCE_ID + 1,"%s%s",id,_q[i]);
+			snprintf(my_queue, 1 + MAX_LEN_RESOURCE_ID,"%s%s",id,_q[i]);
 
 			debug_printf("[entity] deleting queue {%s}\n",my_queue);
 
