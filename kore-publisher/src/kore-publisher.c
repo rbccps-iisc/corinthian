@@ -259,10 +259,10 @@ init (int state)
 		return KORE_RESULT_ERROR;
 	}
 
-	/*if (chroot(".") < 0) {
+	if (chroot("chroot") < 0) {
 		perror("chroot failed ");
 		return KORE_RESULT_ERROR;
-	}*/
+	}
 
 	chdir("/");
 
