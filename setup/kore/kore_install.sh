@@ -8,13 +8,12 @@ then
     rm jail-keymgr/random.data
 fi
 
-#earlier we had only 1 user:
-#adduser -h /dev/null -s /sbin/nologin -D -H _kore_worker -u 8888
+adduser -h /dev/null -s /sbin/nologin -D -H _kore_worker -u 8888
 
-for p in $(seq 1 $(nproc --all))
-do
-	adduser -h /dev/null -s /sbin/nologin -D -H _kore_worker_$p -u 88$p
-done
+#for p in $(seq 1 $(nproc --all))
+#do
+#	adduser -h /dev/null -s /sbin/nologin -D -H _kore_worker_$p -u 88$p
+#done
 
 adduser -h /dev/null -s /sbin/nologin -D -H _kore_keymgr -u 9999
 

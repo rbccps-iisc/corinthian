@@ -241,38 +241,6 @@ init (int state)
 	async_init ();
 ////////////////////////////////////////////////////
 
-
-///////////////// Drop privileges //////////////////
-
-	struct passwd *p;
-
-	char unprivileged_user[32];
-	snprintf(unprivileged_user,32,"_kore_worker_%d",worker->id);
-
-	if ((p = getpwnam(unprivileged_user)) == NULL) {
-		perror("getpwnam failed ");
-		return KORE_RESULT_ERROR;
-	}
-
-	if (setgid(p->pw_gid) < 0) {
-		perror("setgid failed ");
-		return KORE_RESULT_ERROR;
-	}
-
-	if (chroot("chroot") < 0) {
-		perror("chroot failed ");
-		return KORE_RESULT_ERROR;
-	}
-
-	chdir("/");
-
-	if (setuid(p->pw_uid) < 0) {
-		perror("setuid failed ");
-		return KORE_RESULT_ERROR;
-	}
-
-////////////////////////////////////////////////////
-
 	return KORE_RESULT_OK;
 }
 
