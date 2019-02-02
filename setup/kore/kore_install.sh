@@ -27,4 +27,4 @@ chmod 1555 jail-keymgr
 # let no one write to random.data
 chmod 600 jail-keymgr/random.data
 
-tmux new-session -d -s kore 'cd /kore-publisher && kodev build && kore -nfc conf/kore-publisher.conf'
+tmux new-session -d -s kore 'cd /kore-publisher && kodev build && kore -fc conf/kore-publisher.conf'
