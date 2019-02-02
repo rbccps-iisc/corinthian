@@ -10,7 +10,7 @@ sudo chmod 1444   ../kore-publisher/jail-keymgr/dh2048.pem
 sudo chmod 555   ../kore-publisher/jail-keymgr/random.data
 
 sudo chmod 1555   ../kore-publisher/jail-keymgr/cert
-sudo chmod 1444   ../kore-publisher/jail-keymgr/cert/key.pem
+sudo chmod 1400   ../kore-publisher/jail-keymgr/cert/key.pem
 sudo chmod 1444   ../kore-publisher/jail-keymgr/cert/certificate.pem
 
 

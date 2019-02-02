@@ -237,8 +237,40 @@ init (int state)
 	memset(&props, 0, sizeof props);
 	props._flags = AMQP_BASIC_CONTENT_TYPE_FLAG | AMQP_BASIC_USER_ID_FLAG;
 
-////////////////////////////////////////////////////
+//////////////////// Async initialization //////////
 	async_init ();
+////////////////////////////////////////////////////
+
+
+///////////////// Drop privileges //////////////////
+
+	struct passwd *p;
+
+	char unprivileged_user[32];
+	snprintf(unprivileged_user,32,"kore_worker_%d",worker->id);
+
+	if ((p = getpwnam(unprivileged_user)) == NULL) {
+		perror("getpwnam failed ");
+		return KORE_RESULT_ERROR;
+	}
+
+	if (chroot("./jail") < 0) {
+		perror("chroot failed ");
+		return KORE_RESULT_ERROR;
+	}
+
+	chdir("/");
+
+	if (setgid(p->pw_gid) < 0) {
+		perror("setgid failed ");
+		return KORE_RESULT_ERROR;
+	}
+
+	if (setuid(p->pw_uid) < 0) {
+		perror("setuid failed ");
+		return KORE_RESULT_ERROR;
+	}
+
 ////////////////////////////////////////////////////
 
 	return KORE_RESULT_OK;

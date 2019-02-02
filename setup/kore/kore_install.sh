@@ -8,14 +8,14 @@ then
     rm jail-keymgr/random.data
 fi
 
+#earlier we had only 1 user:
+#adduser -h /dev/null -s /sbin/nologin -D -H kore_worker -u 8888
 
-###### For future #####
-#for p in $(seq 1 $(nproc --all))
-#do
-#	adduser -h /dev/null -s /sbin/nologin -D -H kore_worker_$p -u 888$p
-#done
+for p in $(seq 1 $(nproc --all))
+do
+	adduser -h /dev/null -s /sbin/nologin -D -H kore_worker_$p -u 888$p
+done
 
-adduser -h /dev/null -s /sbin/nologin -D -H kore_worker -u 8888
 adduser -h /dev/null -s /sbin/nologin -D -H kore_keymgr -u 9999
 
 head -c1024 < /dev/urandom > jail-keymgr/random.data 
@@ -28,4 +28,4 @@ chmod 555 jail-keymgr
 # let no one write to random.data
 chmod 444 jail-keymgr/random.data
 
-tmux new-session -d -s kore 'cd /kore-publisher && kodev build && kore -fc conf/kore-publisher.conf'
+tmux new-session -d -s kore 'cd /kore-publisher && kodev build && kore -nfc conf/kore-publisher.conf'
