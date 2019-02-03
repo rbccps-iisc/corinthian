@@ -1526,13 +1526,14 @@ catalog (struct http_request *req)
 	int i, num_rows;
 
 	const char *entity;
+	const char *tag;
 
 	req->status = 403;
 
 	http_populate_get(req);
+
 	if (http_argument_get_string(req,"id",(void *)&entity))
 	{
-		// if not a valid entity
 		if (! looks_like_a_valid_entity(entity))
 			BAD_REQUEST("id is not a valid entity");
 
@@ -1540,14 +1541,24 @@ catalog (struct http_request *req)
 			BAD_REQUEST("invalid entity");
 
 		CREATE_STRING (query,
-				"SELECT schema FROM users WHERE id='%s'",
+				"SELECT id,schema FROM users WHERE id='%s'",
 					entity
+		);
+	}
+	else if (http_argument_get_string(req,"tag",(void *)&tag))
+	{
+		if (! is_string_safe(tag))	
+			BAD_REQUEST("invalid tag");
+
+		CREATE_STRING (query,
+				"SELECT id,schema FROM users WHERE id LIKE '%%/%%' "
+				"AND jsonb_typeof(schema->'tags') = 'array' " 
+				"AND schema->'tags' ? lower('%s') ORDER BY id",
+					tag 
 		);
 	}
 	else
 	{
-		entity = NULL;
-
 		CREATE_STRING (query,
 			"SELECT id,schema FROM users WHERE id LIKE '%%/%%' ORDER BY id LIMIT 50"
 		);
@@ -1555,39 +1566,26 @@ catalog (struct http_request *req)
 
 	RUN_QUERY (query,"unable to query catalog data");
 
+	kore_buf_reset(response);
+	kore_buf_append(response,"{",1);
+
 	num_rows = kore_pgsql_ntuples(&sql);
 
-	kore_buf_reset(response);
-	if (entity == NULL) // get top 50 data 
+	for (i = 0; i < num_rows; ++i)
 	{
-		kore_buf_append(response,"{",1);
+		char *id	= kore_pgsql_getvalue(&sql,i,0);
+		char *schema 	= kore_pgsql_getvalue(&sql,i,1);
 
-		for (i = 0; i < num_rows; ++i)
-		{
-			char *id	= kore_pgsql_getvalue(&sql,i,0);
-			char *schema 	= kore_pgsql_getvalue(&sql,i,1);
+		kore_buf_appendf(response,"\"%s\":%s,",id,schema);
+	} 
 
-			kore_buf_appendf(response,"\"%s\":%s,",id,schema);
-		} 
-		if (num_rows > 0)
-		{
-			// remove the last COMMA 
-			--(response->offset);
-		}
-
-		kore_buf_append(response,"}",1);
-	}
-	else
+	if (num_rows > 0)
 	{
-		// if this entity has no schema or the entity does't exist
-		if (num_rows == 0)
-			BAD_REQUEST("not a valid id");
-
-		char *schema = kore_pgsql_getvalue(&sql,0,0);
-
-		// max 3MB
-		kore_buf_append(response,schema,strnlen(schema,3*1024*1024));
+		// remove the last COMMA 
+		--(response->offset);
 	}
+
+	kore_buf_append(response,"}",1);
 
 	OK();
 
@@ -3946,7 +3944,7 @@ is_string_safe (const char *string)
 		++len;
 
 		// string is too long
-		if (len > 256)
+		if (len > MAX_LEN_SAFE_STRING)
 			return false;
 	}
 

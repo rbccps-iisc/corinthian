@@ -46,6 +46,8 @@
 
 #define HEART_BEAT (0)
 
+#define MAX_LEN_SAFE_STRING	(256)
+
 #define MAX_LEN_SALT		(32)
 #define MAX_LEN_APIKEY	 	(32)
 
