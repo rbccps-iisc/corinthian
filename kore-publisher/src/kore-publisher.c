@@ -1525,8 +1525,9 @@ catalog (struct http_request *req)
 {
 	int i, num_rows;
 
-	const char *entity;
 	const char *tag;
+	const char *json;
+	const char *entity;
 
 	req->status = 403;
 
@@ -1555,6 +1556,18 @@ catalog (struct http_request *req)
 				"AND jsonb_typeof(schema->'tags') = 'array' " 
 				"AND schema->'tags' ? lower('%s') ORDER BY id",
 					tag 
+		);
+	}
+	else if (http_argument_get_string(req,"json",(void *)&json))
+	{
+		BAD_REQUEST ("not yet implemented !");
+
+		/* if (! check_json(json))	
+			BAD_REQUEST("invalid json"); */
+
+		CREATE_STRING (query,
+			"SELECT id,schema FROM users WHERE schema @> '%s'"
+				json	
 		);
 	}
 	else
