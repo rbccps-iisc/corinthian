@@ -642,6 +642,9 @@ publish (struct http_request *req)
 	{
 		if (req->http_body == NULL)
 			BAD_REQUEST("no message found in request");
+
+		if (req->http_body_length > MAX_LEN_SAFE_JSON)
+			BAD_REQUEST("message too long");
 			
 		if ((message = (char *)req->http_body->data) == NULL)
 			BAD_REQUEST("no message found in request");
@@ -1230,6 +1233,9 @@ register_entity (struct http_request *req)
 		BAD_REQUEST("entity is not valid");
 
 	char *body = req->http_body ? (char *)req->http_body->data : NULL;
+
+	if (req->http_body_length > MAX_LEN_SAFE_JSON)
+		BAD_REQUEST("schema too long");
 	
 	bool is_autonomous = false;
 	if (http_request_header(req, "is-autonomous", &char_is_autonomous) == KORE_RESULT_OK)
@@ -1523,8 +1529,66 @@ done:
 	END();
 }
 
+/* 
+	TODO GUI END POINT FOR catalog
+	catalog_gui (struct http_request *req)
+*/
+
 int
 catalog (struct http_request *req)
+{
+	int i, num_rows;
+
+	const char *id;
+	const char *apikey;
+
+	req->status = 403;
+
+	kore_buf_reset(response);
+	kore_buf_append(response,"{",1);
+
+	CREATE_STRING (query,
+		"SELECT id,schema FROM users WHERE id LIKE '%%/%%' ORDER BY id"
+	);
+
+	if (
+		KORE_RESULT_OK != http_request_header(req, "id", &id)
+				||
+		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+				||
+		(! login_success (id,apikey,NULL))
+	)
+	{
+		kore_buf_append(query," LIMIT 50",9);
+	}
+
+	RUN_QUERY (query,"unable to query catalog data");
+
+	num_rows = kore_pgsql_ntuples(&sql);
+
+	for (i = 0; i < num_rows; ++i)
+	{
+		char *id	= kore_pgsql_getvalue(&sql,i,0);
+		char *schema 	= kore_pgsql_getvalue(&sql,i,1);
+
+		kore_buf_appendf(response,"\"%s\":%s,",id,schema);
+	} 
+
+	if (num_rows > 0)
+	{
+		// remove the last COMMA 
+		--(response->offset);
+	}
+
+	kore_buf_append(response,"}",1);
+
+	END();
+done:
+	OK();
+}
+
+int
+search_catalog (struct http_request *req)
 {
 	int i, num_rows;
 
@@ -1536,6 +1600,9 @@ catalog (struct http_request *req)
 	req->status = 403;
 
 	http_populate_get(req);
+
+	if (req->http_body_length > MAX_LEN_SAFE_JSON)
+		BAD_REQUEST("body too long");
 
 	if (http_argument_get_string(req,"id",(void *)&entity))
 	{
@@ -1602,11 +1669,7 @@ catalog (struct http_request *req)
 	}
 	else
 	{
-		CREATE_STRING (query,
-			"SELECT id,schema FROM users WHERE id LIKE '%%/%%' ORDER BY id LIMIT 50"
-		);
-
-		RUN_QUERY (query,"unable to query catalog data");
+		BAD_REQUEST("inputs for the API are missing");
 	}
 
 	kore_buf_reset(response);
@@ -1640,8 +1703,6 @@ int
 catalog_tags (struct http_request *req)
 {
 	int i, num_rows;
-
-	const char *entity;
 
 	req->status = 403;
 

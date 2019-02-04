@@ -76,6 +76,7 @@
 
 int catalog		(struct http_request *);
 int catalog_tags	(struct http_request *);
+int search_catalog	(struct http_request *);
 
 int publish		(struct http_request *);
 int publish_async	(struct http_request *);
