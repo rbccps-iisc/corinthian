@@ -1568,10 +1568,10 @@ catalog (struct http_request *req)
 
 	for (i = 0; i < num_rows; ++i)
 	{
-		char *id	= kore_pgsql_getvalue(&sql,i,0);
+		char *entity_id	= kore_pgsql_getvalue(&sql,i,0);
 		char *schema 	= kore_pgsql_getvalue(&sql,i,1);
 
-		kore_buf_appendf(response,"\"%s\":%s,",id,schema);
+		kore_buf_appendf(response,"\"%s\":%s,",entity_id,schema);
 	} 
 
 	if (num_rows > 0)
@@ -2802,7 +2802,7 @@ unfollow (struct http_request *req)
 
 	CREATE_STRING (query,
 				"SELECT 1 FROM acl "
-				"WHERE follow_id = '%s' "
+				"WHERE follow_id = '%s' ",
 					follow_id
 	);
 
@@ -2837,7 +2837,7 @@ unfollow (struct http_request *req)
 
 		if (tries > MAX_AMQP_RETRIES)
 		{
-			snprintf(error_string,1025,"unbind failed e={%s} q={%s} t={%s}\n",my_exchange,from,topic);
+			snprintf(error_string,1025,"unbind failed e={%s} q={%s} t={%s}\n",my_exchange,from_id,topic);
 			ERROR(error_string);
 		}
 
