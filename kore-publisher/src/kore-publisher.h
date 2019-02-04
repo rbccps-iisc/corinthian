@@ -46,7 +46,8 @@
 
 #define HEART_BEAT (0)
 
-#define MAX_LEN_SAFE_STRING	(256)
+#define MAX_LEN_SAFE_STRING	(3*1024*1024)
+#define MAX_LEN_SAFE_JSON	(256)
 
 #define MAX_LEN_SALT		(32)
 #define MAX_LEN_APIKEY	 	(32)
@@ -135,7 +136,7 @@ void *delete_exchanges_and_queues 	(void *);
 
 bool is_string_safe 	(const char *str);
 void string_to_lower 	(const char *str);
-void json_sanitize 	(const char *str);
+bool is_json_safe	(const char *str);
 
 bool is_request_from_localhost (struct http_request *);
 

@@ -1248,7 +1248,10 @@ register_entity (struct http_request *req)
 		FORBIDDEN("invalid id or apikey");
 
 	if (body)
-		json_sanitize(body);
+	{
+		if (! is_json_safe(body))
+			BAD_REQUEST("bad json input");
+	}
 	else
 		body = "{}";
 
@@ -1526,8 +1529,9 @@ catalog (struct http_request *req)
 	int i, num_rows;
 
 	const char *tag;
-	const char *json;
 	const char *entity;
+
+	const char *body = req->http_body ? (char *)req->http_body->data : NULL;
 
 	req->status = 403;
 
@@ -1545,6 +1549,8 @@ catalog (struct http_request *req)
 				"SELECT id,schema FROM users WHERE id='%s'",
 					entity
 		);
+
+		RUN_QUERY (query,"unable to query catalog data");
 	}
 	else if (http_argument_get_string(req,"tag",(void *)&tag))
 	{
@@ -1557,27 +1563,51 @@ catalog (struct http_request *req)
 				"AND schema->'tags' ? lower('%s') ORDER BY id",
 					tag 
 		);
-	}
-	else if (http_argument_get_string(req,"json",(void *)&json))
-	{
-		BAD_REQUEST ("not yet implemented !");
 
-		/* if (! check_json(json))	
-			BAD_REQUEST("invalid json"); */
+		RUN_QUERY (query,"unable to query catalog data");
+	}
+	else if (body)
+	{
+		if (! is_json_safe(body))
+			BAD_REQUEST("bad json input");
 
 		CREATE_STRING (query,
-			"SELECT id,schema FROM users WHERE schema @> '%s'"
-				json	
+			"SELECT id,schema FROM users WHERE schema @> $1"
 		);
+
+		kore_pgsql_cleanup(&sql);
+		kore_pgsql_init(&sql);
+
+		if (! kore_pgsql_setup(&sql,"db",KORE_PGSQL_SYNC))
+		{
+			kore_pgsql_logerror(&sql);
+			ERROR("DB error while setup");
+		}
+
+		if ( 
+			! kore_pgsql_query_params (
+				&sql,
+				(char *)query->data,
+				0,
+				1,
+				body,
+				req->http_body_length,
+				0
+			)
+		)
+		{
+			kore_pgsql_logerror(&sql);
+			ERROR("failed to query catalog schema using body");
+		}
 	}
 	else
 	{
 		CREATE_STRING (query,
 			"SELECT id,schema FROM users WHERE id LIKE '%%/%%' ORDER BY id LIMIT 50"
 		);
-	}
 
-	RUN_QUERY (query,"unable to query catalog data");
+		RUN_QUERY (query,"unable to query catalog data");
+	}
 
 	kore_buf_reset(response);
 	kore_buf_append(response,"{",1);
@@ -3964,23 +3994,27 @@ is_string_safe (const char *string)
 	return true;
 }
 
-void
-json_sanitize (const char *string)
+bool
+is_json_safe (const char *string)
 {
+	size_t len = 0;
+
 	char *p = (char *)string;
 
 	while (*p)
 	{
 		if (*p == '\'' || *p == '\\')
 		{
-			*p = '\0';
-			return;
+			return false;	
 		}
 
 		++p;
+
+		if (len > MAX_LEN_SAFE_JSON)
+			return false;
 	}
 
-	return;
+	return true;
 }
 
 bool
