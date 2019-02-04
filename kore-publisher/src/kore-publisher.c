@@ -1572,7 +1572,7 @@ catalog (struct http_request *req)
 			BAD_REQUEST("bad json input");
 
 		CREATE_STRING (query,
-			"SELECT id,schema FROM users WHERE schema @> $1"
+			"SELECT id,schema FROM users WHERE schema @> '$1'::jsonb"
 		);
 
 		kore_pgsql_cleanup(&sql);
