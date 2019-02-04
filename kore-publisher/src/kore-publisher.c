@@ -1594,7 +1594,8 @@ search_catalog (struct http_request *req)
 
 	const char *tag;
 	const char *entity;
-	const char *pattern;
+
+	const char *key;
 	const char *value;
 
 	const char *body = req->http_body ? (char *)req->http_body->data : NULL;
@@ -1635,22 +1636,19 @@ search_catalog (struct http_request *req)
 
 		RUN_QUERY (query,"unable to query catalog data");
 	}
-	else if (http_argument_get_string(req,"pattern",(void *)&pattern))
+	else if (http_argument_get_string(req,"key",(void *)&key))
 	{
-		// XXX
-		BAD_REQUEST ("not yet implemented");
-
 		if (! http_argument_get_string(req,"value",(void *)&value))
 			BAD_REQUEST("value field missing");
 			
-		if (! is_string_safe(pattern))	
-			BAD_REQUEST("invalid tag");
+		if (! is_string_safe(key))	
+			BAD_REQUEST("invalid key");
 
 		if (! is_string_safe(value))	
 			BAD_REQUEST("invalid value");
 
 		// convert . to ,
-		char *p = pattern;
+		char *p = key;
 		while (*p)
 		{
 			if (*p == '.')
@@ -1658,13 +1656,16 @@ search_catalog (struct http_request *req)
 			++p;
 		}
 
+		// remove all starting and trailing double quotes and remove spaces
 		CREATE_STRING (query,
 				"SELECT id,schema FROM users WHERE id LIKE '%%/%%' "
-				"AND schema #> '{%s}' = '%s' " 
+				"AND TRIM(RTRIM(LTRIM((schema #> '{%s}')::TEXT,'\"'),'\"')) = '%s' " 
 				"ORDER BY id",
-					pattern,
-					value	
+					key,
+					value
 		);
+
+		RUN_QUERY (query,"unable to query catalog data");
 	}
 	else if (body)
 	{
