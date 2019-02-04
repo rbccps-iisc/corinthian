@@ -4003,10 +4003,11 @@ is_json_safe (const char *string)
 
 	while (*p)
 	{
+		if (! isprint(*p))
+			return false;
+
 		if (*p == '\'' || *p == '\\')
-		{
 			return false;	
-		}
 
 		++p;
 
