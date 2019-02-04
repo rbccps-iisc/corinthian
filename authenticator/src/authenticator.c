@@ -18,8 +18,6 @@
 #include <errno.h>
 #include <pwd.h>
 
-#define UNPRIVILEGED_USER ("nobody")
-
 #define MAX_LEN_SALT		(32)
 #define MAX_LEN_APIKEY	 	(32)
 
@@ -301,6 +299,9 @@ auth_user(struct http_request *req)
 	debug_printf("Got username = {%s}\n",username);
 
 	GET_MANDATORY_FIELD(password);
+
+	if (strcmp(username,"guest") == 0)
+		BAD_REQUEST();
 
 	if (strnlen(username,65) >= 65) 
 		BAD_REQUEST();

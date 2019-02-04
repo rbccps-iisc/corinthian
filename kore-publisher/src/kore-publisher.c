@@ -31,6 +31,7 @@ static const char *_q[] = {
 
 static const char *_invalid_owner_names [] = {
 	"admin",
+	"guest",
 	"amq",
 	"amqp",
 	"mqtt",
@@ -1559,7 +1560,7 @@ catalog (struct http_request *req)
 		(! login_success (id,apikey,NULL))
 	)
 	{
-		kore_buf_append(query," LIMIT 50",9);
+		kore_buf_appendf(query,"%s"," LIMIT 50");
 	}
 
 	RUN_QUERY (query,"unable to query catalog data");
