@@ -2735,14 +2735,7 @@ unfollow (struct http_request *req)
 	const char *id;
 	const char *apikey;
 
-	const char *from;
-	const char *to;
-	const char *topic;
-	const char *permission;
-	const char *message_type;
-
-	char *acl_id;
-	char *follow_id;
+	const char *follow_id;
 
 	BAD_REQUEST_if
 	(
@@ -2750,66 +2743,15 @@ unfollow (struct http_request *req)
 				||
 		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
 				||
-		KORE_RESULT_OK != http_request_header(req, "to", &to)
-				||
-		KORE_RESULT_OK != http_request_header(req, "topic", &topic)
-				||
-		KORE_RESULT_OK != http_request_header(req, "permission", &permission)
+		KORE_RESULT_OK != http_request_header(req, "follow-id", &follow_id)
 			,
 		"inputs missing in headers"
 	);
 
-	if (http_request_header(req, "message-type", &message_type) == KORE_RESULT_OK)
-	{
-		if (strcmp(message_type,"protected") != 0 && strcmp(message_type,"diagnostics") != 0)
-		{
-			BAD_REQUEST("invalid message-type");	
-		}
-	}
-	else
-	{
-		message_type = "protected";
-	}
-
-	if (looks_like_a_valid_owner(id))
-	{
-		if (KORE_RESULT_OK != http_request_header(req, "from", &from))
-			BAD_REQUEST("'from' value missing in header");
-
-		if (! looks_like_a_valid_entity(from))
-			BAD_REQUEST("'from' is not a valid entity");
-
-		// check if the he is the owner of from 
-		if (! is_owner(id,from))
-			FORBIDDEN("you are not the owner of 'from' entity");
-	}
-	else
-	{
-		// entity must unfollow itself -> 'to'
-		from = id;
-	}
-
-	if (
-		(strcmp(permission,"read") !=0)
-			&&
-		(strcmp(permission,"write") !=0)
-			&&
-		(strcmp(permission,"read-write") !=0)
-	)
-	{
-		BAD_REQUEST("Invalid permission string");
-	}
-
 /////////////////////////////////////////////////
 
-	if (! is_string_safe(from))
-		BAD_REQUEST("invalid from");
-
-	if (! is_string_safe(to))
-		BAD_REQUEST("invalid to");
-
-	if (! is_string_safe(topic))
-		BAD_REQUEST("invalid topic");
+	if (! is_string_safe(follow_id))
+		BAD_REQUEST("invalid follow-id");
 
 	bool is_autonomous = false;
 
@@ -2821,38 +2763,123 @@ unfollow (struct http_request *req)
 
 /////////////////////////////////////////////////
 
-	if (strcmp(permission,"write") == 0 || strcmp(permission,"read-write") == 0)
+	if (looks_like_a_valid_owner(id))
 	{
-		CREATE_STRING ( query,
-			"SELECT follow_id FROM follow "
-				"WHERE "
-				"from_id = '%s' "
-					"AND "
-				"exchange = '%s.command' "
-					"AND "
-				"topic = '%s' "
-					"AND "
-				"permission = 'write'",
-
-					from,
-					to,
-					topic
+		CREATE_STRING (query,
+			"SELECT "
+			"from_id,exchange,permission,topic "
+			"FROM follow "
+			"WHERE follow_id = '%s' AND from_id LIKE '%s/%%' "
+			"ORDER BY time DESC",
+				follow_id,
+				id
 		);
+	}
+	else
+	{
+		CREATE_STRING (query,
+			"SELECT "
+			"from_id,exchange,permission,topic "
+			"FROM follow "
+			"WHERE follow_id = '%s' AND from_id = '%s' "
+			"ORDER BY time DESC",
+				follow_id,
+				id
+		);
+	}
 
-		RUN_QUERY(query,"failed to query follow table for permission");
+	RUN_QUERY(query, "could not get follow requests");
 
-		if (kore_pgsql_ntuples(&sql) == 0)
-			FORBIDDEN("unauthorized");
+	int num_rows = kore_pgsql_ntuples(&sql);
 
-		follow_id	= kore_pgsql_getvalue(&sql,0,0);
-		
+	if (num_rows != 1)
+		FORBIDDEN("unauthorized");
+
+	char *from_id 		= kore_pgsql_getvalue(&sql,0,0);
+	char *my_exchange	= kore_pgsql_getvalue(&sql,0,1);
+	char *permission	= kore_pgsql_getvalue(&sql,0,2);
+	char *topic		= kore_pgsql_getvalue(&sql,0,3);
+
+	CREATE_STRING (query,
+				"SELECT 1 FROM acl "
+				"WHERE follow_id = '%s' "
+					follow_id
+	);
+
+	RUN_QUERY(query,"failed to query acl table for permission");
+
+	if (kore_pgsql_ntuples(&sql) != 1)
+		FORBIDDEN("unauthorized");
+
+	if (strcmp(permission,"read") == 0)
+	{
+		for (tries = 1; tries <= MAX_AMQP_RETRIES; ++tries)
+		{
+			amqp_queue_unbind (
+				admin_connection,
+				1,
+				amqp_cstring_bytes(from_id),
+				amqp_cstring_bytes(my_exchange),
+				amqp_cstring_bytes(topic),
+				amqp_empty_table
+			);
+
+			r = amqp_get_rpc_reply(admin_connection);
+
+			if (r.reply_type == AMQP_RESPONSE_NORMAL)
+				break;
+			else
+			{
+				printf("%s Retrying ....\n",__FUNCTION__);
+				init_admin_connection();
+			}
+		}
+
+		if (tries > MAX_AMQP_RETRIES)
+		{
+			snprintf(error_string,1025,"unbind failed e={%s} q={%s} t={%s}\n",my_exchange,from,topic);
+			ERROR(error_string);
+		}
+
+		char priority_queue [1 + MAX_LEN_RESOURCE_ID];
+		snprintf(priority_queue,1 + MAX_LEN_RESOURCE_ID,"%s.priority", from_id);
+
+		for (tries = 1; tries <= MAX_AMQP_RETRIES ; ++tries)
+		{
+			amqp_queue_unbind (
+				admin_connection,
+				1,
+				amqp_cstring_bytes(priority_queue),
+				amqp_cstring_bytes(my_exchange),
+				amqp_cstring_bytes(topic),
+				amqp_empty_table
+			);
+
+			r = amqp_get_rpc_reply(admin_connection);
+
+			if (r.reply_type == AMQP_RESPONSE_NORMAL)
+				break;
+			else
+			{
+				printf("%s Retrying ....\n",__FUNCTION__);
+				init_admin_connection();
+			}
+		}
+
+		if (tries > 3)
+		{
+			snprintf(error_string,1025,"unbind priority failed e={%s} q={%s} t={%s}\n",my_exchange,priority_queue,topic);
+			ERROR(error_string);
+		}
+	}
+	else if (strcmp(permission,"write") == 0)
+	{
 		char write_exchange 	[1 + MAX_LEN_RESOURCE_ID];
-		char command_queue	[1 + MAX_LEN_RESOURCE_ID];
+		char *command_queue 	= my_exchange;
 		char write_topic	[1 + MAX_LEN_TOPIC];
 
-		snprintf(write_exchange,1 + MAX_LEN_RESOURCE_ID,"%s.publish",from);
-		snprintf(command_queue, 1 + MAX_LEN_RESOURCE_ID,"%s.command",to);
-		snprintf(write_topic,	1 + MAX_LEN_TOPIC,	"%s.command.%s",to,topic);
+		snprintf(write_exchange,1 + MAX_LEN_RESOURCE_ID,"%s.publish",from_id);
+		snprintf(write_topic,	1 + MAX_LEN_TOPIC,	"%s.%s",my_exchange,topic);
 
 		for (tries = 1; tries <= MAX_AMQP_RETRIES; ++tries)
 		{
@@ -2881,110 +2908,13 @@ unfollow (struct http_request *req)
 			snprintf(error_string,1025,"unbind failed e={%s} q={%s} t={%s}\n",write_exchange,command_queue,write_topic);
 			ERROR(error_string);
 		}
-
-		CREATE_STRING 	(query, "DELETE FROM follow WHERE follow_id='%s'", follow_id);
-		RUN_QUERY	(query, "failed to delete from follow table");
-		
-		CREATE_STRING 	(query, "DELETE FROM acl WHERE follow_id='%s'", follow_id);
-		RUN_QUERY	(query, "failed to delete from acl table");
-		
-		// if its just write then stop 
-		if (strcmp(permission,"write") == 0)
-			OK();
 	}
-
-//// for read permissions /////
-	snprintf(exchange, 1 + MAX_LEN_RESOURCE_ID,"%s.%s",to,message_type);
-
-	CREATE_STRING ( query,
-		"SELECT acl_id,follow_id FROM acl "
-			"WHERE "
-			"from_id = '%s' "
-				"AND "
-			"exchange = '%s' "
-				"AND "
-			"topic = '%s' "
-				"AND "
-			"permission = 'read'",
-
-				from,
-				exchange,
-				topic
-	);
-
-	RUN_QUERY(query,"failed to query acl table for permission");
-
-	if (kore_pgsql_ntuples(&sql) != 1)
-		FORBIDDEN("unauthorized");
-
-	char priority_queue [1 + MAX_LEN_RESOURCE_ID];
-
-	snprintf(priority_queue,1 + MAX_LEN_RESOURCE_ID,"%s.priority", from);
-
-	acl_id		= kore_pgsql_getvalue(&sql,0,0);
-	follow_id	= kore_pgsql_getvalue(&sql,0,1);
-
-	CREATE_STRING 	(query, "DELETE FROM acl WHERE acl_id='%s'", acl_id);
-	RUN_QUERY	(query, "failed to delete from acl table");
 
 	CREATE_STRING 	(query, "DELETE FROM follow WHERE follow_id='%s'", follow_id);
 	RUN_QUERY	(query, "failed to delete from follow table");
-
-	for (tries = 1; tries <= MAX_AMQP_RETRIES; ++tries)
-	{
-		amqp_queue_unbind (
-			admin_connection,
-			1,
-			amqp_cstring_bytes(from),
-			amqp_cstring_bytes(exchange),
-			amqp_cstring_bytes(topic),
-			amqp_empty_table
-		);
-
-		r = amqp_get_rpc_reply(admin_connection);
-
-		if (r.reply_type == AMQP_RESPONSE_NORMAL)
-			break;
-		else
-		{
-			printf("%s Retrying ....\n",__FUNCTION__);
-			init_admin_connection();
-		}
-	}
-
-	if (tries > MAX_AMQP_RETRIES)
-	{
-		snprintf(error_string,1025,"unbind failed e={%s} q={%s} t={%s}\n",exchange,from,topic);
-		ERROR(error_string);
-	}
-
-	for (tries = 1; tries <= MAX_AMQP_RETRIES ; ++tries)
-	{
-		amqp_queue_unbind (
-			admin_connection,
-			1,
-			amqp_cstring_bytes(priority_queue),
-			amqp_cstring_bytes(exchange),
-			amqp_cstring_bytes(topic),
-			amqp_empty_table
-		);
-
-		r = amqp_get_rpc_reply(admin_connection);
-
-		if (r.reply_type == AMQP_RESPONSE_NORMAL)
-			break;
-		else
-		{
-			printf("%s Retrying ....\n",__FUNCTION__);
-			init_admin_connection();
-		}
-	}
-
-	if (tries > 3)
-	{
-		snprintf(error_string,1025,"unbind priority failed e={%s} q={%s} t={%s}\n",exchange,priority_queue,topic);
-		ERROR(error_string);
-	}
+		
+	CREATE_STRING 	(query, "DELETE FROM acl WHERE follow_id='%s'", follow_id);
+	RUN_QUERY	(query, "failed to delete from acl table");
 
 	OK();
 
