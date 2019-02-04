@@ -2755,11 +2755,21 @@ unfollow (struct http_request *req)
 		KORE_RESULT_OK != http_request_header(req, "topic", &topic)
 				||
 		KORE_RESULT_OK != http_request_header(req, "permission", &permission)
-				||
-		KORE_RESULT_OK != http_request_header(req, "message-type", &message_type)
 			,
 		"inputs missing in headers"
 	);
+
+	if (http_request_header(req, "message-type", &message_type) == KORE_RESULT_OK)
+	{
+		if (strcmp(message_type,"protected") != 0 && strcmp(message_type,"diagnostics") != 0)
+		{
+			BAD_REQUEST("invalid message-type");	
+		}
+	}
+	else
+	{
+		message_type = "protected";
+	}
 
 	if (looks_like_a_valid_owner(id))
 	{
@@ -2779,7 +2789,7 @@ unfollow (struct http_request *req)
 		from = id;
 	}
 
-	if(
+	if (
 		(strcmp(permission,"read") !=0)
 			&&
 		(strcmp(permission,"write") !=0)
