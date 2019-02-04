@@ -1548,10 +1548,6 @@ catalog (struct http_request *req)
 	kore_buf_reset(response);
 	kore_buf_append(response,"{",1);
 
-	CREATE_STRING (query,
-		"SELECT id,schema FROM users WHERE id LIKE '%%/%%' ORDER BY id"
-	);
-
 	if (
 		KORE_RESULT_OK != http_request_header(req, "id", &id)
 				||
@@ -1560,7 +1556,16 @@ catalog (struct http_request *req)
 		(! login_success (id,apikey,NULL))
 	)
 	{
-		kore_buf_appendf(query,"%s"," LIMIT 50");
+		CREATE_STRING (query,
+			"SELECT id,schema FROM users WHERE id LIKE '%%/%%' ORDER BY id "
+			"LIMIT 50"
+		);
+	}
+	else
+	{
+		CREATE_STRING (query,
+			"SELECT id,schema FROM users WHERE id LIKE '%%/%%' ORDER BY id"
+		);
 	}
 
 	RUN_QUERY (query,"unable to query catalog data");
