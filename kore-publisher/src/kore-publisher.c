@@ -1594,6 +1594,8 @@ search_catalog (struct http_request *req)
 
 	const char *tag;
 	const char *entity;
+	const char *pattern;
+	const char *value;
 
 	const char *body = req->http_body ? (char *)req->http_body->data : NULL;
 
@@ -1632,6 +1634,37 @@ search_catalog (struct http_request *req)
 		);
 
 		RUN_QUERY (query,"unable to query catalog data");
+	}
+	else if (http_argument_get_string(req,"pattern",(void *)&pattern))
+	{
+		// XXX
+		BAD_REQUEST ("not yet implemented");
+
+		if (! http_argument_get_string(req,"value",(void *)&value))
+			BAD_REQUEST("value field missing");
+			
+		if (! is_string_safe(pattern))	
+			BAD_REQUEST("invalid tag");
+
+		if (! is_string_safe(value))	
+			BAD_REQUEST("invalid value");
+
+		// convert . to ,
+		char *p = pattern;
+		while (*p)
+		{
+			if (*p == '.')
+				*p = ',';
+			++p;
+		}
+
+		CREATE_STRING (query,
+				"SELECT id,schema FROM users WHERE id LIKE '%%/%%' "
+				"AND schema #> '{%s}' = '%s' " 
+				"ORDER BY id",
+					pattern,
+					value	
+		);
 	}
 	else if (body)
 	{
