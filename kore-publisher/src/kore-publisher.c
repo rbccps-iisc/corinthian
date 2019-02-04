@@ -1002,7 +1002,7 @@ subscribe (struct http_request *req)
 	if (i > 0)
 		--(response->offset);
 
-	kore_buf_append(response,"]",1);
+	kore_buf_append(response,"]\n",2);
 
 	OK();
 
@@ -1415,7 +1415,7 @@ get_entities (struct http_request *req)
 	if (num_rows > 0)
 		--(response->offset);
 
-	kore_buf_append(response,"}",1);
+	kore_buf_append(response,"}\n",2);
 
 	OK();
 
@@ -1580,7 +1580,7 @@ catalog (struct http_request *req)
 		--(response->offset);
 	}
 
-	kore_buf_append(response,"}",1);
+	kore_buf_append(response,"}\n",2);
 
 	END();
 done:
@@ -1725,7 +1725,7 @@ search_catalog (struct http_request *req)
 		--(response->offset);
 	}
 
-	kore_buf_append(response,"}",1);
+	kore_buf_append(response,"}\n",2);
 
 	OK();
 
@@ -1773,7 +1773,7 @@ catalog_tags (struct http_request *req)
 	if (num_rows > 0)
 		--(response->offset);
 
-	kore_buf_append(response,"}",1);
+	kore_buf_append(response,"}\n",2);
 
 	OK();
 
@@ -1956,7 +1956,7 @@ get_owners(struct http_request *req)
 		--(response->offset);
 	}
 
-	kore_buf_append(response,"}",1);
+	kore_buf_append(response,"}\n",2);
 
 	OK();
 
@@ -3334,7 +3334,7 @@ get_follow_status (struct http_request *req)
 		--(response->offset);
 	}
 
-	kore_buf_append(response,"]",1);
+	kore_buf_append(response,"]\n",2);
 
 	OK();
 
@@ -3430,7 +3430,7 @@ get_follow_requests (struct http_request *req)
 		--(response->offset);
 	}
 
-	kore_buf_append(response,"]",1);
+	kore_buf_append(response,"]\n",2);
 
 	OK();
 
@@ -3639,7 +3639,7 @@ permissions (struct http_request *req)
 	if (num_rows > 0)
 		--(response->offset);
 
-	kore_buf_append(response,"]",1);
+	kore_buf_append(response,"]\n",2);
 
 	OK();
 
