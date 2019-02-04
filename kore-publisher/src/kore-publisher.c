@@ -1583,9 +1583,10 @@ catalog (struct http_request *req)
 
 	kore_buf_append(response,"}\n",2);
 
-	END();
-done:
 	OK();
+
+done:
+	END();
 }
 
 int
