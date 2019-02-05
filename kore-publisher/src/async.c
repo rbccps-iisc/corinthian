@@ -293,6 +293,7 @@ publish_async (struct http_request *req)
 	// ok to publish to himself
 	if (strcmp(id,to) == 0)
 	{
+
 		if (
 			(strcmp(message_type,"public") 		!= 0)	&&
 			(strcmp(message_type,"private") 	!= 0)	&&
@@ -383,6 +384,12 @@ done:
 int async_init ()
 {
 	int i;
+
+	if (query == NULL)
+		query = kore_buf_alloc(512);
+
+	if (response == NULL)
+		response = kore_buf_alloc(1024*1024);
 
 	for (i = 0; i < MAX_ASYNC_THREADS; ++i)
 	{
