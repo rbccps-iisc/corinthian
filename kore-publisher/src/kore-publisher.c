@@ -15,8 +15,6 @@ static const char *_e[] = {
 	".notification",
 	".publish",
 	".diagnostics",
-	// ".public.validated",
-	// ".protected.validated",
 	NULL
 };
 
@@ -233,14 +231,19 @@ init (int state)
 			"postgres",
 			postgres_pwd
 	);
+
 	kore_pgsql_register("db",connection_str);
 
 	memset(&props, 0, sizeof props);
 	props._flags = AMQP_BASIC_CONTENT_TYPE_FLAG | AMQP_BASIC_USER_ID_FLAG;
 
 //////////////////// Async initialization //////////
-	async_init ();
+
+	async_init (connection_str);
+
 ////////////////////////////////////////////////////
+
+	printf("===> Worker [%d]'s initialization OK\n",worker->id);
 
 	return KORE_RESULT_OK;
 }
@@ -569,7 +572,7 @@ publish (struct http_request *req)
 
 	const char *content_type;
 
-	char topic_to_publish [1 + MAX_LEN_TOPIC];
+	char subject_to_publish [1 + MAX_LEN_TOPIC];
 
 	req->status = 403;
 
@@ -604,7 +607,7 @@ publish (struct http_request *req)
 			BAD_REQUEST("message-type is not valid");
 		}
 
-		snprintf(
+		snprintf (
 			exchange,
 			1 + MAX_LEN_RESOURCE_ID,
 			"%s.%s",
@@ -612,10 +615,10 @@ publish (struct http_request *req)
 				message_type
 		);
 
-		strlcpy(topic_to_publish,subject,MAX_LEN_TOPIC);
+		strlcpy(subject_to_publish,subject,MAX_LEN_TOPIC);
 
 		debug_printf("==> exchange = %s\n",exchange);
-		debug_printf("==> topic = %s\n",topic_to_publish);
+		debug_printf("==> topic = %s\n",subject_to_publish);
 	}
 	else
 	{
@@ -625,7 +628,7 @@ publish (struct http_request *req)
 		}
 
 		snprintf (
-			topic_to_publish,
+			subject_to_publish,
 			1 + MAX_LEN_TOPIC,
 			"%s.%s.%s",
 				to,
@@ -636,7 +639,7 @@ publish (struct http_request *req)
 		snprintf(exchange, 1 + MAX_LEN_RESOURCE_ID,"%s.publish",id);
 
 		debug_printf("==> exchange = %s\n",exchange);
-		debug_printf("==> topic = %s\n",topic_to_publish);
+		debug_printf("==> topic = %s\n",subject_to_publish);
 	}
 
 	if (http_request_header(req, "message", &message) != KORE_RESULT_OK)
@@ -730,7 +733,7 @@ publish (struct http_request *req)
 			*cached_conn,
 			1,
 			amqp_cstring_bytes(exchange),
-			amqp_cstring_bytes(topic_to_publish),
+			amqp_cstring_bytes(subject_to_publish),
 			0,
 			0,
 			&props,

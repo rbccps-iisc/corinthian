@@ -66,6 +66,7 @@ void* q_delete (Q *q)
 			q->tail->next = NULL;
 
 		free (tail);
+
 done:
 	pthread_mutex_unlock(&q->mutex);
 	
