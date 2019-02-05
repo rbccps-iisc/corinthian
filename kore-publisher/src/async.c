@@ -3,7 +3,6 @@
 
 static struct kore_pgsql sql;
 
-//static char queue	[MAX_LEN_RESOURCE_ID + 1];
 static char exchange	[MAX_LEN_RESOURCE_ID + 1];
 
 static struct kore_buf *query 		= NULL;
@@ -245,7 +244,9 @@ async_publish_function (void *v)
 					amqp_cstring_bytes(message)
 				)
 			)
+			{
 				goto done;
+			}
 
 done:
 			free (data);
@@ -383,8 +384,6 @@ int async_init ()
 {
 	int i;
 
-	// XXX: do everything a normal init does
-
 	for (i = 0; i < MAX_ASYNC_THREADS; ++i)
 	{
 		q_init(&thread_q[i]);
@@ -405,5 +404,3 @@ int async_init ()
 	
 	return KORE_RESULT_OK;
 }
-
-

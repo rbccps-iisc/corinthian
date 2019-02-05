@@ -1530,11 +1530,6 @@ done:
 	END();
 }
 
-/* 
-	TODO GUI END POINT FOR catalog
-	catalog_gui (struct http_request *req)
-*/
-
 int
 catalog (struct http_request *req)
 {
