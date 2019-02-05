@@ -3069,8 +3069,8 @@ share (struct http_request *req)
 
 	if (strcmp(permission,"read") == 0)
 	{
-		/*
 		snprintf(bind_exchange,	1 + MAX_LEN_RESOURCE_ID,"%s",	my_exchange);
+		/*
 		snprintf(bind_queue,	1 + MAX_LEN_RESOURCE_ID,"%s",	from_id); 		// TODO: what about priority queue
 		snprintf(bind_topic,	1 + MAX_LEN_TOPIC,      "%s",	topic);
 		*/
