@@ -47,19 +47,25 @@ int q_insert (Q *q, void *v)
 
 void* q_delete (Q *q)
 {
-	void *v = NULL;
+	void *v		= NULL;
+	node *tail	= NULL;
 
 	pthread_mutex_lock(&q->mutex);
 
 		if (q->head == NULL || q->tail == NULL)
 			goto done;
 
-		v = q->tail->value;
+		tail 	= q->tail;
+		v 	= q->tail->value;
 
 		q->tail 	= q->tail->prev;
-		q->tail->next 	= NULL;
 
-		free (q->tail);
+		if (q->tail == NULL)
+			q->head = NULL;
+		else	
+			q->tail->next = NULL;
+
+		free (tail);
 done:
 	pthread_mutex_unlock(&q->mutex);
 	
