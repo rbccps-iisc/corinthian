@@ -14,7 +14,7 @@ static char 	hash_string		[2*SHA256_DIGEST_LENGTH + 1];
 
 static ht connection_ht;
 
-#define MAX_ASYNC_THREADS (1)
+#define MAX_ASYNC_THREADS (2)
 
 static int queue_index = 0;
 
