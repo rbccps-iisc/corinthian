@@ -1635,7 +1635,13 @@ search_catalog (struct http_request *req)
 		CREATE_STRING (query,
 				"SELECT id,schema FROM users WHERE id LIKE '%%/%%' "
 				"AND jsonb_typeof(schema->'tags') = 'array' " 
-				"AND schema->'tags' ? lower('%s') ORDER BY id",
+				"AND ("
+					"(schema->'tags' ? LOWER('%s'))"
+						" OR "
+					"(schema->'tags' ? '%s')"
+				") "
+				"ORDER BY id",
+					tag, 
 					tag 
 		);
 
