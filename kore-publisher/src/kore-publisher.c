@@ -789,7 +789,11 @@ subscribe (struct http_request *req)
 
 	if (KORE_RESULT_OK == http_request_header(req, "message-type", &message_type))
 	{
-		if (strcmp(message_type,"priority") == 0)
+		if (strcmp(message_type,"private") == 0)
+		{
+			strlcat(queue,".private",128);
+		}
+		else if (strcmp(message_type,"priority") == 0)
 		{
 			strlcat(queue,".priority",128);
 		}
