@@ -1,7 +1,7 @@
 #include "kore-publisher.h"
 #include "async.h"
 
-#define MAX_ASYNC_THREADS (5)
+#define MAX_ASYNC_THREADS (2)
 
 static int queue_index = 0;
 
