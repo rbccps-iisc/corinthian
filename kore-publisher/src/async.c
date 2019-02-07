@@ -254,22 +254,22 @@ done:
 		}
 	}
 
-	http_response_header(		
-		req,			
-		"content-type",		
-		"application/json"	
-	);				
+	http_response_header(
+		req,
+		"content-type",
+		"application/json"
+	);
 
-	http_response (			
-		req,			
-		req->status, 		
-		response->data,		
-		response->offset	
-	);				
+	http_response (
+		req,
+		req->status,
+		response->data,
+		response->offset
+	);
 
-	kore_buf_reset(response);	
+	kore_buf_reset(response);
 
-	return (KORE_RESULT_OK);	
+	return (KORE_RESULT_OK);
 }
 
 int async_init (char *connection_str)

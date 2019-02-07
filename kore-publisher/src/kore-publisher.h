@@ -111,7 +111,9 @@ int unblock		(struct http_request *);
 
 int permissions 	(struct http_request *);
 
-int db_cleanup		(struct http_request *);
+///////////////////////////////////////////////////////////
+
+int serve_websocket (struct http_request *);
 
 ///////////////////////////////////////////////////////////
 
