@@ -734,7 +734,7 @@ publish (struct http_request *req)
 			1,
 			amqp_cstring_bytes(exchange),
 			amqp_cstring_bytes(subject_to_publish),
-			0,
+			1, /* mandatory */
 			0,
 			&props,
 			amqp_cstring_bytes(message)
@@ -905,7 +905,6 @@ subscribe (struct http_request *req)
 			(res.reply.id 	== AMQP_BASIC_GET_EMPTY_METHOD) &&
 			((time(NULL) - start_time) < 1)
 		);
-
 
 		if (AMQP_RESPONSE_NORMAL != res.reply_type)
 			break;

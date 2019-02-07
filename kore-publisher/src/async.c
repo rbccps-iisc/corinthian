@@ -149,7 +149,7 @@ async_publish_function (void *v)
 					1,
 					amqp_cstring_bytes(exchange),
         				amqp_cstring_bytes(subject_to_publish),
-					0,
+					1, /* mandatory */
 					0,
 					&props,
 					amqp_cstring_bytes(message)
