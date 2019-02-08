@@ -35,8 +35,8 @@ int serve_websocket (struct http_request *req)
 	const char *id;
 	const char *apikey;
 
-	const void *sec_websocket_key;
-	const void *sec_websocket_version;
+	const char *sec_websocket_key;
+	const char *sec_websocket_version;
 
 	struct kore_buf *response = kore_buf_alloc(128);
 
@@ -56,37 +56,36 @@ int serve_websocket (struct http_request *req)
 	if (! login_success(id,apikey,&is_autonomous))
 		FORBIDDEN("invalid id or apikey");
 
-	BAD_REQUEST("NOT YET IMPLEMENTED !");
+	struct kore_pool http_header_pool;
+
+	kore_pool_init (
+		&http_header_pool,
+		"my_http_request_pool",
+           	sizeof(struct http_request),
+		2
+	);
 		
 	if (KORE_RESULT_OK != http_request_header(req,"sec-websocket-key",&sec_websocket_key))
 	{
-		// TODO: get it from pool 
-		struct http_header *hdr = malloc(sizeof(struct http_header));
+		struct http_header *hdr = kore_pool_get(&http_header_pool);
 
-		if (hdr == NULL)
-			ERROR("out of memory");
-
-		char tmp_sec_websocket_key[32];
+		char server_generated_sec_websocket_key[32];
 
 		for (int i = 0; i < 32; ++i)
-			tmp_sec_websocket_key [i] = password_chars[arc4random_uniform(n_passwd_chars)]; 
+			server_generated_sec_websocket_key [i] = password_chars[arc4random_uniform(n_passwd_chars)]; 
 
-		hdr->header	= strdup("sec-websocket-key");
-		hdr->value	= strdup(tmp_sec_websocket_key);
+		hdr->header	= kore_strdup("sec-websocket-key");
+		hdr->value	= kore_strdup(server_generated_sec_websocket_key);
 
 		TAILQ_INSERT_TAIL(&(req->req_headers), hdr, list);
 	}
 
 	if (KORE_RESULT_OK != http_request_header(req,"sec-websocket-version",&sec_websocket_version))
 	{
-		// TODO: get it from pool 
-		struct http_header *hdr = malloc(sizeof(struct http_header));
+		struct http_header *hdr = kore_pool_get(&http_header_pool);
 
-		if (hdr == NULL)
-			ERROR("out of memory");
-
-		hdr->header	= strdup("sec-websocket-version");
-		hdr->value	= strdup("13");
+		hdr->header	= kore_strdup("sec-websocket-version");
+		hdr->value	= kore_strdup("13");
 
 		TAILQ_INSERT_TAIL(&(req->req_headers), hdr, list);
 	}
