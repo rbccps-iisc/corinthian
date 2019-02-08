@@ -11,10 +11,11 @@ static const char password_chars[] =
 static const char *_e[] = {
 	".public",
 	".private",
-	".protected",
-	".notification",
 	".publish",
+	".service",
+	".protected",
 	".diagnostics",
+	".notification",
 	NULL
 };
 
@@ -23,6 +24,7 @@ static const char *_q[] = {
 	".private",
 	".priority",
 	".command",
+	".service",
 	".notification",
 	NULL
 };
@@ -622,9 +624,13 @@ publish (struct http_request *req)
 	}
 	else
 	{
-		if (strcmp(message_type,"command") != 0)
+		if (
+			(strcmp(message_type,"command") != 0)
+				&&
+			(strcmp(message_type,"service") != 0)
+		)
 		{
-			BAD_REQUEST("message-type can only be command");		
+			BAD_REQUEST("message-type can only be command/service");
 		}
 
 		snprintf (
@@ -715,6 +721,7 @@ publish (struct http_request *req)
 			ERROR("could not open an AMQP connection");
 
 		rpc_reply = amqp_get_rpc_reply(*cached_conn);
+
 		if (rpc_reply.reply_type != AMQP_RESPONSE_NORMAL)
 			ERROR("did not receive expected response from broker");
 
@@ -805,6 +812,10 @@ subscribe (struct http_request *req)
 		{
 			strlcat(queue,".notification",128);
 		}
+		else if (strcmp(message_type,"service") == 0)
+		{
+			strlcat(queue,".service",128);
+		}
 		else
 		{
 			BAD_REQUEST("invalid message-type");
@@ -875,6 +886,7 @@ subscribe (struct http_request *req)
 			ERROR("could not open an AMQP connection");
 
 		rpc_reply = amqp_get_rpc_reply(*cached_conn);
+
 		if (rpc_reply.reply_type != AMQP_RESPONSE_NORMAL)
 			ERROR("error from broker");
 
@@ -2158,7 +2170,8 @@ queue_bind (struct http_request *req)
 		(strcmp(message_type,"public") 		!= 0) &&
 		(strcmp(message_type,"private") 	!= 0) &&
 		(strcmp(message_type,"protected") 	!= 0) &&
-		(strcmp(message_type,"diagnostics") 	!= 0)
+		(strcmp(message_type,"diagnostics") 	!= 0) &&
+		(strcmp(message_type,"service")		!= 0)
 	)
 	{
 		BAD_REQUEST("message-type is invalid");
@@ -2218,7 +2231,6 @@ queue_bind (struct http_request *req)
 				"SELECT 1 FROM acl WHERE "
 				"from_id = '%s' "
 				"AND exchange = '%s' "
-				"AND permission = 'read' "
 				"AND valid_till > now() AND topic = '%s'",
 				from,
 				exchange,
@@ -2321,10 +2333,11 @@ queue_unbind (struct http_request *req)
 		BAD_REQUEST("'to' is not a valid entity");
 
 	if (
-		(strcmp(message_type,"public") != 0) &&
-		(strcmp(message_type,"private") != 0) &&
-		(strcmp(message_type,"protected") != 0) &&
-		(strcmp(message_type,"diagnostics") != 0)
+		(strcmp(message_type,"public") 		!= 0) &&
+		(strcmp(message_type,"private") 	!= 0) &&
+		(strcmp(message_type,"protected") 	!= 0) &&
+		(strcmp(message_type,"diagnostics") 	!= 0) &&
+		(strcmp(message_type,"service")		!= 0)
 	)
 	{
 		BAD_REQUEST("message-type is invalid");
@@ -2383,7 +2396,6 @@ queue_unbind (struct http_request *req)
 			    "SELECT 1 FROM acl WHERE "
 			    "from_id = '%s' "
 			    "AND exchange = '%s' "
-			    "AND permission = 'read' "
 			    "AND valid_till > now() "
 			    "AND topic = '%s'",
 			    from,
@@ -2444,8 +2456,6 @@ follow (struct http_request *req)
 	const char *from;
 	const char *to;
 
-	const char *permission; // read, write, or, read-write
-
 	const char *topic; // topics the subscriber is interested in
 
 	const char *validity; // in hours 
@@ -2464,26 +2474,23 @@ follow (struct http_request *req)
 				||
 		KORE_RESULT_OK != http_request_header(req, "to", &to)
 				||
-		KORE_RESULT_OK != http_request_header(req, "permission", &permission)
-				||
 		KORE_RESULT_OK != http_request_header(req, "validity", &validity)
 				||
 		KORE_RESULT_OK != http_request_header(req, "topic", &topic)
+				||
+		KORE_RESULT_OK != http_request_header(req, "message-type", &message_type)
 			,
 		"inputs missing in headers"
 	);
 
-	if (http_request_header(req, "message-type", &message_type) == KORE_RESULT_OK)
-	{
-		if (strcmp(message_type,"protected") != 0 && strcmp(message_type,"diagnostics") != 0)
-		{
-			BAD_REQUEST("invalid message-type");	
-		}
-	}
-	else
-	{
-		message_type = "protected";
-	}
+	BAD_REQUEST_if (
+		(strcmp(message_type,"service")		!= 0) &&
+		(strcmp(message_type,"command") 	!= 0) &&
+		(strcmp(message_type,"protected") 	!= 0) &&
+		(strcmp(message_type,"diagnostics") 	!= 0)
+		,
+		"invalid message-type"
+	);
 
 	if (looks_like_a_valid_owner(id))
 	{
@@ -2520,14 +2527,6 @@ follow (struct http_request *req)
 	if (! is_string_safe(topic))
 		BAD_REQUEST("invalid topic");
 
-	BAD_REQUEST_if (
-		(strcmp(permission,"read") 		!= 0) &&
-		(strcmp(permission,"write") 		!= 0) &&
-		(strcmp(permission,"read-write") 	!= 0)
-		,
-		"invalid permission"
-	);
-
 	bool is_autonomous = false;
 
 	if (! login_success(id,apikey,&is_autonomous))
@@ -2543,11 +2542,8 @@ follow (struct http_request *req)
 	if (is_owner(id,to))
 		status = "approved";
 
-	char read_follow_id  [10];
-	char write_follow_id [10];
-
-	read_follow_id[0] = '\0';
-	write_follow_id[0] = '\0';
+	char follow_id  [10];
+	follow_id[0] = '\0';
 
 	int int_validity = strtonum(validity,1,10000,NULL);
 	if (int_validity <= 0)
@@ -2567,101 +2563,57 @@ follow (struct http_request *req)
 	char *char_is_to_autonomous	= kore_pgsql_getvalue(&sql,0,0);
 	bool is_to_autonomous		= char_is_to_autonomous[0] == 't';
 
-	if (strcmp(permission,"read") == 0 || strcmp(permission,"read-write") == 0)
-	{
-		CREATE_STRING (query, 
-			"INSERT INTO follow "
-			"(follow_id,requested_by,from_id,exchange,time,permission,topic,validity,status) "
-			"VALUES(DEFAULT,'%s','%s','%s.%s',now(),'read','%s','%d','%s')",
-				id,
-				from,
-				to,	// .message_type is appended to it
-				message_type,
-				topic,
-				int_validity,
-				status
-		);
-		RUN_QUERY (query, "failed to insert follow - read");
+	CREATE_STRING (query, 
+		"INSERT INTO follow "
+		"(follow_id,requested_by,from_id,exchange,time,topic,validity,status) "
+		"VALUES(DEFAULT,'%s','%s','%s.%s',now(),'%s','%s','%d','%s')",
+			id,
+			from,
+			to,
+			message_type,
+			topic,
+			int_validity,
+			status
+	);
 
-		CREATE_STRING 	(query,"SELECT currval(pg_get_serial_sequence('follow','follow_id'))");
-		RUN_QUERY 	(query,"failed pg_get_serial read");
+	RUN_QUERY (query, "failed to insert follow");
 
-		strlcpy(read_follow_id,kore_pgsql_getvalue(&sql,0,0),10);
-	}
-
-	if (strcmp(permission,"write") == 0 || strcmp(permission,"read-write") == 0)
-	{
-		CREATE_STRING (query,
-			"INSERT INTO follow "
-			"(follow_id,requested_by,from_id,exchange,time,permission,topic,validity,status) "
-			"VALUES(DEFAULT,'%s','%s','%s.command',now(),'write','%s','%d','%s')",
-				id,
-				from,
-				to,	// .command is appended to it
-				topic,
-				int_validity,
-				status
-		);
-		RUN_QUERY (query, "failed to insert follow - write");
-
-		CREATE_STRING 	(query,"SELECT currval(pg_get_serial_sequence('follow','follow_id'))");
-		RUN_QUERY 	(query,"failed pg_get_serial write");
-
-		strlcpy(write_follow_id,kore_pgsql_getvalue(&sql,0,0),10);
-	}
+	CREATE_STRING 	(query,"SELECT currval(pg_get_serial_sequence('follow','follow_id'))");
+	RUN_QUERY 	(query,"failed pg_get_serial");
 
 	if (strcmp(status,"approved") == 0)
 	{
 		// add entry in acl
-		if (strcmp(permission,"read") == 0 || strcmp(permission,"read-write") == 0)
+		CREATE_STRING (query,
+			"INSERT INTO acl "
+			"(acl_id,from_id,exchange,follow_id,topic,valid_till) "
+			"VALUES(DEFAULT,'%s','%s.%s','%s','%s', '%s', now() + interval '%d hours')",
+		        	from,
+				to,
+				message_type,
+				follow_id,
+				topic,
+				int_validity
+		);
+
+		RUN_QUERY (query,"could not run insert query on acl");
+
+		if (strcmp(message_type,"command") == 0 || strcmp(message_type,"service") == 0)
 		{
-			CREATE_STRING (query,
-				"INSERT INTO acl "
-				"(acl_id,from_id,exchange,follow_id,permission,topic,valid_till) "
-				"VALUES(DEFAULT,'%s','%s.%s','%s','%s', '%s', now() + interval '%d hours')",
-			        	from,
-					to,		// .message_type is appended to it
-					message_type,
-					read_follow_id,
-					"read",
-					topic,
-					int_validity
-			);
-
-			RUN_QUERY (query,"could not run insert query on acl - read");
-		}
-
-		if (strcmp(permission,"write") == 0 || strcmp(permission,"read-write") == 0)
-		{
-			CREATE_STRING (query,
-				"INSERT INTO acl "
-				"(acl_id,from_id,exchange,follow_id,permission,topic,valid_till) "
-				"VALUES(DEFAULT,'%s','%s.%s','%s','%s', '%s', now() + interval '%d hours')",
-			        	from,
-					to,		// .message_type is appended to it
-					message_type,
-					write_follow_id,
-					"write",
-					topic,
-					int_validity
-			);
-
-			RUN_QUERY (query,"could not run insert query on acl - write");
-
 			char write_exchange 	[1 + MAX_LEN_RESOURCE_ID];
-			char command_queue	[1 + MAX_LEN_RESOURCE_ID];
+			char write_queue	[1 + MAX_LEN_RESOURCE_ID];
 			char write_topic	[1 + MAX_LEN_TOPIC];
 
 			snprintf(write_exchange,1 + MAX_LEN_RESOURCE_ID,"%s.publish",from);
-			snprintf(command_queue, 1 + MAX_LEN_RESOURCE_ID,"%s.command",to);
-			snprintf(write_topic,   1 + MAX_LEN_TOPIC,	"%s.command.%s",to,topic);
+			snprintf(write_queue, 	1 + MAX_LEN_RESOURCE_ID,"%s.%s",to,message_type);
+			snprintf(write_topic,   1 + MAX_LEN_TOPIC,	"%s.%s.%s",to,message_type,topic);
 
 			for (tries = 1; tries <= MAX_AMQP_RETRIES; ++tries)
 			{
 				amqp_queue_bind (
 					admin_connection,
 					1,
-					amqp_cstring_bytes(command_queue),
+					amqp_cstring_bytes(write_queue),
 					amqp_cstring_bytes(write_exchange),
 					amqp_cstring_bytes(write_topic),
 					amqp_empty_table
@@ -2680,23 +2632,10 @@ follow (struct http_request *req)
 
 			if (tries > MAX_AMQP_RETRIES)
 			{
-				snprintf(error_string,1025,"bind failed e={%s} q={%s} t={%s}\n",write_exchange, command_queue, write_topic);
+				snprintf(error_string,1025,"bind failed e={%s} q={%s} t={%s}\n",write_exchange, write_queue, write_topic);
 				ERROR(error_string);
 			}
 
-			CREATE_STRING (query,
-				"INSERT INTO acl "
-				"(acl_id,from_id,exchange,follow_id,permission,topic,valid_till) "
-				"VALUES(DEFAULT,'%s','%s.command','%s','%s', '%s', now() + interval '%d hours')",
-			        	from,
-					to,		// .command is appended to it
-					read_follow_id,
-					"write",
-					topic,
-					int_validity
-			);
-
-			RUN_QUERY (query,"could not run insert query on acl - read ");
 		}
 
 		req->status = 200;
@@ -2727,7 +2666,7 @@ follow (struct http_request *req)
 		char *subject = "Request for follow";
 
 		char message[1025];
-		snprintf(message,  1025, "'%s' has requested '%s' access on '%s'",id,permission,to);
+		snprintf(message,  1025, "'%s' has requested access to '%s'",id,to);
 
 		props.user_id 		= amqp_cstring_bytes("admin");
 		props.content_type 	= amqp_cstring_bytes("text/plain");
@@ -2754,21 +2693,7 @@ follow (struct http_request *req)
 	}
 
 	kore_buf_reset(response);
-	kore_buf_append(response,"{",1);
-
-	if (read_follow_id[0])
-		kore_buf_appendf(response,"\"follow-id-read\":\"%s\"",read_follow_id);
-
-	if (write_follow_id[0])
-	{
-		// put a comma if follow-id-read was written in response
-		if (read_follow_id[0])
-			kore_buf_append(response,",",1);
-
-		kore_buf_appendf(response,"\"follow-id-write\":\"%s\"",write_follow_id);
-	}
-
-	kore_buf_append(response,"}\n",2);
+	kore_buf_appendf(response,"{\"follow-id\":\"%s\"}\n",follow_id);
 
 done:
 	if (req->status == 500)
@@ -2815,7 +2740,7 @@ unfollow (struct http_request *req)
 	{
 		CREATE_STRING (query,
 			"SELECT "
-			"from_id,exchange,permission,topic "
+			"from_id,exchange,topic "
 			"FROM follow "
 			"WHERE follow_id = '%s' AND from_id LIKE '%s/%%' "
 			"ORDER BY time DESC",
@@ -2827,7 +2752,7 @@ unfollow (struct http_request *req)
 	{
 		CREATE_STRING (query,
 			"SELECT "
-			"from_id,exchange,permission,topic "
+			"from_id,exchange,topic "
 			"FROM follow "
 			"WHERE follow_id = '%s' AND from_id = '%s' "
 			"ORDER BY time DESC",
@@ -2845,8 +2770,7 @@ unfollow (struct http_request *req)
 
 	char *from_id 		= kore_pgsql_getvalue(&sql,0,0);
 	char *my_exchange	= kore_pgsql_getvalue(&sql,0,1);
-	char *permission	= kore_pgsql_getvalue(&sql,0,2);
-	char *topic		= kore_pgsql_getvalue(&sql,0,3);
+	char *topic		= kore_pgsql_getvalue(&sql,0,2);
 
 	CREATE_STRING (query,
 				"SELECT 1 FROM acl "
@@ -2859,7 +2783,11 @@ unfollow (struct http_request *req)
 	if (kore_pgsql_ntuples(&sql) != 1)
 		FORBIDDEN("unauthorized");
 
-	if (strcmp(permission,"read") == 0)
+	if (
+		strcmp(message_type,"protected") == 0 	|| 
+		strcmp(message_type,"diagnostics") == 0	||
+		strcmp(message_type,"notification") == 0
+	)
 	{
 		for (tries = 1; tries <= MAX_AMQP_RETRIES; ++tries)
 		{
@@ -2920,10 +2848,10 @@ unfollow (struct http_request *req)
 			ERROR(error_string);
 		}
 	}
-	else if (strcmp(permission,"write") == 0)
+	else // command or service
 	{
 		char write_exchange 	[1 + MAX_LEN_RESOURCE_ID];
-		char *command_queue 	= my_exchange;
+		char *write_queue 	= my_exchange;
 		char write_topic	[1 + MAX_LEN_TOPIC];
 
 		snprintf(write_exchange,1 + MAX_LEN_RESOURCE_ID,"%s.publish",from_id);
@@ -2934,7 +2862,7 @@ unfollow (struct http_request *req)
 			amqp_queue_unbind (
 				admin_connection,
 				1,
-				amqp_cstring_bytes(command_queue),
+				amqp_cstring_bytes(write_queue),
 				amqp_cstring_bytes(write_exchange),
 				amqp_cstring_bytes(write_topic),
 				amqp_empty_table
@@ -2953,7 +2881,7 @@ unfollow (struct http_request *req)
 
 		if (tries > MAX_AMQP_RETRIES)
 		{
-			snprintf(error_string,1025,"unbind failed e={%s} q={%s} t={%s}\n",write_exchange,command_queue,write_topic);
+			snprintf(error_string,1025,"unbind failed e={%s} q={%s} t={%s}\n",write_exchange,write_queue,write_topic);
 			ERROR(error_string);
 		}
 	}
@@ -3013,7 +2941,7 @@ share (struct http_request *req)
 	if (looks_like_a_valid_owner(id))
 	{
 		CREATE_STRING (query, 
-			"SELECT from_id,exchange,permission,validity,topic FROM follow "
+			"SELECT from_id,exchange,validity,topic FROM follow "
 			"WHERE follow_id = '%s' AND exchange LIKE '%s/%%.%%' and status='pending'",
 				follow_id,
 				id
@@ -3022,7 +2950,7 @@ share (struct http_request *req)
 	else
 	{
 		CREATE_STRING (query, 
-			"SELECT from_id,exchange,permission,validity,topic FROM follow "
+			"SELECT from_id,exchange,validity,topic FROM follow "
 			"WHERE follow_id = '%s' AND exchange LIKE '%s.%%' and status='pending'",
 				follow_id,
 				id
@@ -3036,9 +2964,8 @@ share (struct http_request *req)
 
 	char *from_id		= kore_pgsql_getvalue(&sql,0,0);
 	char *my_exchange 	= kore_pgsql_getvalue(&sql,0,1);
-	char *permission 	= kore_pgsql_getvalue(&sql,0,2); 
-	char *validity_hours 	= kore_pgsql_getvalue(&sql,0,3); 
-	char *topic 	 	= kore_pgsql_getvalue(&sql,0,4); 
+	char *validity_hours 	= kore_pgsql_getvalue(&sql,0,2);
+	char *topic 	 	= kore_pgsql_getvalue(&sql,0,3); 
 
 	CREATE_STRING (query,
 		"SELECT is_autonomous FROM users "
@@ -3063,12 +2990,11 @@ share (struct http_request *req)
 
 	// add entry in acl
 	CREATE_STRING (query,
-		"INSERT INTO acl (acl_id,from_id,exchange,follow_id,permission,topic,valid_till) "
+		"INSERT INTO acl (acl_id,from_id,exchange,follow_id,topic,valid_till) "
 		"VALUES(DEFAULT,'%s','%s','%s','%s','%s',now() + interval '%s hours')",
 			from_id,
 			my_exchange,
 			follow_id,
-			permission,
 			topic,
 			validity_hours
 	);
@@ -3079,7 +3005,11 @@ share (struct http_request *req)
 	char bind_queue		[1 + MAX_LEN_RESOURCE_ID];
 	char bind_topic		[1 + MAX_LEN_TOPIC];
 
-	if (strcmp(permission,"read") == 0)
+	if (
+		ends_with(exchange,".protected") == 0 	|| 
+		ends_with(exchange,".diagnostics") == 0	||
+		ends_with(exchange,".notification") == 0
+	)
 	{
 		snprintf(bind_exchange,	1 + MAX_LEN_RESOURCE_ID,"%s",	my_exchange);
 		/*
@@ -3087,11 +3017,11 @@ share (struct http_request *req)
 		snprintf(bind_topic,	1 + MAX_LEN_TOPIC,      "%s",	topic);
 		*/
 	}
-	else if (strcmp(permission,"write") == 0)
+	else
 	{
 		snprintf(bind_exchange,	1 + MAX_LEN_RESOURCE_ID,"%s.publish",	from_id);
-		snprintf(bind_queue,	1 + MAX_LEN_RESOURCE_ID,"%s",		my_exchange);		// exchange in follow is "device.command"
-		snprintf(bind_topic,	1 + MAX_LEN_TOPIC,      "%s.%s",	my_exchange,topic); 	// binding routing is "dev.command.topic"
+		snprintf(bind_queue,	1 + MAX_LEN_RESOURCE_ID,"%s",		my_exchange);
+		snprintf(bind_topic,	1 + MAX_LEN_TOPIC,      "%s.%s",	my_exchange,topic);
 
 		for (tries = 1; tries <= MAX_AMQP_RETRIES; ++tries)
 		{
@@ -3123,10 +3053,6 @@ share (struct http_request *req)
 
 		debug_printf("\n--->binding {%s} with {%s} {%s}\n",bind_queue,bind_exchange,bind_topic);
 	}
-	else
-	{
-		ERROR ("wrong value of permission in db");
-	}
 
 	if (is_from_autonomous)
 		snprintf (exchange, 1 + MAX_LEN_RESOURCE_ID, "%s.notification",from_id);
@@ -3152,7 +3078,7 @@ share (struct http_request *req)
 	char *subject = "Approved follow request";
 
 	char message[1025];
-	snprintf(message, 1025, "'%s' has approved follow request for '%s' access on '%s'",id,permission,bind_exchange);
+	snprintf(message, 1025, "'%s' has approved follow request for access on '%s'",id,bind_exchange);
 
 	props.user_id 		= amqp_cstring_bytes("admin");
 	props.content_type 	= amqp_cstring_bytes("text/plain");
@@ -3294,7 +3220,7 @@ get_follow_status (struct http_request *req)
 	{
 		CREATE_STRING (query,
 			"SELECT "
-			"follow_id,requested_by,exchange,time,permission,topic,validity,status "
+			"follow_id,requested_by,exchange,time,topic,validity,status "
 			"FROM follow "
 			"WHERE from_id LIKE '%s/%%' "
 			"ORDER BY time DESC",
@@ -3305,7 +3231,7 @@ get_follow_status (struct http_request *req)
 	{
 		CREATE_STRING (query,
 			"SELECT "
-			"follow_id,requested_by,exchange,time,permission,topic,validity,status "
+			"follow_id,requested_by,exchange,time,topic,validity,status "
 			"FROM follow "
 			"WHERE from_id = '%s' "
 			"ORDER BY time DESC",
@@ -3327,7 +3253,6 @@ get_follow_status (struct http_request *req)
 			"\"from\":\"%s\","
 			"\"to\":\"%s\","
 			"\"time\":\"%s\","
-			"\"permission\":\"%s\","
 			"\"topic\":\"%s\","
 			"\"validity\":\"%s\","
 			"\"status\":\"%s\"},"
@@ -3338,8 +3263,7 @@ get_follow_status (struct http_request *req)
 			kore_pgsql_getvalue(&sql,i,3),
 			kore_pgsql_getvalue(&sql,i,4),
 			kore_pgsql_getvalue(&sql,i,5),
-			kore_pgsql_getvalue(&sql,i,6),
-			kore_pgsql_getvalue(&sql,i,7)
+			kore_pgsql_getvalue(&sql,i,6)
 		);
 	}
 	if (num_rows > 0)
@@ -3392,7 +3316,7 @@ get_follow_requests (struct http_request *req)
 	{
 		CREATE_STRING (query,
 			"SELECT "
-			"follow_id,requested_by,exchange,time,permission,topic,validity "
+			"follow_id,requested_by,exchange,time,topic,validity "
 			"FROM follow "
 			"WHERE exchange LIKE '%s/%%.%%' AND status='pending' "
 			"ORDER BY time",
@@ -3403,7 +3327,7 @@ get_follow_requests (struct http_request *req)
 	{
 		CREATE_STRING (query,
 			"SELECT "
-			"follow_id,requested_by,exchange,time,permission,topic,validity "
+			"follow_id,requested_by,exchange,time,topic,validity "
 			"FROM follow "
 			"WHERE exchange LIKE '%s.%%' AND status='pending' "
 			"ORDER BY time",
@@ -3425,7 +3349,6 @@ get_follow_requests (struct http_request *req)
 			"\"from\":\"%s\","
 			"\"to\":\"%s\","
 			"\"time\":\"%s\","
-			"\"permission\":\"%s\","
 			"\"topic\":\"%s\","
 			"\"validity\":\"%s\"},"
 			,
@@ -3627,7 +3550,7 @@ permissions (struct http_request *req)
 /////////////////////////////////////////////////
 
 	CREATE_STRING(query,
-			"SELECT exchange,permission FROM acl WHERE from_id='%s' "
+			"SELECT exchange FROM acl WHERE from_id='%s' "
 			"AND valid_till > now()",entity
 	);
 	RUN_QUERY (query,"could not query acl table");
@@ -3639,13 +3562,10 @@ permissions (struct http_request *req)
 
 	for (i = 0; i < num_rows; ++i)
 	{
-		char *my_exchange 	= kore_pgsql_getvalue(&sql,i,0);
-		char *perm 		= kore_pgsql_getvalue(&sql,i,1);
-
-		kore_buf_appendf(response,
-				"{\"entity\":\"%s\",\"permission\":\"%s\"},",
-					my_exchange,
-					perm
+		kore_buf_appendf(
+				response,
+					"\"%s\",",
+						kore_pgsql_getvalue(&sql,i,0);
 		);
 	}
 
@@ -3842,8 +3762,14 @@ create_exchanges_and_queues (void *v)
 			}
 			debug_printf("[entity] DONE creating queue {%s}\n",my_queue);
 
-			// bind .private and .notification 
-			if (strcmp(_q[i],".private") == 0 || strcmp(_q[i],".notification") == 0)
+			// bind .service, .private and .notification 
+			if (
+				(strcmp(_q[i],".service") == 0)
+					||
+				(strcmp(_q[i],".private") == 0)
+					||
+				(strcmp(_q[i],".notification") == 0)
+			)
 			{
 				snprintf(my_exchange, 1 + MAX_LEN_RESOURCE_ID,"%s%s",id,_q[i]);
 				debug_printf("[entity] binding {%s} -> {%s}\n",my_queue,my_exchange);

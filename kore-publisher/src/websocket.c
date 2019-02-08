@@ -21,7 +21,21 @@ websocket_connect(struct connection *c)
 void
 websocket_message(struct connection *c, u_int8_t op, void *data, size_t len)
 {
-	printf("Message\n");
+	printf("Message {%s}\n",data);
+	if (len >= 3)
+	{	
+		/*if (data[0] == 'p' && data[1] == ' ')
+		{
+		}
+		else if (data[0] == 's' && data[1] == ' ')
+		{
+		}*/
+		// error
+	}
+	else
+	{
+		// error
+	}
 }
 
 void
@@ -56,8 +70,10 @@ int serve_websocket (struct http_request *req)
 	if (! login_success(id,apikey,&is_autonomous))
 		FORBIDDEN("invalid id or apikey");
 
+	/// TODO put it in websocket init
 	struct kore_pool http_header_pool;
 
+	/// TODO put it in websocket init
 	kore_pool_init (
 		&http_header_pool,
 		"my_http_request_pool",
@@ -78,7 +94,11 @@ int serve_websocket (struct http_request *req)
 		hdr->value	= kore_strdup(server_generated_sec_websocket_key);
 
 		TAILQ_INSERT_TAIL(&(req->req_headers), hdr, list);
+
+		printf("\nGenerated key {%s}\n",sec_websocket_key);
 	}
+	else
+		printf("\nFound key {%s}\n",sec_websocket_key);
 
 	if (KORE_RESULT_OK != http_request_header(req,"sec-websocket-version",&sec_websocket_version))
 	{
@@ -89,6 +109,10 @@ int serve_websocket (struct http_request *req)
 
 		TAILQ_INSERT_TAIL(&(req->req_headers), hdr, list);
 	}
+	else
+		printf("Found version {%s}\n",sec_websocket_version);
+
+	printf("Yes\n");
 
 	kore_websocket_handshake (
 		req,
@@ -98,8 +122,8 @@ int serve_websocket (struct http_request *req)
 	);
 
 	return (KORE_RESULT_OK);
-
 done:
+
 	http_response_header(
 		req,
 		"content-type",

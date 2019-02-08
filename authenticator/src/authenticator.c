@@ -411,19 +411,22 @@ auth_resource(struct http_request *req)
 
 		if (looks_like_a_valid_owner(username))
 		{
-			// allow queue = username.notification
+			// allow reading .notification
 			if (strcmp(name + strlen_username ,".notififcation") == 0)
 				OK();
+
 		}
 		else
 		{
-			// else allow in queues = username, username.priority and username.priority 
+			// else allow in queues = username, .priority, .priority, .service
 			if (
 				(strcmp(name,username) == 0)
 					||
 				(strcmp(name + strlen_username ,".priority") == 0)
 					||
 				(strcmp(name + strlen_username ,".command") == 0)
+					||
+				(strcmp(name + strlen_username ,".service") == 0)
 			)
 			{
 				OK();
