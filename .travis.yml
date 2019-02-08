@@ -17,6 +17,6 @@ before_script:
   - cd ..
 
 script:
-  - ./test-suite/test fxnl --random
-  - ./test-suite/test sec
-  - ./test-suite/test concr
+  - ./test-suite/test functional--random
+  - ./test-suite/test security
+  - ./test-suite/test concurrency
