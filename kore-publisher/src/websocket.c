@@ -49,9 +49,6 @@ int serve_websocket (struct http_request *req)
 	const char *id;
 	const char *apikey;
 
-	const char *sec_websocket_key;
-	const char *sec_websocket_version;
-
 	struct kore_buf *response = kore_buf_alloc(128);
 
 	req->status = 403;
@@ -70,49 +67,8 @@ int serve_websocket (struct http_request *req)
 	if (! login_success(id,apikey,&is_autonomous))
 		FORBIDDEN("invalid id or apikey");
 
-	/// TODO put it in websocket init
-	struct kore_pool http_header_pool;
-
-	/// TODO put it in websocket init
-	kore_pool_init (
-		&http_header_pool,
-		"my_http_request_pool",
-           	sizeof(struct http_request),
-		2
-	);
-		
-	if (KORE_RESULT_OK != http_request_header(req,"sec-websocket-key",&sec_websocket_key))
-	{
-		struct http_header *hdr = kore_pool_get(&http_header_pool);
-
-		char server_generated_sec_websocket_key[32];
-
-		for (int i = 0; i < 32; ++i)
-			server_generated_sec_websocket_key [i] = password_chars[arc4random_uniform(n_passwd_chars)]; 
-
-		hdr->header	= kore_strdup("sec-websocket-key");
-		hdr->value	= kore_strdup(server_generated_sec_websocket_key);
-
-		TAILQ_INSERT_TAIL(&(req->req_headers), hdr, list);
-
-		printf("\nGenerated key {%s}\n",sec_websocket_key);
-	}
-	else
-		printf("\nFound key {%s}\n",sec_websocket_key);
-
-	if (KORE_RESULT_OK != http_request_header(req,"sec-websocket-version",&sec_websocket_version))
-	{
-		struct http_header *hdr = kore_pool_get(&http_header_pool);
-
-		hdr->header	= kore_strdup("sec-websocket-version");
-		hdr->value	= kore_strdup("13");
-
-		TAILQ_INSERT_TAIL(&(req->req_headers), hdr, list);
-	}
-	else
-		printf("Found version {%s}\n",sec_websocket_version);
-
-	printf("Yes\n");
+	// todo ok ?
+	req->hdlr_extra = kore_strdup("success");
 
 	kore_websocket_handshake (
 		req,

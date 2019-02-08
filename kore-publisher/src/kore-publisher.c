@@ -12,7 +12,6 @@ static const char *_e[] = {
 	".public",
 	".private",
 	".publish",
-	".service",
 	".protected",
 	".diagnostics",
 	".notification",
@@ -24,7 +23,6 @@ static const char *_q[] = {
 	".private",
 	".priority",
 	".command",
-	".service",
 	".notification",
 	NULL
 };
@@ -126,6 +124,7 @@ init_admin_connection (void)
 	}
 
 	rpc_reply = amqp_get_rpc_reply(admin_connection);
+
 	if (rpc_reply.reply_type != AMQP_RESPONSE_NORMAL)
 	{
 		fprintf(stderr,"broker did not send AMQP_RESPONSE_NORMAL\n");
@@ -624,14 +623,8 @@ publish (struct http_request *req)
 	}
 	else
 	{
-		if (
-			(strcmp(message_type,"command") != 0)
-				&&
-			(strcmp(message_type,"service") != 0)
-		)
-		{
-			BAD_REQUEST("message-type can only be command/service");
-		}
+		if (strcmp(message_type,"command") != 0)
+			BAD_REQUEST("message-type can only be command");
 
 		snprintf (
 			subject_to_publish,
@@ -811,10 +804,6 @@ subscribe (struct http_request *req)
 		else if (strcmp(message_type,"notification") == 0)
 		{
 			strlcat(queue,".notification",128);
-		}
-		else if (strcmp(message_type,"service") == 0)
-		{
-			strlcat(queue,".service",128);
 		}
 		else
 		{
@@ -2170,8 +2159,7 @@ queue_bind (struct http_request *req)
 		(strcmp(message_type,"public") 		!= 0) &&
 		(strcmp(message_type,"private") 	!= 0) &&
 		(strcmp(message_type,"protected") 	!= 0) &&
-		(strcmp(message_type,"diagnostics") 	!= 0) &&
-		(strcmp(message_type,"service")		!= 0)
+		(strcmp(message_type,"diagnostics") 	!= 0)
 	)
 	{
 		BAD_REQUEST("message-type is invalid");
@@ -2336,8 +2324,7 @@ queue_unbind (struct http_request *req)
 		(strcmp(message_type,"public") 		!= 0) &&
 		(strcmp(message_type,"private") 	!= 0) &&
 		(strcmp(message_type,"protected") 	!= 0) &&
-		(strcmp(message_type,"diagnostics") 	!= 0) &&
-		(strcmp(message_type,"service")		!= 0)
+		(strcmp(message_type,"diagnostics") 	!= 0)
 	)
 	{
 		BAD_REQUEST("message-type is invalid");
@@ -2484,7 +2471,6 @@ follow (struct http_request *req)
 	);
 
 	BAD_REQUEST_if (
-		(strcmp(message_type,"service")		!= 0) &&
 		(strcmp(message_type,"command") 	!= 0) &&
 		(strcmp(message_type,"protected") 	!= 0) &&
 		(strcmp(message_type,"diagnostics") 	!= 0)
@@ -2598,7 +2584,7 @@ follow (struct http_request *req)
 
 		RUN_QUERY (query,"could not run insert query on acl");
 
-		if (strcmp(message_type,"command") == 0 || strcmp(message_type,"service") == 0)
+		if (strcmp(message_type,"command") == 0)
 		{
 			char write_exchange 	[1 + MAX_LEN_RESOURCE_ID];
 			char write_queue	[1 + MAX_LEN_RESOURCE_ID];
@@ -2678,7 +2664,7 @@ follow (struct http_request *req)
 				1,
 				amqp_cstring_bytes(exchange),
 				amqp_cstring_bytes(subject),
-				0,
+				1, /* mandatory */
 				0,
 				&props,
 				amqp_cstring_bytes(message)
@@ -2848,7 +2834,7 @@ unfollow (struct http_request *req)
 			ERROR(error_string);
 		}
 	}
-	else // command or service
+	else // command
 	{
 		char write_exchange 	[1 + MAX_LEN_RESOURCE_ID];
 		char *write_queue 	= my_exchange;
@@ -3090,7 +3076,7 @@ share (struct http_request *req)
 			1,
 			amqp_cstring_bytes(exchange),
 			amqp_cstring_bytes(subject),
-			0,
+			1, /* mandatory */
 			0,
 			&props,
 			amqp_cstring_bytes(message)
@@ -3762,10 +3748,8 @@ create_exchanges_and_queues (void *v)
 			}
 			debug_printf("[entity] DONE creating queue {%s}\n",my_queue);
 
-			// bind .service, .private and .notification 
+			// bind .private and .notification 
 			if (
-				(strcmp(_q[i],".service") == 0)
-					||
 				(strcmp(_q[i],".private") == 0)
 					||
 				(strcmp(_q[i],".notification") == 0)

@@ -418,15 +418,13 @@ auth_resource(struct http_request *req)
 		}
 		else
 		{
-			// else allow in queues = username, .priority, .priority, .service
+			// else allow in queues = username, .priority, .priority
 			if (
 				(strcmp(name,username) == 0)
 					||
 				(strcmp(name + strlen_username ,".priority") == 0)
 					||
 				(strcmp(name + strlen_username ,".command") == 0)
-					||
-				(strcmp(name + strlen_username ,".service") == 0)
 			)
 			{
 				OK();
