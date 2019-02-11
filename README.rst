@@ -48,7 +48,7 @@ Quickstart
 
 #. Test the middleware using::
 
-    ./test-suite/test fxnl --random
+    ./test-suite/test functional --random
 
 
 Restricting admin APIs
