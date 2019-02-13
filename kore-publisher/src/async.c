@@ -184,20 +184,20 @@ publish_async (struct http_request *req)
 
 	BAD_REQUEST_if
 	(
-		KORE_RESULT_OK != http_request_header(req, "id", &id)
+		! http_request_header(req, "id", &id)
 				||
-		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+		! http_request_header(req, "apikey", &apikey)
 				||
-		KORE_RESULT_OK != http_request_header(req, "to", &to)
+		! http_request_header(req, "to", &to)
 				||
-		KORE_RESULT_OK != http_request_header(req, "subject", &subject)
+		! http_request_header(req, "subject", &subject)
 				||
-		KORE_RESULT_OK != http_request_header(req, "message-type", &message_type)
+		! http_request_header(req, "message-type", &message_type)
 			,
 		"inputs missing in headers"
 	);
 
-	if (http_request_header(req, "message", &message) != KORE_RESULT_OK)
+	if (! http_request_header(req, "message", &message))
 	{
 		if (req->http_body == NULL)
 			BAD_REQUEST("no message found in request");
@@ -209,7 +209,7 @@ publish_async (struct http_request *req)
 			BAD_REQUEST("no message found in request");
 	}
 
-	if (http_request_header(req, "content-type", &content_type) != KORE_RESULT_OK)
+	if (! http_request_header(req, "content-type", &content_type))
 		content_type = "";
 
 	publish_async_data_t *data = malloc (sizeof(publish_async_data_t));
@@ -269,7 +269,7 @@ done:
 
 	kore_buf_reset(response);
 
-	return (KORE_RESULT_OK);
+	return KORE_RESULT_OK;
 }
 
 int async_init (char *connection_str)

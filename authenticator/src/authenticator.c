@@ -321,7 +321,7 @@ done:
 
 	kore_pgsql_cleanup(&sql);
 
-	return (KORE_RESULT_OK);
+	return KORE_RESULT_OK;
 }
 
 int
@@ -329,7 +329,7 @@ auth_vhost(struct http_request *req)
 {
 	// dont worry about vhost
 	http_response(req, 200, "allow", 5);
-	return (KORE_RESULT_OK);
+	return KORE_RESULT_OK;
 }
 
 int
@@ -337,7 +337,7 @@ auth_topic(struct http_request *req)
 {
 	// dont worry about topic 
 	http_response(req, 200, "allow", 5);
-	return (KORE_RESULT_OK);
+	return KORE_RESULT_OK;
 }
 
 int
@@ -484,7 +484,7 @@ done:
 
 	kore_pgsql_cleanup(&sql);
 
-	return (KORE_RESULT_OK);
+	return KORE_RESULT_OK;
 }
 
 void

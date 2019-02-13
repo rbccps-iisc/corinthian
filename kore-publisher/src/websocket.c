@@ -55,9 +55,9 @@ int serve_websocket (struct http_request *req)
 
 	BAD_REQUEST_if
 	(
-		KORE_RESULT_OK != http_request_header(req, "id", &id)
+		! http_request_header(req, "id", &id)
 				||
-		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+		! http_request_header(req, "apikey", &apikey)
 			,
 		"inputs missing in headers"
 	);
@@ -77,7 +77,7 @@ int serve_websocket (struct http_request *req)
 		"websocket_disconnect"
 	);
 
-	return (KORE_RESULT_OK);
+	return KORE_RESULT_OK;
 done:
 
 	http_response_header(
@@ -95,5 +95,5 @@ done:
 
 	kore_buf_reset(response);
 
-	return (KORE_RESULT_OK);
+	return KORE_RESULT_OK;
 }

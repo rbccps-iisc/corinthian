@@ -208,7 +208,10 @@ bool is_request_from_localhost (struct http_request *);
 	}							\
 	if (! kore_pgsql_query(&sql, (char *)query->data))	\
 	{							\
-		printf("Error in query {%s}\n",query->data);	\
+		printf("[%d] Error in query {%s}\n",		\
+				__LINE__,			\
+				query->data			\
+		);						\
 		kore_pgsql_logerror(&sql);			\
 		ERROR(err);					\
 	}							\

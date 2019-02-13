@@ -486,6 +486,7 @@ login_success (const char *id, const char *apikey, bool *is_autonomous)
 	}
 	if (! kore_pgsql_query(&sql,(const char *)query->data))
 	{
+		printf("[%d] Error in query {%s}\n",__LINE__,query->data);
 		kore_pgsql_logerror(&sql);
 		goto done;
 	}
@@ -579,15 +580,15 @@ publish (struct http_request *req)
 
 	BAD_REQUEST_if
 	(
-		KORE_RESULT_OK != http_request_header(req, "id", &id)
+		! http_request_header(req, "id", &id)
 				||
-		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+		! http_request_header(req, "apikey", &apikey)
 				||
-		KORE_RESULT_OK != http_request_header(req, "to", &to)
+		! http_request_header(req, "to", &to)
 				||
-		KORE_RESULT_OK != http_request_header(req, "subject", &subject)
+		! http_request_header(req, "subject", &subject)
 				||
-		KORE_RESULT_OK != http_request_header(req, "message-type", &message_type)
+		! http_request_header(req, "message-type", &message_type)
 			,
 		"inputs missing in headers"
 	);
@@ -641,7 +642,7 @@ publish (struct http_request *req)
 		debug_printf("==> topic = %s\n",subject_to_publish);
 	}
 
-	if (http_request_header(req, "message", &message) != KORE_RESULT_OK)
+	if (! http_request_header(req, "message", &message))
 	{
 		if (req->http_body == NULL)
 			BAD_REQUEST("no message found in request");
@@ -654,7 +655,7 @@ publish (struct http_request *req)
 	}
 
 	// get content-type and set in props
-	if (http_request_header(req,"content-type",&content_type) != KORE_RESULT_OK)
+	if (! http_request_header(req,"content-type",&content_type))
 	{
 		content_type = "";
 	}
@@ -773,11 +774,21 @@ subscribe (struct http_request *req)
 
 	req->status = 403;
 
+	http_populate_get(req);
+
 	BAD_REQUEST_if
 	(
-		KORE_RESULT_OK != http_request_header(req, "id", &id)
+		(
+			! http_request_header		(req, "id", &id)
+				&&
+			! http_argument_get_string 	(req, "id", &id)
+		)
 				||
-		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+		(
+			! http_request_header		(req, "apikey", &apikey)
+				&&
+			! http_argument_get_string 	(req, "apikey", &apikey)
+		)
 			,
 		"inputs missing in headers"
 	);
@@ -787,7 +798,7 @@ subscribe (struct http_request *req)
 
 	strlcpy(queue,id,128);
 
-	if (KORE_RESULT_OK == http_request_header(req, "message-type", &message_type))
+	if (http_request_header(req, "message-type", &message_type))
 	{
 		if (strcmp(message_type,"private") == 0)
 		{
@@ -812,7 +823,7 @@ subscribe (struct http_request *req)
 	}
 
 	int int_num_messages = 10;
-	if (KORE_RESULT_OK == http_request_header(req, "num-messages", &num_messages))
+	if (http_request_header(req, "num-messages", &num_messages))
 	{
 		int_num_messages = strtonum(num_messages,1,100,NULL);
 
@@ -1046,9 +1057,9 @@ reset_apikey (struct http_request *req)
 
 	BAD_REQUEST_if
 	(
-		KORE_RESULT_OK != http_request_header(req, "id", &id)
+		! http_request_header(req, "id", &id)
 				||
-		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+		! http_request_header(req, "apikey", &apikey)
 			,
 		"inputs missing in headers"
 	);
@@ -1064,7 +1075,7 @@ reset_apikey (struct http_request *req)
 		if (! is_request_from_localhost(req))
 			FORBIDDEN("admin can only call APIs from localhost");
 
-		if (KORE_RESULT_OK != http_request_header(req, "owner", &reset_api_key_for))
+		if (! http_request_header(req, "owner", &reset_api_key_for))
 			BAD_REQUEST("owner field missing in header");
 
 		if (! is_string_safe(reset_api_key_for))
@@ -1075,7 +1086,7 @@ reset_apikey (struct http_request *req)
 	}
 	else
 	{
-		if (KORE_RESULT_OK != http_request_header(req, "entity", &reset_api_key_for))
+		if (! http_request_header(req, "entity", &reset_api_key_for))
 			BAD_REQUEST("entity field missing in header");
 
 		if (! is_owner(id,reset_api_key_for))
@@ -1135,13 +1146,13 @@ set_autonomous(struct http_request *req)
 
 	BAD_REQUEST_if
 	(
-		KORE_RESULT_OK != http_request_header(req, "id", &id)
+		! http_request_header(req, "id", &id)
 				||
-		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+		! http_request_header(req, "apikey", &apikey)
 				||
-		KORE_RESULT_OK != http_request_header(req, "entity", &entity)
+		! http_request_header(req, "entity", &entity)
 				||
-		KORE_RESULT_OK != http_request_header(req, "is-autonomous", &str_is_autonomous)
+		! http_request_header(req, "is-autonomous", &str_is_autonomous)
 			,
 		"inputs missing in headers"
 	);
@@ -1223,11 +1234,11 @@ register_entity (struct http_request *req)
 
 	BAD_REQUEST_if
 	(
-		KORE_RESULT_OK != http_request_header(req, "id", &id)
+		! http_request_header(req, "id", &id)
 				||
-		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+		! http_request_header(req, "apikey", &apikey)
 				||
-		KORE_RESULT_OK != http_request_header(req, "entity", &entity)
+		! http_request_header(req, "entity", &entity)
 			,
 		"inputs missing in headers"
 	);
@@ -1246,7 +1257,7 @@ register_entity (struct http_request *req)
 		BAD_REQUEST("schema too long");
 	
 	bool is_autonomous = false;
-	if (http_request_header(req, "is-autonomous", &char_is_autonomous) == KORE_RESULT_OK)
+	if (http_request_header(req, "is-autonomous", &char_is_autonomous))
 	{
 		is_autonomous = (0 == strcmp(char_is_autonomous,"true"));
 	}
@@ -1314,7 +1325,7 @@ register_entity (struct http_request *req)
 	kore_pgsql_init(&sql);
 
 	if (! kore_pgsql_setup(&sql,"db",KORE_PGSQL_SYNC))
-	{
+	{	
 		kore_pgsql_logerror(&sql);
 		ERROR("DB error while setup");
 	}
@@ -1331,6 +1342,7 @@ register_entity (struct http_request *req)
 		)
 	)
 	{
+		printf("[%d] Error in query {%s}\n",__LINE__,query->data);
 		kore_pgsql_logerror(&sql);
 		ERROR("failed to create the entity with schema");
 	}
@@ -1374,9 +1386,9 @@ get_entities (struct http_request *req)
 
 	BAD_REQUEST_if
 	(
-		KORE_RESULT_OK != http_request_header(req, "id", &id)
+		! http_request_header(req, "id", &id)
 				||
-		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+		! http_request_header(req, "apikey", &apikey)
 			,
 		"inputs missing in headers"
 	);
@@ -1445,11 +1457,11 @@ deregister_entity (struct http_request *req)
 
 	BAD_REQUEST_if
 	(
-		KORE_RESULT_OK != http_request_header(req, "id", &id)
+		! http_request_header(req, "id", &id)
 				||
-		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+		! http_request_header(req, "apikey", &apikey)
 				||
-		KORE_RESULT_OK != http_request_header(req, "entity", &entity)
+		! http_request_header(req, "entity", &entity)
 			,
 		"inputs missing in headers"
 	);
@@ -1551,11 +1563,11 @@ catalog (struct http_request *req)
 	kore_buf_append(response,"{",1);
 
 	if (
-		KORE_RESULT_OK != http_request_header(req, "id", &id)
+		! http_request_header(req, "id", &id)
 				||
-		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+		! http_request_header(req, "apikey", &apikey)
 				||
-		(! login_success (id,apikey,NULL))
+		! login_success (id,apikey,NULL)
 	)
 	{
 		CREATE_STRING (query,
@@ -1712,6 +1724,7 @@ search_catalog (struct http_request *req)
 			)
 		)
 		{
+			printf("[%d] Error in query {%s}\n",__LINE__,query->data);
 			kore_pgsql_logerror(&sql);
 			ERROR("failed to query catalog schema using body");
 		}
@@ -1819,11 +1832,11 @@ register_owner(struct http_request *req)
 
 	BAD_REQUEST_if
 	(
-		KORE_RESULT_OK != http_request_header(req, "id", &id)
+		! http_request_header(req, "id", &id)
 				||
-		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+		! http_request_header(req, "apikey", &apikey)
 				||
-		KORE_RESULT_OK != http_request_header(req, "owner", &owner)
+		! http_request_header(req, "owner", &owner)
 			,
 		"inputs missing in headers"
 	);
@@ -1927,9 +1940,9 @@ get_owners(struct http_request *req)
 
 	BAD_REQUEST_if
 	(
-		KORE_RESULT_OK != http_request_header(req, "id", &id)
+		! http_request_header(req, "id", &id)
 				||
-		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+		! http_request_header(req, "apikey", &apikey)
 			,
 		"inputs missing in headers"
 	);
@@ -1998,11 +2011,11 @@ deregister_owner(struct http_request *req)
 
 	BAD_REQUEST_if
 	(
-		KORE_RESULT_OK != http_request_header(req, "id", &id)
+		! http_request_header(req, "id", &id)
 				||
-		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+		! http_request_header(req, "apikey", &apikey)
 				||
-		KORE_RESULT_OK != http_request_header(req, "owner", &owner)
+		! http_request_header(req, "owner", &owner)
 			,
 		"inputs missing in headers"
 	);
@@ -2117,15 +2130,15 @@ queue_bind (struct http_request *req)
 
 	BAD_REQUEST_if
 	(
-		KORE_RESULT_OK != http_request_header(req, "id", &id)
+		! http_request_header(req, "id", &id)
 				||
-		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+		! http_request_header(req, "apikey", &apikey)
 				||
-		KORE_RESULT_OK != http_request_header(req, "to", &to)
+		! http_request_header(req, "to", &to)
 				||
-		KORE_RESULT_OK != http_request_header(req, "topic", &topic)
+		! http_request_header(req, "topic", &topic)
 				||
-		KORE_RESULT_OK != http_request_header(req, "message-type", &message_type)
+		! http_request_header(req, "message-type", &message_type)
 			,
 		"inputs missing in headers"
 	);
@@ -2136,7 +2149,7 @@ queue_bind (struct http_request *req)
 
 	if (looks_like_a_valid_owner(id))
 	{
-		if (KORE_RESULT_OK != http_request_header(req, "from", &from))
+		if (! http_request_header(req, "from", &from))
 			BAD_REQUEST("'from' value missing in header");
 
 		if (! looks_like_a_valid_entity(from))
@@ -2197,7 +2210,7 @@ queue_bind (struct http_request *req)
 /////////////////////////////////////////////////
 
 	strlcpy(queue,from,128);
-	if (KORE_RESULT_OK == http_request_header(req, "is-priority", &is_priority))
+	if (http_request_header(req, "is-priority", &is_priority))
 	{
 		if (strcmp(is_priority,"true") == 0)
 		{
@@ -2219,7 +2232,7 @@ queue_bind (struct http_request *req)
 				"SELECT 1 FROM acl WHERE "
 				"from_id = '%s' "
 				"AND exchange = '%s' "
-				"AND valid_till > now() AND topic = '%s'",
+				"AND valid_till > NOW() AND topic = '%s'",
 				from,
 				exchange,
 				topic
@@ -2286,22 +2299,22 @@ queue_unbind (struct http_request *req)
 
 	BAD_REQUEST_if
 	(
-		KORE_RESULT_OK != http_request_header(req, "id", &id)
+		! http_request_header(req, "id", &id)
 				||
-		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+		! http_request_header(req, "apikey", &apikey)
 				||
-		KORE_RESULT_OK != http_request_header(req, "to", &to)
+		! http_request_header(req, "to", &to)
 				||
-		KORE_RESULT_OK != http_request_header(req, "topic", &topic)
+		! http_request_header(req, "topic", &topic)
 				||
-		KORE_RESULT_OK != http_request_header(req, "message-type", &message_type)
+		! http_request_header(req, "message-type", &message_type)
 			,
 		"inputs missing in headers"
 	);
 
 	if (looks_like_a_valid_owner(id))
 	{
-		if (KORE_RESULT_OK != http_request_header(req, "from", &from))
+		if (! http_request_header(req, "from", &from))
 			BAD_REQUEST("'from' value missing in header");
 
 		if (! looks_like_a_valid_entity(from))
@@ -2362,7 +2375,7 @@ queue_unbind (struct http_request *req)
 	snprintf(exchange, 1 + MAX_LEN_RESOURCE_ID,"%s.%s", to,message_type); 
 	strlcpy	(queue,from,MAX_LEN_RESOURCE_ID);
 
-	if (KORE_RESULT_OK == http_request_header(req, "is-priority", &is_priority))
+	if (http_request_header(req, "is-priority", &is_priority))
 	{
 		if (strcmp(is_priority,"true") == 0)
 		{
@@ -2383,7 +2396,7 @@ queue_unbind (struct http_request *req)
 			    "SELECT 1 FROM acl WHERE "
 			    "from_id = '%s' "
 			    "AND exchange = '%s' "
-			    "AND valid_till > now() "
+			    "AND valid_till > NOW() "
 			    "AND topic = '%s'",
 			    from,
 			    exchange,
@@ -2455,17 +2468,17 @@ follow (struct http_request *req)
 
 	BAD_REQUEST_if
 	(
-		KORE_RESULT_OK != http_request_header(req, "id", &id)
+		! http_request_header(req, "id", &id)
 				||
-		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+		! http_request_header(req, "apikey", &apikey)
 				||
-		KORE_RESULT_OK != http_request_header(req, "to", &to)
+		! http_request_header(req, "to", &to)
 				||
-		KORE_RESULT_OK != http_request_header(req, "validity", &validity)
+		! http_request_header(req, "validity", &validity)
 				||
-		KORE_RESULT_OK != http_request_header(req, "topic", &topic)
+		! http_request_header(req, "topic", &topic)
 				||
-		KORE_RESULT_OK != http_request_header(req, "message-type", &message_type)
+		! http_request_header(req, "message-type", &message_type)
 			,
 		"inputs missing in headers"
 	);
@@ -2480,7 +2493,7 @@ follow (struct http_request *req)
 
 	if (looks_like_a_valid_owner(id))
 	{
-		if (KORE_RESULT_OK != http_request_header(req, "from", &from))
+		if (! http_request_header(req, "from", &from))
 			BAD_REQUEST("'from' value missing in header");
 
 		if (! looks_like_a_valid_entity(from))
@@ -2523,7 +2536,6 @@ follow (struct http_request *req)
 
 /////////////////////////////////////////////////
 
-
 	// if both from and to are owned by id
 	if (is_owner(id,to))
 		status = "approved";
@@ -2552,7 +2564,7 @@ follow (struct http_request *req)
 	CREATE_STRING (query, 
 		"INSERT INTO follow "
 		"(follow_id,requested_by,from_id,exchange,time,topic,validity,status) "
-		"VALUES(DEFAULT,'%s','%s','%s.%s',now(),'%s','%s','%d','%s')",
+		"VALUES(DEFAULT,'%s','%s','%s.%s',NOW(),'%s','%d','%s')",
 			id,
 			from,
 			to,
@@ -2573,7 +2585,7 @@ follow (struct http_request *req)
 		CREATE_STRING (query,
 			"INSERT INTO acl "
 			"(acl_id,from_id,exchange,follow_id,topic,valid_till) "
-			"VALUES(DEFAULT,'%s','%s.%s','%s','%s', '%s', now() + interval '%d hours')",
+			"VALUES(DEFAULT,'%s','%s.%s','%s','%s',NOW() + interval '%d hours')",
 		        	from,
 				to,
 				message_type,
@@ -2698,11 +2710,11 @@ unfollow (struct http_request *req)
 
 	BAD_REQUEST_if
 	(
-		KORE_RESULT_OK != http_request_header(req, "id", &id)
+		! http_request_header(req, "id", &id)
 				||
-		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+		! http_request_header(req, "apikey", &apikey)
 				||
-		KORE_RESULT_OK != http_request_header(req, "follow-id", &follow_id)
+		! http_request_header(req, "follow-id", &follow_id)
 			,
 		"inputs missing in headers"
 	);
@@ -2899,11 +2911,11 @@ share (struct http_request *req)
 
 	BAD_REQUEST_if
 	(
-		KORE_RESULT_OK != http_request_header(req, "id", &id)
+		! http_request_header(req, "id", &id)
 				||
-		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+		! http_request_header(req, "apikey", &apikey)
 				||
-		KORE_RESULT_OK != http_request_header(req, "follow-id", &follow_id)
+		! http_request_header(req, "follow-id", &follow_id)
 		,
 
 		"inputs missing in headers"
@@ -2977,7 +2989,7 @@ share (struct http_request *req)
 	// add entry in acl
 	CREATE_STRING (query,
 		"INSERT INTO acl (acl_id,from_id,exchange,follow_id,topic,valid_till) "
-		"VALUES(DEFAULT,'%s','%s','%s','%s','%s',now() + interval '%s hours')",
+		"VALUES(DEFAULT,'%s','%s','%s','%s',NOW() + interval '%s hours')",
 			from_id,
 			my_exchange,
 			follow_id,
@@ -3106,11 +3118,11 @@ reject_follow (struct http_request *req)
 
 	BAD_REQUEST_if
 	(
-		KORE_RESULT_OK != http_request_header(req, "id", &id)
+		! http_request_header(req, "id", &id)
 				||
-		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+		! http_request_header(req, "apikey", &apikey)
 				||
-		KORE_RESULT_OK != http_request_header(req, "follow-id", &follow_id)
+		! http_request_header(req, "follow-id", &follow_id)
 		,
 
 		"inputs missing in headers"
@@ -3182,9 +3194,9 @@ get_follow_status (struct http_request *req)
 
 	BAD_REQUEST_if
 	(
-		KORE_RESULT_OK != http_request_header(req, "id", &id)
+		! http_request_header(req, "id", &id)
 				||
-		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+		! http_request_header(req, "apikey", &apikey)
 		,
 
 		"inputs missing in headers"
@@ -3278,9 +3290,9 @@ get_follow_requests (struct http_request *req)
 
 	BAD_REQUEST_if
 	(
-		KORE_RESULT_OK != http_request_header(req, "id", &id)
+		! http_request_header(req, "id", &id)
 				||
-		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+		! http_request_header(req, "apikey", &apikey)
 		,
 
 		"inputs missing in headers"
@@ -3343,8 +3355,7 @@ get_follow_requests (struct http_request *req)
 			kore_pgsql_getvalue(&sql,i,2),
 			kore_pgsql_getvalue(&sql,i,3),
 			kore_pgsql_getvalue(&sql,i,4),
-			kore_pgsql_getvalue(&sql,i,5),
-			kore_pgsql_getvalue(&sql,i,6)
+			kore_pgsql_getvalue(&sql,i,5)
 		);
 	}
 	if (num_rows > 0)
@@ -3370,9 +3381,9 @@ block (struct http_request *req)
 
 	BAD_REQUEST_if
 	(
-		KORE_RESULT_OK != http_request_header(req, "id", &id)
+		! http_request_header(req, "id", &id)
 				||
-		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+		! http_request_header(req, "apikey", &apikey)
 			,
 		"inputs missing in headers"
 	);
@@ -3385,15 +3396,15 @@ block (struct http_request *req)
 		if (! is_request_from_localhost(req))
 			FORBIDDEN("admin can only call APIs from localhost");
 
-		if (KORE_RESULT_OK != http_request_header(req, "owner", &entity_to_be_blocked))
+		if (! http_request_header(req, "owner", &entity_to_be_blocked))
 		{
-			if (KORE_RESULT_OK != http_request_header(req, "entity", &entity_to_be_blocked))
+			if (! http_request_header(req, "entity", &entity_to_be_blocked))
 				BAD_REQUEST("owner/entity field missing in header");
 		}
 	}
 	else
 	{
-		if (KORE_RESULT_OK != http_request_header(req, "entity", &entity_to_be_blocked))
+		if (! http_request_header(req, "entity", &entity_to_be_blocked))
 			BAD_REQUEST("entity field missing in header");
 
 		if (! looks_like_a_valid_entity(entity_to_be_blocked))
@@ -3438,9 +3449,9 @@ unblock (struct http_request *req)
 
 	BAD_REQUEST_if
 	(
-		KORE_RESULT_OK != http_request_header(req, "id", &id)
+		! http_request_header(req, "id", &id)
 				||
-		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+		! http_request_header(req, "apikey", &apikey)
 			,
 		"inputs missing in headers"
 	);
@@ -3453,15 +3464,15 @@ unblock (struct http_request *req)
 		if (! is_request_from_localhost(req))
 			FORBIDDEN("admin can only call APIs from localhost");
 
-		if (KORE_RESULT_OK != http_request_header(req, "owner", &entity_to_be_unblocked))
+		if (! http_request_header(req, "owner", &entity_to_be_unblocked))
 		{
-			if (KORE_RESULT_OK != http_request_header(req, "entity", &entity_to_be_unblocked))
+			if (! http_request_header(req, "entity", &entity_to_be_unblocked))
 				BAD_REQUEST("owner/entity field missing in header");
 		}
 	}
 	else
 	{
-		if (KORE_RESULT_OK != http_request_header(req, "entity", &entity_to_be_unblocked))
+		if (! http_request_header(req, "entity", &entity_to_be_unblocked))
 			BAD_REQUEST("entity field missing in header");
 
 		if (! looks_like_a_valid_entity(entity_to_be_unblocked))
@@ -3505,16 +3516,16 @@ permissions (struct http_request *req)
 
 	BAD_REQUEST_if
 	(
-		KORE_RESULT_OK != http_request_header(req, "id", &id)
+		! http_request_header(req, "id", &id)
 				||
-		KORE_RESULT_OK != http_request_header(req, "apikey", &apikey)
+		! http_request_header(req, "apikey", &apikey)
 			,
 		"inputs missing in headers"
 	)
 
 	if (looks_like_a_valid_owner(id))
 	{
-		if (KORE_RESULT_OK != http_request_header(req, "entity", &entity))
+		if (! http_request_header(req, "entity", &entity))
 			BAD_REQUEST("entity value not specified in header");
 			
 		if (! is_owner(id,entity))
@@ -3537,7 +3548,7 @@ permissions (struct http_request *req)
 
 	CREATE_STRING(query,
 			"SELECT exchange FROM acl WHERE from_id='%s' "
-			"AND valid_till > now()",entity
+			"AND valid_till > NOW()",entity
 	);
 	RUN_QUERY (query,"could not query acl table");
 
