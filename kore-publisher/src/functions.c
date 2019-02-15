@@ -106,14 +106,14 @@ str_ends_with (const char *s1, const char *s2)
 {
 	// s1 has s2 at the end ?
 
-	size_t s1_len = strnlen(s1,MAX_LEN_SAFE_STRING);
-	size_t s2_len = strnlen(s2,MAX_LEN_SAFE_STRING);
+	int s1_len = strnlen(s1,MAX_LEN_SAFE_STRING);
+	int s2_len = strnlen(s2,MAX_LEN_SAFE_STRING);
 
 	if (s2_len > s1_len)
 		return false;
 
-	size_t i = s1_len;
-	size_t j = s2_len;
+	int i = s1_len;
+	int j = s2_len;
 
 	while (j >= 0) 
 	{
