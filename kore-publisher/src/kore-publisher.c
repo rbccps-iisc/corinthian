@@ -1325,7 +1325,7 @@ register_entity (struct http_request *req)
 	kore_pgsql_init(&sql);
 
 	if (! kore_pgsql_setup(&sql,"db",KORE_PGSQL_SYNC))
-	{	
+	{
 		kore_pgsql_logerror(&sql);
 		ERROR("DB error while setup");
 	}
@@ -2540,9 +2540,6 @@ follow (struct http_request *req)
 	if (is_owner(id,to))
 		status = "approved";
 
-	char follow_id  [10];
-	follow_id[0] = '\0';
-
 	int int_validity = strtonum(validity,1,10000,NULL);
 	if (int_validity <= 0)
 		BAD_REQUEST("validity must be in number of hours");
@@ -2578,6 +2575,8 @@ follow (struct http_request *req)
 
 	CREATE_STRING 	(query,"SELECT currval(pg_get_serial_sequence('follow','follow_id'))");
 	RUN_QUERY 	(query,"failed pg_get_serial");
+
+	const char *follow_id = kore_pgsql_getvalue(&sql,0,0);
 
 	if (strcmp(status,"approved") == 0)
 	{
