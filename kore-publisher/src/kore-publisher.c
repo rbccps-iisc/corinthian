@@ -1654,11 +1654,11 @@ search_catalog (struct http_request *req)
 
 		CREATE_STRING (query,
 				"SELECT id,schema FROM users WHERE id LIKE '%%/%%' "
-				"AND jsonb_typeof(schema->'tags') = 'array' " 
+				"AND jsonb_typeof(schema->'schema'->'tags') = 'array' " 
 				"AND ("
-					"(schema->'tags' ? LOWER('%s'))"
+					"(schema->'schema'->'tags' ? LOWER('%s'))"
 						" OR "
-					"(schema->'tags' ? '%s')"
+					"(schema->'schema'->'tags' ? '%s')"
 				") "
 				"ORDER BY id",
 					tag, 
@@ -1784,8 +1784,8 @@ catalog_tags (struct http_request *req)
 
 		"SELECT RTRIM(LTRIM(tag::TEXT,'('),')') as final_tag,"
 		"COUNT(tag) as tag_count FROM ("
-			"SELECT SUBSTRING(TRIM(LOWER(jsonb_array_elements_text(schema->'tags')::TEXT)) for 30) "
-			"FROM users WHERE jsonb_typeof(schema->'tags') = 'array'"
+			"SELECT SUBSTRING(TRIM(LOWER(jsonb_array_elements_text(schema->'schema'->'tags')::TEXT)) for 30) "
+			"FROM users WHERE jsonb_typeof(schema->'schema'->'tags') = 'array'"
 		") AS tag WHERE tag::TEXT NOT LIKE '%%\"%%' group by final_tag order by tag_count DESC"
 	);
 
