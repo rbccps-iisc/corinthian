@@ -747,16 +747,13 @@ publish (struct http_request *req)
 	OK_202();
 
 done:
-	if (req->status == 500)
+	if (req->status == 500 && cached_conn)
 	{
-		if (cached_conn)
-		{
-			amqp_channel_close	(*cached_conn, 1, AMQP_REPLY_SUCCESS);
-			amqp_connection_close	(*cached_conn,    AMQP_REPLY_SUCCESS);
-			amqp_destroy_connection	(*cached_conn);
+		amqp_channel_close	(*cached_conn, 1, AMQP_REPLY_SUCCESS);
+		amqp_connection_close	(*cached_conn,    AMQP_REPLY_SUCCESS);
+		amqp_destroy_connection	(*cached_conn);
 	
-			ht_delete(&connection_ht,key);
-		}
+		ht_delete(&connection_ht,key);
 	}
 
 	END();
@@ -1026,16 +1023,13 @@ subscribe (struct http_request *req)
 	OK();
 
 done:
-	if (req->status == 500)
+	if (req->status == 500 && cached_conn)
 	{
-		if (cached_conn)
-		{
-			amqp_channel_close	(*cached_conn, 1, AMQP_REPLY_SUCCESS);
-			amqp_connection_close	(*cached_conn,    AMQP_REPLY_SUCCESS);
-			amqp_destroy_connection	(*cached_conn);
-	
-			ht_delete(&connection_ht,key);
-		}
+		amqp_channel_close	(*cached_conn, 1, AMQP_REPLY_SUCCESS);
+		amqp_connection_close	(*cached_conn,    AMQP_REPLY_SUCCESS);
+		amqp_destroy_connection	(*cached_conn);
+
+		ht_delete(&connection_ht,key);
 	}
 
 	END();
@@ -1243,9 +1237,15 @@ register_entity (struct http_request *req)
 		"inputs missing in headers"
 	);
 
+/////////////////////////////////////////////////
+
 	// deny if the user is not a owner
 	if (! looks_like_a_valid_owner(id))
 		BAD_REQUEST("id is not valid");
+
+	// deny if the user is admin 
+	if (strcmp(id,"admin") == 0)
+		FORBIDDEN("admin cannot create entities");
 
 	// entity at the time of registration is simple alapha numeric
 	if (! is_alpha_numeric(entity))
@@ -1311,6 +1311,8 @@ register_entity (struct http_request *req)
 	gen_salt_password_and_apikey (entity_name, salt, password_hash, entity_apikey);
 
 	// use parameterized query for inserting json
+
+	// TODO: make schema.files in schema as []
 
 	CREATE_STRING (query,
 		"INSERT INTO users(id,password_hash,schema,salt,blocked,is_autonomous) "
@@ -1471,6 +1473,10 @@ deregister_entity (struct http_request *req)
 	// deny if the id does not look like an owner
 	if (! looks_like_a_valid_owner(id))
 		BAD_REQUEST("id is not an owner");
+
+	// deny if the user is admin 
+	if (strcmp(id,"admin") == 0)
+		FORBIDDEN("admin cannot create entities");
 
 	if (! is_string_safe(entity))
 		BAD_REQUEST("invalid entity");
