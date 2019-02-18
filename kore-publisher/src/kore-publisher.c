@@ -1314,7 +1314,7 @@ register_entity (struct http_request *req)
 
 	CREATE_STRING (query,
 		"INSERT INTO users(id,password_hash,schema,salt,blocked,is_autonomous) "
-		"VALUES('%s','%s','{\"files\":[],\"schema\":$1}','%s','f','%s')",	// $1 is the schema (in body) 
+		"VALUES('%s','%s',$1,'%s','f','%s')",	// $1 is the schema (in body) 
 		entity_name,
 		password_hash,
 		salt,
@@ -1654,11 +1654,11 @@ search_catalog (struct http_request *req)
 
 		CREATE_STRING (query,
 				"SELECT id,schema FROM users WHERE id LIKE '%%/%%' "
-				"AND jsonb_typeof(schema->'schema'->'tags') = 'array' " 
+				"AND jsonb_typeof(schema->'tags') = 'array' " 
 				"AND ("
-					"(schema->'schema'->'tags' ? LOWER('%s'))"
+					"(schema->'tags' ? LOWER('%s'))"
 						" OR "
-					"(schema->'schema'->'tags' ? '%s')"
+					"(schema->'tags' ? '%s')"
 				") "
 				"ORDER BY id",
 					tag, 
@@ -1784,8 +1784,8 @@ catalog_tags (struct http_request *req)
 
 		"SELECT RTRIM(LTRIM(tag::TEXT,'('),')') as final_tag,"
 		"COUNT(tag) as tag_count FROM ("
-			"SELECT SUBSTRING(TRIM(LOWER(jsonb_array_elements_text(schema->'schema'->'tags')::TEXT)) for 30) "
-			"FROM users WHERE jsonb_typeof(schema->'schema'->'tags') = 'array'"
+			"SELECT SUBSTRING(TRIM(LOWER(jsonb_array_elements_text(schema->'tags')::TEXT)) for 30) "
+			"FROM users WHERE jsonb_typeof(schema->'tags') = 'array'"
 		") AS tag WHERE tag::TEXT NOT LIKE '%%\"%%' group by final_tag order by tag_count DESC"
 	);
 
