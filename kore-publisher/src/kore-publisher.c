@@ -1046,7 +1046,6 @@ reset_apikey (struct http_request *req)
 	char new_apikey		[1 + MAX_LEN_APIKEY];
 	char password_hash	[1 + 2*SHA256_DIGEST_LENGTH];
 
-
 	req->status = 403;
 
 	BAD_REQUEST_if
@@ -1097,6 +1096,16 @@ reset_apikey (struct http_request *req)
 		FORBIDDEN("invalid id or apikey");
 
 /////////////////////////////////////////////////
+
+	CREATE_STRING(query,
+			"SELECT 1 FROM users WHERE id='%s'",
+				reset_api_key_for	
+	);
+
+	RUN_QUERY(query, "could not query the owner/entity");
+
+	if (kore_pgsql_ntuples(&sql) != 1)
+		BAD_REQUEST("invalid owner/entity");
 
 	gen_salt_password_and_apikey (
 		reset_api_key_for,
@@ -1192,6 +1201,16 @@ set_autonomous(struct http_request *req)
 		FORBIDDEN("invalid id or apikey");
 
 /////////////////////////////////////////////////
+
+	CREATE_STRING(query,
+			"SELECT 1 FROM users WHERE id='%s'",
+				entity	
+	);
+
+	RUN_QUERY(query, "could not query the entity");
+
+	if (kore_pgsql_ntuples(&sql) != 1)
+		BAD_REQUEST("invalid entity");
 
 	CREATE_STRING (query,
 		"UPDATE users SET is_autonomous = '%c' WHERE id = '%s'",
@@ -1495,10 +1514,10 @@ deregister_entity (struct http_request *req)
 			"SELECT 1 FROM users WHERE id = '%s'",
 				entity
 	);
+
 	RUN_QUERY(query,"could no query entity");
 
-	if (kore_pgsql_ntuples(&sql) != 1)
-		BAD_REQUEST("invalid entity");
+	int num_rows = kore_pgsql_ntuples(&sql);
 
 	// delete entries in to RabbitMQ
 	if (0 == pthread_create(&thread,NULL,delete_exchanges_and_queues,(void *)entity))
@@ -1514,16 +1533,16 @@ deregister_entity (struct http_request *req)
 
 	CREATE_STRING (query,
 		"DELETE FROM acl WHERE from_id = '%s' OR exchange LIKE '%s.%%'",
-		entity,
-		entity
+			entity,
+			entity
 	);
 
 	RUN_QUERY(query,"could not delete from acl table");
 
 	CREATE_STRING (query,
 		"DELETE FROM follow WHERE requested_by = '%s' OR exchange LIKE '%s.%%'",
-		entity,
-		entity
+			entity,
+			entity
 	);
 
 	RUN_QUERY(query,"could not delete from follow table");
@@ -1532,6 +1551,7 @@ deregister_entity (struct http_request *req)
 			"DELETE FROM users WHERE id = '%s'",
 				entity
 	);
+
 	RUN_QUERY (query,"could not delete the entity");
 
 	OK();
@@ -1549,6 +1569,12 @@ done:
 			kore_buf_reset(response);
 		}
 	}
+
+	/* if the entity did NOT exist, return BAD_REQUEST after we have
+		deleted all of its resources  */
+
+	if (num_rows != 1)
+		BAD_REQUEST("invalid entity");
 
 	END();
 }
@@ -3431,6 +3457,16 @@ block (struct http_request *req)
 /////////////////////////////////////////////////
 
 	CREATE_STRING(query,
+			"SELECT 1 FROM users WHERE id='%s'",
+				entity_to_be_blocked
+	);
+
+	RUN_QUERY(query, "could not query the owner/entity");
+
+	if (kore_pgsql_ntuples(&sql) != 1)
+		BAD_REQUEST("invalid owner/entity");
+
+	CREATE_STRING(query,
 			"UPDATE users set blocked='t' WHERE id='%s'",
 				entity_to_be_blocked	
 	);
@@ -3494,6 +3530,16 @@ unblock (struct http_request *req)
 		FORBIDDEN("invalid id or apikey");
 
 /////////////////////////////////////////////////
+
+	CREATE_STRING(query,
+			"SELECT 1 FROM users WHERE id='%s'",
+				entity_to_be_unblocked
+	);
+
+	RUN_QUERY(query, "could not query the owner/entity");
+
+	if (kore_pgsql_ntuples(&sql) != 1)
+		BAD_REQUEST("invalid owner/entity");
 
 	CREATE_STRING(query,
 			"UPDATE users set blocked='f' WHERE id='%s'",
