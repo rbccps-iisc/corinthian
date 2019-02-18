@@ -11,7 +11,7 @@ channel = None
 def run():
 
     admin_passwd 	= os.getenv("ADMIN_PWD")
-    postgres_passwd 	= os.getenv("POSTGRES_PWD") 
+    postgres_passwd 	= os.getenv("POSTGRES_PWD")
 
     conn = psycopg2.connect(database="postgres", user = "postgres", password = postgres_passwd, host = "127.0.0.1", port = "5432")
 
