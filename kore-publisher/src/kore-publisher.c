@@ -1312,11 +1312,9 @@ register_entity (struct http_request *req)
 
 	// use parameterized query for inserting json
 
-	// TODO: make schema.files in schema as []
-
 	CREATE_STRING (query,
 		"INSERT INTO users(id,password_hash,schema,salt,blocked,is_autonomous) "
-		"VALUES('%s','%s',$1,'%s','f','%s')",	// $1 is the schema (in body) 
+		"VALUES('%s','%s','{\"files\":[],\"schema\":$1}','%s','f','%s')",	// $1 is the schema (in body) 
 		entity_name,
 		password_hash,
 		salt,

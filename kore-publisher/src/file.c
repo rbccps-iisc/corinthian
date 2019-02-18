@@ -63,7 +63,7 @@ int upload_file (struct http_request *req)
 	// search in DB
 
 	CREATE_STRING (query,
-			"SELECT 1 FROM file where id='%s/%s'",
+			"SELECT 1 FROM file WHERE id='%s/%s'",
 				id,
 				file_name
 	);
