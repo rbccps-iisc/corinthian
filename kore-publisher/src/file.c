@@ -56,7 +56,6 @@ int upload_file (struct http_request *req)
 
 /////////////////////////////////////////////////
 
-	// get content-type and set in props
 	if (! http_request_header(req,"content-type",&content_type))
 		content_type = "";
 
@@ -68,17 +67,38 @@ int upload_file (struct http_request *req)
 				file_name
 	);
 
-	bool file_exists = false;
+	RUN_QUERY(query, "could not query the file");
 
-	if (file_exists)
+	if (kore_pgsql_ntuples(&sql) == 0) // file does not exist
 	{
+		CREATE_STRING (query,
+			"INSERT INTO file VALUES('%s/%s','%s')",
+				id,
+				file_name,
+				file_content
+		);
+
+		RUN_QUERY(query, "could not create the file");
+
 		// TODO: insert into catalog
-		// return 201
+
+		OK_201();
 	}
 	else
+	if (kore_pgsql_ntuples(&sql) == 1)
 	{
+		CREATE_STRING (query,
+			"UPDATE file set file_content='%s' WHERE id='%s/%s'",
+				id,
+				file_name,
+				file_content
+		);
+
+		RUN_QUERY(query, "could not update the file");
+
 		// TODO: update catalog
-		// return 200
+
+		OK();
 	}
 
 done:
