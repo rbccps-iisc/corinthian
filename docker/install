@@ -19,9 +19,6 @@ sudo chmod 1555   ../kore-publisher/jail/etc
 sudo chmod 1555   ../kore-publisher/jail/chroot
 sudo chmod 1555   ../kore-publisher/jail/chroot/etc
 
-sudo chown -R 0:0    ../kore-publisher/jail/ui
-sudo chmod -R 1555   ../kore-publisher/jail/ui
-
 sudo chown -R 0:0 ../authenticator/jail
 sudo chmod 1555   ../authenticator/jail
 sudo chmod 1555   ../authenticator/jail/etc
